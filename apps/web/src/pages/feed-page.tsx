@@ -22,9 +22,7 @@ export function FeedPage() {
 
   const [myPending, setMyPending] = useState<Post[]>([]);
 
-  const feedPosts = (feed.data?.items ?? []).filter((p) =>
-    ["APPROVED", "FLAGGED"].includes(p.state)
-  );
+  const feedPosts = (feed.data?.items ?? []).filter((p) => p.state === "APPROVED");
 
   const addPost = (body: string, spaceId: string) => {
     const society = (societies ?? []).find((s) => s.society_id === spaceId);

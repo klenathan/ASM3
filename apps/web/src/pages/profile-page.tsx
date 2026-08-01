@@ -5,10 +5,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/auth/auth-provider";
 import { useMe, useUpdateProfile, useUser, useUserPosts } from "@/lib/api/queries";
 import { toMember } from "@/lib/model";
+import { STUDY_AREAS } from "@/lib/model";
 
 import { MemberAvatar, RoleBadge } from "@/components/member-bits";
 import { PostCard } from "@/components/post-card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -64,9 +67,17 @@ export function ProfilePage() {
       )}
 
       {isSelf ? (
-        <EditProfileCard member={member} bio={targetUser.bio} />
+        <EditProfileCard
+          member={member}
+          bio={targetUser.bio}
+          major={targetUser.major}
+        />
       ) : (
-        <ViewProfileCard member={member} bio={targetUser.bio} />
+        <ViewProfileCard
+          member={member}
+          bio={targetUser.bio}
+          major={targetUser.major}
+        />
       )}
 
       <section aria-label="Posts" className="space-y-4">
@@ -100,12 +111,22 @@ export function ProfilePage() {
 function EditProfileCard({
   member,
   bio: initialBio,
+  major: initialMajor,
 }: {
   member: ReturnType<typeof toMember>;
   bio: string;
+  major: string;
 }) {
   const update = useUpdateProfile();
+  const defaultName = member.name === member.handle ? "" : member.name;
+  const [name, setName] = useState(defaultName);
   const [bio, setBio] = useState(initialBio);
+  const [major, setMajor] = useState(initialMajor);
+
+  const changed =
+    name.trim() !== defaultName.trim() ||
+    bio !== initialBio ||
+    major !== initialMajor;
 
   return (
     <section className="rounded-md border border-border bg-card p-6">
@@ -127,27 +148,73 @@ function EditProfileCard({
         className="mt-5 space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          update.mutate({ bio });
+          update.mutate({
+            display_name: name.trim(),
+            bio,
+            major,
+          });
         }}
       >
-        <label
-          htmlFor="profile-bio"
-          className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-        >
-          Bio
-        </label>
-        <Textarea
-          id="profile-bio"
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
-          placeholder="Tell your campus a little about yourself…"
-          maxLength={300}
-        />
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-name"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+          >
+            Name
+          </label>
+          <Input
+            id="profile-name"
+            autoComplete="name"
+            maxLength={60}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-major"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+          >
+            Study area
+          </label>
+          <NativeSelect
+            id="profile-major"
+            className="w-full"
+            value={major}
+            onChange={(e) => setMajor(e.target.value)}
+          >
+            <NativeSelectOption value="" disabled>
+              Select a study area…
+            </NativeSelectOption>
+            {STUDY_AREAS.map((area) => (
+              <NativeSelectOption key={area} value={area}>
+                {area}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-bio"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+          >
+            Bio
+          </label>
+          <Textarea
+            id="profile-bio"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="Tell your campus a little about yourself…"
+            maxLength={300}
+          />
+        </div>
         <div className="flex justify-end">
           <Button
             type="submit"
             size="sm"
-            disabled={update.isPending || bio === initialBio}
+            disabled={update.isPending || !changed}
           >
             {update.isPending ? (
               <>
@@ -170,9 +237,11 @@ function EditProfileCard({
 function ViewProfileCard({
   member,
   bio,
+  major,
 }: {
   member: ReturnType<typeof toMember>;
   bio: string;
+  major: string;
 }) {
   return (
     <section className="rounded-md border border-border bg-card p-6">
@@ -187,6 +256,11 @@ function ViewProfileCard({
           </div>
           <p className="text-sm text-muted-foreground">@{member.handle}</p>
           <p className="mt-1 text-xs text-muted-foreground">{member.school}</p>
+          {major && (
+            <p className="mt-1 text-xs font-medium text-foreground/80">
+              {major}
+            </p>
+          )}
         </div>
       </div>
       {bio && (

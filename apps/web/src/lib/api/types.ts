@@ -32,6 +32,7 @@ export interface User {
   handle: string;
   display_name: string;
   bio: string;
+  major: string;
   role: Role;
   status: UserStatus;
   institution_id: string;
@@ -42,7 +43,7 @@ export interface User {
 export interface UserProfileUpdate {
   display_name?: string;
   bio?: string;
-  handle?: string;
+  major?: string;
 }
 
 export interface Society {

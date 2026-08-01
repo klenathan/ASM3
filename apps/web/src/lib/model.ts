@@ -11,6 +11,22 @@ export interface Member {
   role: Role;
   school: string;
   bio: string;
+  major: string;
+}
+
+export function toMember(user: User): Member {
+  const name = user.display_name || user.handle || "Member";
+  return {
+    id: user.user_id,
+    name,
+    handle: user.handle || user.user_id,
+    initials: initialsOf(name),
+    avatarHue: hueOf(user.user_id || user.handle),
+    role: user.role,
+    school: schoolName(user.institution_id),
+    bio: user.bio,
+    major: user.major,
+  };
 }
 
 function initialsOf(name: string): string {
@@ -31,22 +47,35 @@ const SCHOOL_LABEL: Record<string, string> = {
   rmit: "RMIT University",
 };
 
+// Official RMIT study areas, mirrored from the "Study with us" navigation at
+// https://www.rmit.edu.au/study-with-us (22 entries as of August 2026).
+export const STUDY_AREAS: readonly string[] = [
+  "Architecture",
+  "Art",
+  "Aviation",
+  "Biomedical sciences",
+  "Building",
+  "Business",
+  "Communication",
+  "Design",
+  "Education",
+  "Engineering",
+  "Environment",
+  "Fashion",
+  "Game design",
+  "Health",
+  "Information technology",
+  "Languages",
+  "Law",
+  "Media",
+  "Property",
+  "Psychology",
+  "Science",
+  "Social and community",
+] as const;
+
 export function schoolName(institutionId: string): string {
   return SCHOOL_LABEL[institutionId] ?? institutionId.toUpperCase();
-}
-
-export function toMember(user: User): Member {
-  const name = user.display_name || user.handle || "Member";
-  return {
-    id: user.user_id,
-    name,
-    handle: user.handle || user.user_id,
-    initials: initialsOf(name),
-    avatarHue: hueOf(user.user_id || user.handle),
-    role: user.role,
-    school: schoolName(user.institution_id),
-    bio: user.bio,
-  };
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -59,6 +88,10 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export function isStaff(role: Role): boolean {
   return role !== "STUDENT";
+}
+
+export function isModerator(role: Role): boolean {
+  return role === "MODERATOR" || role === "RMIT_ADMIN" || role === "PLATFORM_ADMIN";
 }
 
 export const STATE_LABEL: Record<

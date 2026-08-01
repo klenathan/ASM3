@@ -31,7 +31,7 @@ AdminUser = Annotated[AuthenticatedUser, Depends(require_admin)]
 
 
 @router.get("/societies", response_model=list[Society])
-async def list_societies() -> list[Society]:
+async def list_societies(user: CurrentUser) -> list[Society]:
     return await run_in_threadpool(societies_service.list_societies, repo)
 
 
@@ -43,7 +43,7 @@ async def create_society(admin: AdminUser, payload: SocietyCreate) -> Society:
 
 
 @router.get("/r/{slug}", response_model=Society)
-async def society(slug: str) -> Society:
+async def society(user: CurrentUser, slug: str) -> Society:
     try:
         return await run_in_threadpool(societies_service.get_society, repo, slug)
     except NotFoundError as error:

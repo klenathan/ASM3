@@ -8,7 +8,7 @@ import {
   useDecideAppeal,
   useReport,
 } from "@/lib/api/queries";
-import { timeAgo } from "@/lib/model";
+import { isModerator, timeAgo } from "@/lib/model";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,7 @@ const REASONS = [
 
 export function ReportsAppealsPage() {
   const { user } = useAuth();
-  const isModerator =
-    user?.role === "MODERATOR" || user?.role === "RMIT_ADMIN" || user?.role === "PLATFORM_ADMIN";
+  const isMod = user ? isModerator(user.role) : false;
 
   return (
     <div className="space-y-8">
@@ -47,7 +46,7 @@ export function ReportsAppealsPage() {
         <AppealForm />
       </div>
 
-      {isModerator && <AppealsReview />}
+      {isMod && <AppealsReview />}
     </div>
   );
 }

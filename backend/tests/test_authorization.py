@@ -10,7 +10,7 @@ from rmit_society.errors import AuthorizationError, ValidationError_
 from rmit_society.repositories.dynamodb import DynamoDBRepository
 from rmit_society.services import feeds
 from rmit_society.services.content import ContentService
-from rmit_society.services.identity import bootstrap_user
+from rmit_society.services.identity import create_user_profile
 
 
 class QuietPublisher:
@@ -19,7 +19,13 @@ class QuietPublisher:
 
 
 def _make_user(repo: DynamoDBRepository, sub: str) -> User:
-    return bootstrap_user(repo, cognito_sub=sub, handle=f"u-{sub}", display_name=sub)
+    return create_user_profile(
+        repo,
+        cognito_sub=sub,
+        handle=f"s{abs(hash(sub)) % 10_000_000:07d}",
+        display_name=sub,
+        major="Engineering",
+    )
 
 
 def _make_society(repo: DynamoDBRepository, slug: str, owner_id: str) -> Society:

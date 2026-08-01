@@ -90,7 +90,6 @@ _GSIS = [
 def _create_resources() -> None:
     os.environ["AWS_DEFAULT_REGION"] = REGION
     os.environ["AWS_REGION"] = REGION
-    os.environ.pop("AWS_ENDPOINT_URL", None)
     dyn = boto3.client("dynamodb", region_name=REGION)
     dyn.create_table(
         TableName=TABLE,

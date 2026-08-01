@@ -5,9 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "RMIT Society API"
+    api_version: str = "0.1.0"
+    openapi_enabled: bool = True
+    openapi_server_url: str = ""
     environment: str = "local"
     aws_region: str = "ap-southeast-2"
-    aws_endpoint_url: str | None = None
 
     table_name: str = "rmit-society-local"
     media_bucket: str = "rmit-society-local-media"

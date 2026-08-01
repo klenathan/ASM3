@@ -4,7 +4,7 @@
 - **Working name:** TBD
 - **Product type:** School-focused social network and discussion forum
 - **Primary deployment:** AWS
-- **Local development:** MiniStack in Docker
+- **Local development:** host processes with moto-backed AWS adapter tests
 
 ## 1. Product summary
 
@@ -85,7 +85,9 @@ Create the safest useful digital common room for a school community: quick enoug
 
 - Sign up/sign in through Amazon Cognito
 - Verify institution membership using approved school email domains or admin-issued invitations
-- Create a profile with display name, handle, avatar, short bio, school, and role badge
+- Create a profile with display name, handle, avatar, short bio, school, study area/major, and role badge
+
+**Registration fields.** New users register with an RMIT student email, a display name, and a study area/major chosen from the official RMIT study-area list (22 entries mirrored from `rmit.edu.au/study-with-us`). The `s<number>` username/handle is derived from the validated email server-side and is immutable. In local development accounts are auto-confirmed; production requires email verification before a usable session is issued.
 - Enforce user status: `ACTIVE`, `SUSPENDED`, or `DEACTIVATED`
 - Support student, staff, moderator, school-admin, and platform-admin authorization
 - Sign out and deactivate account
@@ -297,7 +299,7 @@ No request-path access pattern may rely on an unbounded scan.
 | ------------------- | ------------------------- | ------------------------------------------------------------------ |
 | Web hosting         | S3 + CloudFront           | Private SPA origin and cached delivery                             |
 | Authentication      | Cognito                   | Sign-in, verified membership, role/tenant claims                   |
-| API                 | API Gateway + Lambda      | Authenticated forum and moderation endpoints                       |
+| API                 | EC2 + CloudFront          | Persistent FastAPI service behind same-origin HTTPS routing         |
 | Database            | DynamoDB                  | Social graph, content metadata, workflow state, notifications      |
 | Media               | S3                        | Quarantined and approved user uploads; analytics artifacts         |
 | Text moderation     | Comprehend                | Toxic-content classification                                       |
@@ -308,9 +310,7 @@ No request-path access pattern may rely on an unbounded scan.
 | Networking/security | VPC, security groups, IAM | Controlled compute access and least privilege                      |
 | Operations          | CloudWatch                | Logs, metrics, alarms, traces/correlation                          |
 
-Production must use real AWS endpoints. Local development routes supported AWS SDK calls to MiniStack at `http://localhost:4566` from the host or `http://ministack:4566` from containers.
-
-If MiniStack does not emulate a required AI behavior, a deterministic local provider returns versioned fixture results through the same interface. Local fallback must be obvious in configuration and must never activate silently in production.
+All deployed SDK calls use real AWS endpoints and the standard AWS credential chain. Host development uses moto-backed repository/provider tests and deterministic synthetic moderation fixtures. Local fallback must never activate silently in deployed `dev` or `prod` environments.
 
 ## 12. Non-functional requirements
 
@@ -406,7 +406,7 @@ Metrics must not incentivize suppressing legitimate reports or maximizing engage
 
 - Rename/remove CloudPulse legacy domain safely
 - Define DynamoDB access patterns and event schemas
-- Provision MiniStack-compatible identity substitute/test claims, API, tables, buckets, queues, and observability
+- Provision real AWS dev/prod identity, API, tables, buckets, queues, and observability through boto3 IaC
 - Establish CI checks and synthetic moderation fixtures
 
 ### Phase 1 — Forum core
@@ -440,7 +440,7 @@ MVP is releasable when:
 - Every privileged action and moderation transition is auditable.
 - Cross-tenant authorization, moderation failure, duplicate delivery, and provider timeout tests pass.
 - Core flows work with keyboard-only navigation and responsive mobile layouts.
-- Local end-to-end flow runs against MiniStack without real AWS credentials or paid AI calls.
+- Automated tests run without production AWS credentials or paid AI calls; AWS integration smoke tests target an isolated dev stage explicitly.
 - Production provisioning is rerunnable and uses least-privilege IAM, private storage, and operational alarms.
 - Product metrics use sanitized events and can be queried through the application-supported Athena workflow.
 
@@ -449,7 +449,7 @@ MVP is releasable when:
 Resolve before relevant implementation:
 
 1. Product name and visual identity
-2. Eligible institution domain/invitation policy
+2. ~~Eligible institution domain/invitation policy~~ — **Decided.** Self-service student registration requires an RMIT student email: local part `s<number>` (5–12 digits, no suffix letters) and a domain equal to or beneath one of the RMIT-owned campus suffixes `rmit.edu.au`, `rmit.edu.vn`, `rmit.eu`. The username/handle is derived server-side as `s<number>` and is immutable. Staff/admin/invitation provisioning is a separate admin flow.
 3. Minimum user age and applicable school/privacy policies
 4. Exact post/reply character, image size, and edit-window limits
 5. Whether school administrators may delegate space creation to students

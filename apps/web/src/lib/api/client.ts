@@ -1,15 +1,34 @@
 import { getAuthToken } from "./token";
 
 const API_BASE_URL: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://localhost:8000/api/v1";
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api/v1";
+
+function messageFromDetail(status: number, detail: unknown): string {
+  if (typeof detail === "string" && detail.trim() !== "") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const msg = (item as { msg?: unknown }).msg;
+        return typeof msg === "string" && msg.trim() !== "" ? msg : null;
+      })
+      .filter((part): part is string => part !== null);
+    if (parts.length > 0) return parts.join(" ");
+  }
+  if (detail && typeof detail === "object") {
+    const fallback = (detail as { message?: string }).message;
+    if (typeof fallback === "string" && fallback.trim() !== "")
+      return fallback;
+  }
+  return `Request failed (${status})`;
+}
 
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
 
   constructor(status: number, detail: unknown) {
-    super(typeof detail === "string" ? detail : `Request failed (${status})`);
+    super(messageFromDetail(status, detail));
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;

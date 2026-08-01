@@ -40,7 +40,12 @@ _combined.include_router(media_router)
 _combined.include_router(analytics_router)
 
 
-@_combined.get("/health")
+@_combined.get(
+    "/health",
+    tags=["system"],
+    summary="Check API health",
+    description="Returns a lightweight liveness response without requiring authentication.",
+)
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "rmit-society", "time": utc_now()}
 

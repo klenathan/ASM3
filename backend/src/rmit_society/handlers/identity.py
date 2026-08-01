@@ -24,17 +24,9 @@ CurrentUser = Annotated[AuthenticatedUser, Depends(resolve_current_user)]
 TokenClaims = Annotated[Claims, Depends(resolve_claims)]
 
 
-@router.post("/me/bootstrap", response_model=User, status_code=status.HTTP_201_CREATED)
+@router.post("/me/bootstrap", response_model=User)
 async def bootstrap(claims: TokenClaims) -> User:
-    return await run_in_threadpool(
-        identity_service.bootstrap_user,
-        repo,
-        cognito_sub=claims.subject,
-        handle=f"u{claims.subject[:8]}",
-        display_name=claims.subject[:12],
-        role=claims.role,
-        institution_id=claims.institution_id,
-    )
+    return await run_in_threadpool(identity_service.resolve_profile, repo, claims)
 
 
 @router.get("/me", response_model=User)
@@ -56,7 +48,7 @@ async def deactivate(user: CurrentUser) -> None:
 
 
 @router.get("/users/{handle}", response_model=User)
-async def user_by_handle(handle: str) -> User:
+async def user_by_handle(user: CurrentUser, handle: str) -> User:
     return await run_in_threadpool(identity_service.get_user_by_handle, repo, handle)
 
 

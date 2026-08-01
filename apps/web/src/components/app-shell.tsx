@@ -14,7 +14,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "@/auth/auth-provider";
 import { useSocieties } from "@/lib/api/queries";
-import { toMember, toSpace } from "@/lib/model";
+import { isModerator, toMember, toSpace } from "@/lib/model";
 
 import { MemberAvatar, RoleBadge } from "./member-bits";
 import { Button } from "./ui/button";
@@ -23,7 +23,7 @@ import { Link } from "react-router-dom";
 
 const NAV = [
   { to: "/feed", label: "Home", icon: Home },
-  { to: "/moderation", label: "Review", icon: ShieldCheck },
+  { to: "/moderation", label: "Review", icon: ShieldCheck, moderatorOnly: true },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/reports", label: "Reports", icon: Flag },
 ];
@@ -36,6 +36,9 @@ export function AppShell() {
 
   const member = user ? toMember(user) : undefined;
   const joined = (societies ?? []).map(toSpace);
+  const navItems = NAV.filter(
+    (item) => !item.moderatorOnly || (member && isModerator(member.role))
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -55,7 +58,7 @@ export function AppShell() {
           </Link>
 
           <nav className="ml-3 hidden items-center gap-1 md:flex">
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -138,7 +141,7 @@ export function AppShell() {
       <div className="mx-auto flex max-w-6xl flex-1 gap-6 px-3 py-6 sm:px-4">
         <aside className="hidden w-60 shrink-0 lg:block">
           <nav className="mb-4 flex flex-col gap-1">
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -182,10 +185,45 @@ export function AppShell() {
           </ul>
         </aside>
 
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 pb-16 md:pb-0">
           <Outlet />
         </main>
       </div>
+
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/90 backdrop-blur md:hidden"
+      >
+        <div className="mx-auto flex h-16 max-w-lg items-stretch justify-around px-2">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 py-1.5 text-[0.65rem] font-medium text-muted-foreground",
+                  isActive && "text-stamp"
+                )
+              }
+            >
+              <item.icon className="size-5" />
+              {item.label}
+            </NavLink>
+          ))}
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              cn(
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 py-1.5 text-[0.65rem] font-medium text-muted-foreground",
+                isActive && "text-stamp"
+              )
+            }
+          >
+            <UserRound className="size-5" />
+            Profile
+          </NavLink>
+        </div>
+      </nav>
     </div>
   );
 }

@@ -12,6 +12,7 @@ const currentUser: User = {
   handle: "ava",
   display_name: "Ava Patel",
   bio: "",
+  major: "Information technology",
   role: "STUDENT",
   status: "ACTIVE",
   institution_id: "rmit",

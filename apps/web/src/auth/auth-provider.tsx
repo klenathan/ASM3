@@ -13,7 +13,17 @@ export interface AuthContextValue {
   refresh: () => Promise<void>;
   signIn: (token: string) => Promise<User>;
   signInWithPassword: (username: string, password: string) => Promise<User>;
-  signUp: (username: string, password: string) => Promise<User>;
+  signUp: (payload: {
+    email: string;
+    password: string;
+    display_name: string;
+    major: string;
+  }) => Promise<{ username: string; confirmation_required: boolean }>;
+  confirmSignUp: (
+    username: string,
+    password: string,
+    confirmationCode: string
+  ) => Promise<User>;
   signOut: () => void;
 }
 
@@ -77,8 +87,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signUp = React.useCallback(
-    async (username: string, password: string) => {
-      const tokens = await endpoints.auth.signUp(username, password);
+    async (payload: {
+      email: string;
+      password: string;
+      display_name: string;
+      major: string;
+    }) => {
+      return endpoints.auth.signUp(payload);
+    },
+    []
+  );
+
+  const confirmSignUp = React.useCallback(
+    async (username: string, password: string, confirmationCode: string) => {
+      const tokens = await endpoints.auth.confirm(
+        username,
+        password,
+        confirmationCode
+      );
       return completeSignIn(tokens.access_token);
     },
     [completeSignIn]
@@ -104,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signInWithPassword,
       signUp,
+      confirmSignUp,
       signOut,
     }),
     [
@@ -116,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signInWithPassword,
       signUp,
+      confirmSignUp,
       signOut,
     ]
   );

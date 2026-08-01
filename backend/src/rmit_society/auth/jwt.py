@@ -20,11 +20,10 @@ class JwtVerifier(Protocol):
 
 
 class LocalJwtVerifier:
-    """Stateless, development-only identity substitute used against MiniStack.
+    """Stateless test-only identity substitute.
 
-    Encodes a signed, expiring payload that mirrors the shape of a Cognito
-    access token so callers exercise the same claim-parsing path as production.
-    It is never used when a real Cognito issuer is configured.
+    Encodes signed, expiring payloads that mirror Cognito access-token claims.
+    Deployed environments always configure and validate a real Cognito issuer.
     """
 
     def __init__(self, *, issuer: str = "local", audience: str = "local") -> None:
@@ -39,6 +38,7 @@ class LocalJwtVerifier:
         status: UserStatus = UserStatus.ACTIVE,
         ttl_s: int = 3600,
         institution_id: str = RMIT_INSTITUTION_ID,
+        cognito_username: str = "",
     ) -> str:
         from datetime import timedelta
 
@@ -56,6 +56,8 @@ class LocalJwtVerifier:
             "role": role.value,
             "status": status.value,
         }
+        if cognito_username:
+            payload["cognito:username"] = cognito_username
         import base64
         import hashlib
 
@@ -197,10 +199,9 @@ class CognitoJwtVerifier:
         return claims
 
 
-def _cognito_defaults(pool_id: str, region: str, endpoint_url: str | None) -> tuple[str, str]:
+def _cognito_defaults(pool_id: str, region: str) -> tuple[str, str]:
     issuer = f"https://cognito-idp.{region}.amazonaws.com/{pool_id}"
-    jwks_endpoint = endpoint_url.rstrip("/") if endpoint_url else issuer
-    return issuer, f"{jwks_endpoint}/{pool_id}/.well-known/jwks.json"
+    return issuer, f"{issuer}/.well-known/jwks.json"
 
 
 @lru_cache
@@ -214,7 +215,6 @@ def build_verifier() -> JwtVerifier:
         default_issuer, default_jwks_url = _cognito_defaults(
             settings.cognito_user_pool_id,
             settings.cognito_user_pool_region,
-            settings.aws_endpoint_url,
         )
         issuer = issuer or default_issuer
         jwks_url = jwks_url or default_jwks_url
@@ -230,9 +230,13 @@ def build_verifier() -> JwtVerifier:
 def claims_from_token(token: str) -> Claims:
     verifier = build_verifier()
     payload = verifier.verify(token)
+    cognito_username = str(
+        payload.get("cognito:username") or payload.get("username") or ""
+    )
     return Claims(
         subject=str(payload["sub"]),
         institution_id=str(payload.get("institution_id", RMIT_INSTITUTION_ID)),
         role=Role(payload.get("role", Role.STUDENT.value)),
         status=UserStatus(payload.get("status", UserStatus.ACTIVE.value)),
+        cognito_username=cognito_username,
     )

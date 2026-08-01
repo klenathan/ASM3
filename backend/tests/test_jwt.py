@@ -65,3 +65,12 @@ def test_suspended_status_reflected() -> None:
     token = verifier.issue(subject="u1", status=UserStatus.SUSPENDED)
     claims = claims_from_token(token)
     assert not claims.is_active
+
+
+def test_cognito_username_claim_populated() -> None:
+    verifier = _verifier()
+    token = verifier.issue(
+        subject="u1", cognito_username="s1234567@student.rmit.edu.au"
+    )
+    claims = claims_from_token(token)
+    assert claims.cognito_username == "s1234567@student.rmit.edu.au"

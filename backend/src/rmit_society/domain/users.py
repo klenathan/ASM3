@@ -16,6 +16,7 @@ class User(BaseModel):
     handle: str
     display_name: str = "Member"
     bio: str = ""
+    major: str = ""
     role: Role = Role.STUDENT
     status: UserStatus = UserStatus.ACTIVE
     institution_id: str = INSTITUTION_ID
@@ -26,4 +27,4 @@ class User(BaseModel):
 class UserProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=60)
     bio: str | None = Field(default=None, max_length=300)
-    handle: str | None = Field(default=None, min_length=3, max_length=30)
+    major: str | None = Field(default=None, max_length=80)

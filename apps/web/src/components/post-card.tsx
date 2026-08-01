@@ -21,6 +21,7 @@ function fallbackMember(post: Post): Member {
     role: "STUDENT",
     school: "",
     bio: "",
+    major: "",
   };
 }
 
@@ -102,7 +103,7 @@ export function PostCard({
     >
       <div className="flex flex-col overflow-hidden md:flex-row">
         <div
-          className="relative shrink-0 overflow-hidden border-b border-border md:w-2 md:border-0 md:border-r"
+          className="relative h-1.5 shrink-0 overflow-hidden border-b border-border md:h-auto md:w-2 md:border-0 md:border-r"
           style={{ background: `oklch(0.6 0.15 ${sp.hue})` }}
         >
           <span className="sr-only">{sp.name}</span>

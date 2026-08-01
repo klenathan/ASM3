@@ -1,9 +1,12 @@
+from rmit_society.auth.claims import Claims, Role, UserStatus
 from rmit_society.base import new_id, utc_now
 from rmit_society.domain.content import ContentVersion, Post
 from rmit_society.domain.enums import ContentState
 from rmit_society.domain.societies import Society, SocietyMembership
 from rmit_society.domain.users import User
+from rmit_society.errors import AuthenticationError
 from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.services.identity import create_user_profile, resolve_profile
 
 
 def _user(repo: DynamoDBRepository, sub: str) -> User:
@@ -44,6 +47,92 @@ def test_user_profile_and_handle_reservation(aws_resources) -> None:
     assert repo.get_user_by_handle(user.handle).user_id == user.user_id
     # Handle reservation is unique.
     assert repo.reserve_handle(user.handle, "other") is False
+
+
+def test_create_profile_is_idempotent_and_persists_major(aws_resources) -> None:
+    repo = DynamoDBRepository()
+    first = create_user_profile(
+        repo,
+        cognito_sub="sub-major",
+        handle="s1234567",
+        display_name="Alex",
+        major="Engineering",
+    )
+    second = create_user_profile(
+        repo,
+        cognito_sub="sub-major",
+        handle="s1234567",
+        display_name="Ignored",
+        major="Ignored",
+    )
+    assert second.user_id == first.user_id
+    assert second.display_name == "Alex"
+    assert second.major == "Engineering"
+    assert second.handle == "s1234567"
+    assert repo.get_user_by_cognito_sub("sub-major").user_id == first.user_id
+    assert repo.get_user_by_handle("s1234567").user_id == first.user_id
+
+
+def test_resolve_profile_rejects_unknown_and_mismatched_identity(aws_resources) -> None:
+    repo = DynamoDBRepository()
+    profile = create_user_profile(
+        repo,
+        cognito_sub="sub-profile",
+        handle="s1234567",
+        display_name="Alex",
+        major="Science",
+    )
+
+    # No Cognito username claim and no profile -> reject (bootstrap is read-only).
+    unknown = Claims(
+        subject="no-such-sub",
+        institution_id="rmit",
+        role=Role.STUDENT,
+        status=UserStatus.ACTIVE,
+    )
+    try:
+        resolve_profile(repo, unknown)
+        raise AssertionError("expected AuthenticationError")
+    except AuthenticationError:
+        pass
+
+    # Valid cognito username matching the stored handle resolves the profile.
+    matching = Claims(
+        subject="sub-profile",
+        institution_id="rmit",
+        role=Role.STUDENT,
+        status=UserStatus.ACTIVE,
+        cognito_username="s1234567@student.rmit.edu.au",
+    )
+    assert resolve_profile(repo, matching).user_id == profile.user_id
+
+    # Cognito username that does not match the stored handle is rejected.
+    mismatched = Claims(
+        subject="sub-profile",
+        institution_id="rmit",
+        role=Role.STUDENT,
+        status=UserStatus.ACTIVE,
+        cognito_username="s9999999@student.rmit.edu.au",
+    )
+    try:
+        resolve_profile(repo, mismatched)
+        raise AssertionError("expected AuthenticationError")
+    except AuthenticationError:
+        pass
+
+    # An ineligible (non-RMIT) cognito username is rejected.
+    ineligible = Claims(
+        subject="sub-profile",
+        institution_id="rmit",
+        role=Role.STUDENT,
+        status=UserStatus.ACTIVE,
+        cognito_username="student@example.com",
+    )
+    try:
+        resolve_profile(repo, ineligible)
+        raise AssertionError("expected AuthenticationError")
+    except AuthenticationError:
+        pass
 
 
 def test_society_slug_join_and_members(aws_resources) -> None:

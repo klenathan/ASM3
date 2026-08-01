@@ -1,120 +1,139 @@
-# Cloud Computing Assessment 3
+# RMIT Society — AWS deployment
 
-This repository uses [MiniStack](https://github.com/ministackorg/ministack) as the local AWS emulator. All emulated AWS APIs are available through `http://localhost:4566`.
+AI-assisted school forum deployed to real AWS. Infrastructure uses direct, idempotent boto3 reconciliation; no CloudFormation/CDK, Docker Compose, MiniStack, or local AWS emulator.
+
+## Architecture
+
+- private S3 web origin + CloudFront HTTPS delivery
+- same-origin CloudFront `/api/*` routing to FastAPI on EC2
+- Cognito verified-email user pool and public SPA client
+- DynamoDB single table with eight application GSIs
+- private S3 media/analytics buckets
+- EventBridge → FIFO SQS media routing, worker queues, and DLQs
+- Lambda moderation/image/event consumers
+- Comprehend and Rekognition moderation providers
+- immutable ECR repositories
+- ECS Fargate analytics task
+- Glue catalog, Athena workgroup, and CloudWatch logs
+- dedicated two-AZ VPC; EC2 port 8000 accepts only CloudFront origin traffic
 
 ## Prerequisites
 
-- Docker with Docker Compose
-- AWS CLI v2 for running the examples below
+- Python 3.12 and [uv](https://docs.astral.sh/uv/)
+- Node.js and pnpm
+- AWS CLI v2
+- AWS IAM Identity Center profile or role with provisioning permissions
+- immutable backend and worker images published by CI to provisioned ECR repositories
 
-## Start The Local AWS Emulator
+Never store AWS access keys, secret keys, or session tokens in `.env` or tracked files.
 
-The Compose setup is equivalent to the requested basic command:
+## 1. Authenticate and verify account
 
 ```sh
-docker run -p 4566:4566 ministackorg/ministack
+aws sso login --profile rmit-dev
+AWS_PROFILE=rmit-dev aws sts get-caller-identity
 ```
 
-It additionally persists state under `./temp-data/ministack-data` and mounts the Docker socket so MiniStack can run container-backed Lambda, ECS, and RDS resources.
+Record returned 12-digit account ID. Production deployment requires explicit account confirmation.
+
+## 2. Install and validate
 
 ```sh
-docker compose up -d
-docker compose ps
-curl http://localhost:4566/_ministack/health
-```
-
-Compose has usable defaults, so creating a `.env` file is optional. To customize the defaults:
-
-```sh
-cp .env.example .env
-```
-
-Stop MiniStack without deleting its state:
-
-```sh
-docker compose down
-```
-
-Delete MiniStack and all persisted local AWS state:
-
-```sh
-docker compose down
-rm -rf ./temp-data/ministack-data
-```
-
-## AWS CLI
-
-Load the local-only credentials and endpoint before using the AWS CLI:
-
-```sh
-set -a
-source .env 2>/dev/null || source .env.example
-set +a
-aws sts get-caller-identity
-aws s3 mb s3://asm3-local
-aws s3 ls
-```
-
-`AWS_ENDPOINT_URL` routes modern AWS CLI and SDK clients to MiniStack. If a tool does not support that environment variable, pass the endpoint explicitly:
-
-```sh
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
-```
-
-Use the same endpoint, region, and fake credentials when constructing application AWS SDK clients. Applications running on the host use `http://localhost:4566`; containers on the `asm3-local` Docker network use `http://ministack:4566`.
-
-## Backend
-
-The backend API runs as a persistent FastAPI server (`rmit_society.server:app`)
-rather than as Lambda functions, so local development is a plain uvicorn process
-against MiniStack — no Lambda zip packaging.
-
-```sh
-make deploy-local
-set -a
-source .env 2>/dev/null || source .env.example
-source .cloudpulse/local.env
-set +a
 cd backend
 uv sync
-uv run uvicorn rmit_society.server:app --app-dir src --port 8000
-# In another terminal:
-curl http://localhost:8000/api/v1/health
+uv run ruff check .
+uv run mypy
+uv run pytest
+
+cd ../apps/web
+pnpm install
+pnpm lint
+pnpm test
+pnpm build
 ```
 
-`make deploy-local` provisions Cognito and writes pool/client verifier settings to
-`.cloudpulse/local.env`. The local web login can create and sign in accounts
-through Cognito. `make dev-backend` loads this generated file automatically.
+Backend can run directly on host for unit/UI development:
 
-Sourcing the root environment file is required: it gives the host-run API the
-MiniStack endpoint and provisioned queue URLs. Without it, async moderation
-messages are not sent to the local queues.
-
-In dev/prod, `infra/deploy.py` launches an EC2 instance that runs the same
-backend image on port 8000. In `--stage local`, the deploy also launches the
-EC2 instance against MiniStack (so the EC2 resource, security group, IAM
-instance profile, AMI lookup, and idempotent reuse are exercised by the deploy
-workflow), but MiniStack only emulates the instance as `running` and cannot
-boot the Docker container, so the real API still runs via host uvicorn against
-MiniStack. SQS consumers (moderation/image/events) remain Lambda functions and
-may move to the EC2 container later.
-
-The real AWS deployment is still a scaffold, not production-ready: hosted Cognito
-UI wiring, TLS/edge routing, CloudFront provisioning, backend health-gated
-deployments, and running-instance image updates remain incomplete.
-
-## Assessment Service Coverage
-
-The assessment requires services from Compute, Containers, Storage, Networking and Content Delivery, Database, and Analytics. MiniStack can locally emulate suitable services in each category, including Lambda, ECS, S3, API Gateway, DynamoDB/RDS, and EMR/Athena.
-
-The default image requested for this project uses MiniStack's mock Athena engine. For real local Athena SQL execution through DuckDB, set this in `.env`:
-
-```dotenv
-MINISTACK_IMAGE=ministackorg/ministack:full
+```sh
+cd backend
+uv run uvicorn rmit_society.server:app --reload --app-dir src --port 8000
 ```
 
-MiniStack is only a local development and integration-test environment. The assessment specification also requires the completed application to be deployed to AWS, and every claimed service must be invoked automatically by application operations rather than only through the AWS CLI or console.
+Swagger UI: `http://localhost:8000/docs`. Host development uses mocks/test fixtures or explicitly configured AWS dev resources; it never redirects SDK calls to a local emulator.
 
-## Security
+## 3. Bootstrap AWS resources
 
-The credentials in `.env.example` are fake and valid only for MiniStack. `.env` files are ignored by Git. Never put real AWS access keys in this repository.
+Bootstrap creates shared resources and immutable ECR repositories, but does not launch application compute without release images.
+
+```sh
+AWS_PROFILE=rmit-dev \
+AWS_ACCOUNT_ID=123456789012 \
+make bootstrap STAGE=dev AWS_REGION=ap-southeast-2
+```
+
+Outputs are written to `.deploy/dev.json` (ignored by Git). Use `repositories.backend` and `repositories.worker` as CI image destinations. Tag images with release SHA/version; `latest` is rejected.
+
+Production:
+
+```sh
+AWS_PROFILE=rmit-prod \
+AWS_ACCOUNT_ID=123456789012 \
+make bootstrap STAGE=prod AWS_REGION=ap-southeast-2
+```
+
+## 4. Build release artifacts
+
+Build frontend with same-origin API default:
+
+```sh
+cd apps/web
+pnpm build
+cd ../..
+```
+
+Build and push these container definitions from a CI runner, not local deployment tooling:
+
+- `backend/Dockerfile` → `repositories.backend:<release>`
+- `backend/Dockerfile.worker` → `repositories.worker:<release>`
+
+ECR repositories are immutable and retain 20 release images. IaC never invokes a local container runtime.
+
+## 5. Deploy
+
+```sh
+AWS_PROFILE=rmit-dev \
+AWS_ACCOUNT_ID=123456789012 \
+BACKEND_IMAGE=123456789012.dkr.ecr.ap-southeast-2.amazonaws.com/rmit-society-dev-backend:<release> \
+WORKER_IMAGE=123456789012.dkr.ecr.ap-southeast-2.amazonaws.com/rmit-society-dev-worker:<release> \
+make deploy STAGE=dev AWS_REGION=ap-southeast-2
+```
+
+Full deployment:
+
+1. reconciles foundational resources
+2. registers ECS task definition with immutable worker image
+3. reconciles Cognito
+4. launches/reuses EC2 backend for immutable backend image
+5. packages and updates SQS Lambda consumers
+6. creates/updates CloudFront OAC and distribution
+7. updates Cognito callback/logout URLs
+8. uploads `apps/web/dist`
+9. invalidates CloudFront cache
+
+Final URL, Cognito IDs, resource names, and deployment status are in `.deploy/<stage>.json`.
+
+## Configuration
+
+`.env.example` contains placeholders only. AWS credentials use standard boto3 credential chain. Deployed runtime configuration is injected by IaC. Important optional variables:
+
+- `CORS_ORIGINS` — host-development origins; deployed SPA uses same-origin routing
+- `BACKEND_INSTANCE_TYPE` — defaults to `t3.micro`
+- `OPENAPI_ENABLED` — disable public API docs in production if required
+
+## Safety
+
+- `prod` requires `--expected-account-id` / `AWS_ACCOUNT_ID`.
+- Provisioning is rerunnable and non-destructive; no teardown command is provided.
+- DynamoDB deletion protection and point-in-time recovery are enabled in production.
+- Buckets remain private, encrypted, versioned, and blocked from public access.
+- Moderation failures remain fail-closed in application workflows.

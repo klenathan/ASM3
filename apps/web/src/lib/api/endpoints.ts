@@ -21,7 +21,7 @@ import type {
   UserProfileUpdate,
 } from "./types";
 
-interface LocalAuthTokens {
+interface AuthTokens {
   access_token: string;
   expires_in: number;
   token_type: string;
@@ -30,9 +30,23 @@ interface LocalAuthTokens {
 export const endpoints = {
   auth: {
     signIn: (username: string, password: string) =>
-      api.post<LocalAuthTokens>("/auth/local/sign-in", { username, password }),
-    signUp: (username: string, password: string) =>
-      api.post<LocalAuthTokens>("/auth/local/sign-up", { username, password }),
+      api.post<AuthTokens>("/auth/sign-in", { username, password }),
+    signUp: (payload: {
+      email: string;
+      password: string;
+      display_name: string;
+      major: string;
+    }) =>
+      api.post<{ username: string; confirmation_required: boolean }>(
+        "/auth/sign-up",
+        payload
+      ),
+    confirm: (username: string, password: string, confirmationCode: string) =>
+      api.post<AuthTokens>("/auth/confirm", {
+        username,
+        password,
+        confirmation_code: confirmationCode,
+      }),
   },
   me: {
     bootstrap: () => api.post<User>("/me/bootstrap"),

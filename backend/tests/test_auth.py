@@ -36,10 +36,36 @@ def test_sign_up_returns_actionable_password_validation_error(
 
     with pytest.raises(ValidationError_) as raised:
         auth.sign_up(
-            auth.Credentials(
-                username="student@example.com",
+            auth.RegistrationCredentials(
+                email="s1234567@student.rmit.edu.au",
                 password="Password123!",
+                display_name="Alex",
+                major="Engineering",
             )
         )
 
     assert "uppercase, lowercase, number, and symbol" in raised.value.message
+
+
+def test_sign_up_rejects_non_rmit_email_before_calling_cognito(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    def fail(**kwargs: object) -> None:
+        del kwargs
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(auth, "_cognito", lambda: SimpleNamespace(sign_up=fail))
+
+    with pytest.raises(ValidationError_):
+        auth.sign_up(
+            auth.RegistrationCredentials(
+                email="student@example.com",
+                password="Password123!",
+                display_name="Alex",
+                major="Engineering",
+            )
+        )
+    assert called is False

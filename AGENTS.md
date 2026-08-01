@@ -24,15 +24,13 @@ This is a social forum first. AI moderation supports the community; it is not th
 - `apps/web/` — React 19, TypeScript, Vite, Tailwind CSS, shadcn/Base UI frontend
 - `backend/` — Python 3.12, FastAPI, Pydantic, boto3; EC2 server app + Lambda SQS consumers and ECS worker
 - `backend/tests/` — pytest tests
-- `infra/` — idempotent boto3 provisioning and Lambda packaging
-- `compose.yaml` — local MiniStack AWS emulator
-- `temp-data/` — generated local MiniStack state; never edit or commit
-- `README.md` — local environment instructions
+- `infra/` — service-focused, idempotent boto3 provisioning and Lambda packaging
+- `README.md` — host development and real AWS deployment instructions
 - `PRODUCT.md` — product scope, flows, safety policy, and success criteria
 
 ## Target architecture
 
-Use managed AWS services in production and MiniStack through Docker for local AWS integration.
+Use managed AWS services in deployed dev/prod stages. Use moto and deterministic fixtures for host-side AWS adapter tests; no local AWS emulator.
 
 - **Web:** React SPA hosted in private S3 and delivered by CloudFront
 - **Identity:** Amazon Cognito; verified institution membership and role claims
@@ -49,24 +47,14 @@ Every AWS service claimed by the assessment must be invoked by an application wo
 
 Do not introduce another cloud, database, auth provider, or infrastructure framework without explicit approval. Existing infrastructure uses direct boto3 reconciliation rather than CloudFormation/CDK; preserve that approach unless requirements change.
 
-## Local AWS development
+## AWS development
 
-MiniStack is the default local AWS environment.
-
-```sh
-docker compose up -d
-docker compose ps
-curl http://localhost:4566/_ministack/health
-```
-
-Copy `.env.example` to `.env` only when overrides are needed. Credentials in `.env.example` are intentionally fake.
-
-- Host applications use `http://localhost:4566`.
-- Containers on `asm3-local` use `http://ministack:4566`.
-- Route boto3 clients through centralized settings and `AWS_ENDPOINT_URL`; do not scatter endpoint checks.
-- Use the same domain interfaces in local and AWS environments.
-- When MiniStack cannot emulate an AI response, use a deterministic local moderation adapter/fixture behind the production interface. Never call paid production AI services from local tests by default.
-- Tests must not depend on persisted `temp-data/` state or execution order.
+- Authenticate through AWS IAM Identity Center, `AWS_PROFILE`, or attached roles. Never track access keys or session tokens.
+- Run automated AWS adapter tests with moto and deterministic moderation fixtures. Never call paid moderation APIs from tests by default.
+- Run integration smoke tests only against an explicitly selected isolated `dev` stage.
+- boto3 clients use normal AWS regional endpoints; do not add endpoint overrides or emulator branches.
+- `.env.example` contains placeholders only. Runtime resource values come from `.deploy/<stage>.json` and IaC-injected environment variables.
+- Tests must not depend on external AWS state or execution order unless explicitly marked as integration tests.
 
 ## Core domain rules
 
@@ -121,14 +109,25 @@ uv run pytest
 Local API example:
 
 ```sh
-uv run uvicorn cloudpulse.handlers.observations:app --reload --app-dir src --port 8000
+uv run uvicorn rmit_society.server:app --reload --app-dir src --port 8000
 ```
+
+OpenAPI/Swagger UI is available at `http://localhost:8000/docs`; ReDoc is at
+`http://localhost:8000/redoc`; raw schema is at `http://localhost:8000/openapi.json`.
+API routes use `/api/v1`. Protected operations document Cognito `bearerAuth`.
+
+Before implementing frontend API calls, start the backend and inspect `/docs` or
+`/openapi.json` for current paths, request models, response models, status codes, and
+authentication requirements. Do not infer API contracts from legacy CloudPulse code.
 
 Rename the Python package and handler paths only as a coordinated migration across packaging, tests, Docker, and infrastructure.
 
 ## Frontend conventions
 
 - Use TypeScript strictness and the `@/` source alias.
+- Explore the backend OpenAPI page at `http://localhost:8000/docs` before coding
+  frontend integrations; use `/openapi.json` when inspecting the machine-readable
+  contract.
 - Prefer existing UI primitives in `apps/web/src/components/ui/` over new dependencies or custom replacements.
 - Keep server state in TanStack Query; keep ephemeral presentation state local.
 - Centralize API calls, runtime configuration, auth token handling, and error mapping.
@@ -152,18 +151,18 @@ Use `pnpm` only. Update `pnpm-lock.yaml` through pnpm; never edit it manually.
 
 - Provisioning must be rerunnable and converge safely in `local`, `dev`, and `prod` stages.
 - Derive resource names from project and stage. Never hard-code account IDs, real ARNs, VPC IDs, or credentials.
-- Keep local endpoint handling compatible with MiniStack and production handling compatible with AWS.
+- Keep boto3 clients on standard AWS endpoints and credential chain; validate target account before provisioning.
 - Encrypt stored data, block public S3 access, configure CORS narrowly, and set retention/lifecycle rules.
 - Add retries, DLQs, alarms, log retention, and least-privilege policies with asynchronous resources.
 - Destructive migrations, deployments, and teardown require explicit user approval.
-- Do not manually edit generated archives, build output, `.cloudpulse/`, `node_modules/`, or MiniStack state.
+- Do not manually edit generated archives, build output, `.deploy/`, or `node_modules/`.
 
 ## Testing expectations
 
 For each behavior change, cover the smallest relevant layers:
 
 - Domain/unit tests for moderation decisions and authorization
-- Repository/provider tests with mocks or MiniStack where AWS semantics matter
+- Repository/provider tests with moto/mocks; isolated AWS dev smoke tests where real semantics matter
 - API tests for success, validation, unauthorized, forbidden, tenant-boundary, and conflict paths
 - Frontend tests for user-visible state and accessibility-sensitive interactions
 - End-to-end smoke path when a cross-service flow changes
@@ -189,6 +188,6 @@ A feature is done when:
 - Authorization, tenant isolation, moderation state, retries, and failure behavior are defined.
 - Relevant tests pass without relying on production AWS or persisted local state.
 - Accessibility and responsive behavior are checked.
-- New AWS resources are provisioned idempotently for MiniStack and AWS, or local limitations are documented with deterministic adapters.
+- New AWS resources are provisioned idempotently in real AWS dev/prod stages; tests use deterministic adapters without paid calls.
 - Logs and analytics exclude sensitive content.
 - Commands, configuration, interfaces, and architectural decisions are documented.

@@ -1,50 +1,40 @@
 # RMIT Society backend
 
-The backend is a single FastAPI application (`rmit_society.server:app`) that runs
-as a persistent server — an EC2 instance in dev/prod, or plain uvicorn locally —
-rather than as per-domain Lambda functions.
+FastAPI application deployed as persistent EC2 service. SQS moderation, image, and event consumers deploy as Lambda functions; aggregate analytics runs as on-demand ECS Fargate task.
 
-From the repository root, provision MiniStack and load host-local AWS settings
-before starting Uvicorn:
+## Host development
+
+No local container or AWS emulator is required.
 
 ```sh
-make deploy-local
-set -a
-source .env 2>/dev/null || source .env.example
-set +a
-cd backend
 uv sync
-uv run uvicorn rmit_society.server:app --app-dir src --port 8000
+uv run uvicorn rmit_society.server:app --reload --app-dir src --port 8000
 ```
 
-The API mounts all domain routers under `/api/v1` and exposes `/api/v1/health`.
-`rmit_society.local:app` remains as a backward-compatible alias for that app.
-
-SQS consumers (moderation, image, event) still deploy as Lambda functions
-(`rmit_society.workers.lambda_handlers.*`) triggered by event-source mappings;
-they may move onto the EC2 backend container later.
+Use moto-backed tests for AWS adapters. For explicit integration testing, configure isolated `dev` AWS resources from `.deploy/dev.json`; never use production resources or paid moderation calls from automated tests.
 
 ## Package layout
 
-- `rmit_society/api.py` — ASGI app factory with narrow CORS and domain-error handlers
-- `rmit_society/server.py` — canonical combined app (all routers under `/api/v1`)
-- `rmit_society/aws.py` — centralized boto3 client/resource through `AWS_ENDPOINT_URL`
-- `rmit_society/config.py` — pydantic-settings configuration
-- `rmit_society/base.py` — UTC timestamps, opaque IDs, tamper-resistant cursor codec
-- `rmit_society/auth/` — Cognito/local JWT verification, role claims, FastAPI dependencies
+- `rmit_society/api.py` — ASGI factory, CORS, domain-error handlers
+- `rmit_society/server.py` — combined app under `/api/v1`
+- `rmit_society/aws.py` — boto3 clients using standard AWS credential chain
+- `rmit_society/config.py` — Pydantic runtime configuration
+- `rmit_society/auth/` — Cognito JWT verification and authorization dependencies
 - `rmit_society/domain/` — Pydantic entities and enums
-- `rmit_society/repositories/` — repository protocols and DynamoDB single-table adapter
-- `rmit_society/services/` — identity, societies, content, feeds, engagement, moderation, media, analytics
-- `rmit_society/providers/` — Comprehend, Rekognition, local deterministic moderation, SQS, S3 media
-- `rmit_society/handlers/` — `APIRouter`s per domain (mounted by `server.py`) + legacy Lambda `handler`s
-- `rmit_society/workers/` — SQS moderation/image/event consumers and the ECS analytics worker
+- `rmit_society/repositories/` — protocols and DynamoDB single-table adapter
+- `rmit_society/services/` — application/domain services
+- `rmit_society/providers/` — Comprehend, Rekognition, SQS, and S3 adapters
+- `rmit_society/handlers/` — FastAPI routers
+- `rmit_society/workers/` — Lambda consumers and ECS analytics worker
 
-## Entry points
+## Entrypoints
 
-- Server (EC2 / local): `uvicorn rmit_society.server:app`
-- Docker: `backend/Dockerfile` runs the server on port 8000 (used by the EC2 backend)
-- SQS Lambda consumers: `rmit_society.workers.lambda_handlers.{moderation_handler,image_handler,event_handler}`
-- ECS analytics worker: `python -m rmit_society.workers.analytics`
+- EC2 server image: `backend/Dockerfile`
+- Lambda consumers: `rmit_society.workers.lambda_handlers.{moderation_handler,image_handler,event_handler}`
+- ECS worker image: `backend/Dockerfile.worker`
+- ECS worker command: `python -m rmit_society.workers.analytics`
+
+Container images are built by CI and supplied to boto3 IaC as immutable ECR release URIs. Provisioning does not build images.
 
 ## Checks
 

@@ -368,7 +368,7 @@ Required GSIs or equivalent projection items:
 1.  Analytics: Replace weather exports with sanitized forum events, then adapt ECS, Glue, Athena, and admin APIs.
 1.  Infrastructure cutover: Add new routes/resources and remove stale CloudPulse routes from reconciliation.
 1.  Cleanup: Delete legacy weather code only after forum handlers and tests pass.
-1.  Documentation: Update root/backend README, environment examples, route documentation, data retention, and local MiniStack workflow.
+1.  Documentation: Update root/backend README, environment examples, route documentation, data retention, and real AWS workflow.
 1.  Required Verification
     Run:
     cd backend
@@ -394,6 +394,6 @@ Required GSIs or equivalent projection items:
 - Moderator override and appeal reversal
 - Deleted and blocked content visibility
 - No sensitive data in logs or analytics
-- MiniStack workflows without production AI calls
+- Moto-backed test workflows without production AI calls
 - Idempotent infrastructure reconciliation
   The next implementation agent should execute this plan incrementally and keep the application runnable throughout, rather than deleting the CloudPulse package before replacement handlers exist.
