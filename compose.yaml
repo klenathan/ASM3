@@ -1,0 +1,37 @@
+services:
+  ministack:
+    image: ${MINISTACK_IMAGE:-ministackorg/ministack:latest}
+    ports:
+      - "${MINISTACK_PORT:-4566}:4566"
+    environment:
+      GATEWAY_PORT: "4566"
+      MINISTACK_HOST: localhost
+      MINISTACK_ACCOUNT_ID: ${MINISTACK_ACCOUNT_ID:-000000000000}
+      MINISTACK_REGION: ${AWS_REGION:-ap-southeast-2}
+      LOG_LEVEL: ${MINISTACK_LOG_LEVEL:-INFO}
+      PERSIST_STATE: "1"
+      STATE_DIR: /data/state
+      S3_PERSIST: "1"
+      S3_DATA_DIR: /data/s3
+      LAMBDA_EXECUTOR: docker
+      DOCKER_NETWORK: ${MINISTACK_DOCKER_NETWORK:-asm3-local}
+    volumes:
+      - ./temp-data/ministack-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - default
+    restart: unless-stopped
+
+networks:
+  default:
+    name: ${MINISTACK_DOCKER_NETWORK:-asm3-local}

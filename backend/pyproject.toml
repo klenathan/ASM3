@@ -1,0 +1,47 @@
+[project]
+name = "cloudpulse-backend"
+version = "0.1.0"
+description = "Serverless API and analytics worker for CloudPulse"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3>=1.42.0,<2",
+  "fastapi>=0.135.0,<1",
+  "httpx>=0.28.0,<1",
+  "mangum>=0.21.0,<1",
+  "pydantic-settings>=2.13.0,<3",
+  "uvicorn[standard]>=0.42.0,<1",
+]
+
+[dependency-groups]
+dev = [
+  "moto[dynamodb,s3]>=5.1.0,<6",
+  "mypy>=1.19.0,<2",
+  "pytest>=9.0.0,<10",
+  "pytest-asyncio>=1.3.0,<2",
+  "ruff>=0.15.0,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cloudpulse"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["cloudpulse"]
