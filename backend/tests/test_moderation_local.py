@@ -1,5 +1,5 @@
-from rmit_society.domain.enums import ModerationDecision, RiskLevel
-from rmit_society.providers.local_moderation import LocalTextModerator
+from rmit_society.moderation.providers import LocalTextModerator
+from rmit_society.shared.enums import ModerationDecision, RiskLevel
 
 
 def _moderate(text: str):

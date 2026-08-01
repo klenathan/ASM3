@@ -9,7 +9,7 @@ concrete driver, so the switch is a configuration change.
 from __future__ import annotations
 
 from rmit_society.config import get_settings
-
+from rmit_society.repositories.dynamodb import DynamoDBRepository
 from rmit_society.repositories.interfaces import Repository
 from rmit_society.repositories.postgres import PostgresRepository
 
@@ -22,10 +22,14 @@ def get_repository() -> Repository:
     if _repository is None:
         settings = get_settings()
 
-        _repository = PostgresRepository(
-            settings.database_url,
-            auto_create=settings.database_auto_create,
-        )
+        if settings.database_driver == "dynamodb":
+            # Compatibility path for legacy host tests; deployed settings use PostgreSQL.
+            _repository = DynamoDBRepository()
+        else:
+            _repository = PostgresRepository(
+                settings.database_url,
+                auto_create=settings.database_auto_create,
+            )
     return _repository
 
 

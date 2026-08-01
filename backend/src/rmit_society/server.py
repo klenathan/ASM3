@@ -18,11 +18,12 @@ from fastapi import APIRouter
 
 from rmit_society.analytics.api import router as analytics_router
 from rmit_society.api import create_api
-from rmit_society.base import utc_now
 from rmit_society.community.api import router as community_router
-from rmit_society.identity.api import auth_router, router as identity_router
+from rmit_society.identity.api import auth_router
+from rmit_society.identity.api import router as identity_router
 from rmit_society.media.api import router as media_router
 from rmit_society.moderation.api import router as moderation_router
+from rmit_society.system.controllers.health_routes import health
 
 app = create_api("RMIT Society local API")
 
@@ -41,8 +42,8 @@ _combined.include_router(analytics_router)
     summary="Check API health",
     description="Returns a lightweight liveness response without requiring authentication.",
 )
-async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "rmit-society", "time": utc_now()}
+async def health_route() -> dict[str, str]:
+    return health()
 
 
 app.include_router(_combined, prefix="/api/v1")

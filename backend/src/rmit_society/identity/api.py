@@ -22,11 +22,12 @@ from rmit_society.config import get_settings
 from rmit_society.errors import AuthenticationError, NotFoundError, ValidationError_
 from rmit_society.identity import application as identity_service
 from rmit_society.identity.domain import (
+    User,
+    UserProfileUpdate,
     derive_username_from_email,
     validate_display_name,
     validate_study_area,
 )
-from rmit_society.identity.domain import User, UserProfileUpdate
 from rmit_society.repositories.factory import get_repository
 
 repo = get_repository()

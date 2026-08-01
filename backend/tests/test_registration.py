@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from rmit_society.domain.registration import (
+from rmit_society.errors import ValidationError_
+from rmit_society.identity.domain import (
     ALLOWED_CAMPUS_SUFFIXES,
     STUDY_AREAS,
     VALID_STUDY_AREAS,
@@ -10,7 +11,6 @@ from rmit_society.domain.registration import (
     validate_display_name,
     validate_study_area,
 )
-from rmit_society.errors import ValidationError_
 
 
 @pytest.mark.parametrize(

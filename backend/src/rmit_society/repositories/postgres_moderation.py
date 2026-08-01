@@ -12,11 +12,11 @@ from rmit_society.repositories.postgres_base import (
     Comments,
     ModerationDecisions,
     ModerationJobs,
+    PostgresRepositoryBase,
     Posts,
     _as_dict,
     _dialect_insert,
     _dump,
-    PostgresRepositoryBase,
 )
 from rmit_society.shared.events import AuditEvent
 
@@ -33,7 +33,9 @@ class ModerationRepository(PostgresRepositoryBase):
 
     def get_job(self, content_id: str) -> ModerationJob | None:
         with self._session() as session:
-            row = session.scalars(select(ModerationJobs).where(ModerationJobs.content_id == content_id)).first()
+            row = session.scalars(
+                select(ModerationJobs).where(ModerationJobs.content_id == content_id)
+            ).first()
             return ModerationJob.model_validate(_as_dict(row)) if row else None
 
     def update_job_state(self, content_id: str, state: str, decision: str, retries: int) -> None:
@@ -59,7 +61,9 @@ class ModerationRepository(PostgresRepositoryBase):
 
     def list_queue(self, state: str) -> list[str]:
         with self._session() as session:
-            post_rows = session.execute(select(Posts.post_id, Posts.created_at).where(Posts.state == state)).all()
+            post_rows = session.execute(
+                select(Posts.post_id, Posts.created_at).where(Posts.state == state)
+            ).all()
             comment_rows = session.execute(
                 select(Comments.comment_id, Comments.created_at).where(Comments.state == state)
             ).all()
@@ -95,7 +99,11 @@ class ModerationRepository(PostgresRepositoryBase):
 
     def append_audit(self, event: AuditEvent) -> None:
         with self._session.begin() as session:
-            session.execute(_dialect_insert(self._engine, AuditEvents).values(**_dump(event)).on_conflict_do_nothing())
+            session.execute(
+                _dialect_insert(self._engine, AuditEvents)
+                .values(**_dump(event))
+                .on_conflict_do_nothing()
+            )
 
     def list_audit(self, target_type: str, target_id: str) -> list[AuditEvent]:
         del target_type

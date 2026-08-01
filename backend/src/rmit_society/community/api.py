@@ -6,7 +6,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.concurrency import run_in_threadpool
-from mangum import Mangum
 
 from rmit_society.api import create_api
 from rmit_society.auth.dependencies import (
@@ -68,7 +67,7 @@ def _load_posts(content_ids: list[str]) -> list[Post]:
 
 @router.get("/societies", response_model=list[Society])
 async def list_societies(user: CurrentUser) -> list[Society]:
-    return await run_in_threadpool(SocietyService.list, repo)
+    return await run_in_threadpool(SocietyService.list_societies, repo)
 
 
 @router.post("/societies", response_model=Society, status_code=status.HTTP_201_CREATED)

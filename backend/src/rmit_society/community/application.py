@@ -155,7 +155,7 @@ class SocietyService:
         return society
 
     @staticmethod
-    def list(repo: Repository) -> list[Society]:
+    def list_societies(repo: Repository) -> list[Society]:
         return repo.list_societies()
 
     @staticmethod
@@ -209,7 +209,9 @@ class SocietyService:
         society = repo.get_society(society_id)
         if society is None:
             raise NotFoundError("Society not found")
-        if actor_user_id != society.owner_user_id and not repo.is_moderator(society_id, actor_user_id):
+        if actor_user_id != society.owner_user_id and not repo.is_moderator(
+            society_id, actor_user_id
+        ):
             raise AuthorizationError("Moderator role required")
         if not repo.is_member(society_id, target_user_id):
             raise NotFoundError("Target is not a member")

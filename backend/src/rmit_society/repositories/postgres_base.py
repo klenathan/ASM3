@@ -41,9 +41,11 @@ class Users(Base):
     __tablename__ = "users"
 
     user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    cognito_sub: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    cognito_sub: Mapped[str] = mapped_column(
+        String(128), unique=True, index=True)
     handle: Mapped[str] = mapped_column(String(64))
-    handle_lower: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    handle_lower: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(120), default="Member")
     bio: Mapped[str] = mapped_column(Text, default="")
     major: Mapped[str] = mapped_column(String(80), default="")
@@ -73,7 +75,8 @@ class Societies(Base):
 
     society_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     slug: Mapped[str] = mapped_column(String(64))
-    slug_lower: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    slug_lower: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text, default="")
     rules: Mapped[str] = mapped_column(Text, default="")
@@ -95,7 +98,8 @@ class SocietyMemberships(Base):
     __tablename__ = "society_memberships"
 
     society_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, index=True)
     is_moderator: Mapped[bool] = mapped_column(Boolean, default=False)
     joined_at: Mapped[str] = mapped_column(String(40))
 
@@ -130,7 +134,8 @@ class Comments(Base):
     post_id: Mapped[str] = mapped_column(String(64), index=True)
     author_user_id: Mapped[str] = mapped_column(String(64), index=True)
     institution_id: Mapped[str] = mapped_column(String(32), default="rmit")
-    parent_comment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    parent_comment_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True)
     path: Mapped[str] = mapped_column(String(256))
     depth: Mapped[int] = mapped_column(Integer, default=0)
     body: Mapped[str] = mapped_column(Text)
@@ -172,7 +177,8 @@ class Follows(Base):
     __tablename__ = "follows"
 
     follower_user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    target_user_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    target_user_id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, index=True)
     created_at: Mapped[str] = mapped_column(String(40))
     institution_id: Mapped[str] = mapped_column(String(32), default="rmit")
 
@@ -189,7 +195,8 @@ class Blocks(Base):
 class Reports(Base):
     __tablename__ = "reports"
     __table_args__ = (
-        UniqueConstraint("content_id", "reporter_user_id", name="uq_report_guard"),
+        UniqueConstraint("content_id", "reporter_user_id",
+                         name="uq_report_guard"),
     )
 
     report_id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -210,7 +217,8 @@ class Notifications(Base):
     recipient_user_id: Mapped[str] = mapped_column(String(64), index=True)
     type: Mapped[str] = mapped_column(String(32))
     content_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    actor_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    actor_user_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[str] = mapped_column(String(40))
     institution_id: Mapped[str] = mapped_column(String(32), default="rmit")
@@ -249,7 +257,8 @@ class ModerationDecisions(Base):
     content_type: Mapped[str] = mapped_column(String(16))
     decision: Mapped[str] = mapped_column(String(16))
     actor_type: Mapped[str] = mapped_column(String(16))
-    actor_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    actor_user_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True)
     reason: Mapped[str] = mapped_column(Text, default="")
     labels: Mapped[list[Any]] = mapped_column(JSON, default=list)
     provider: Mapped[str] = mapped_column(String(32))
@@ -269,7 +278,8 @@ class Appeals(Base):
     context: Mapped[str] = mapped_column(Text, default="")
     state: Mapped[str] = mapped_column(String(16), index=True)
     decision_reason: Mapped[str] = mapped_column(Text, default="")
-    reviewer_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewer_user_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True)
     created_at: Mapped[str] = mapped_column(String(40))
     updated_at: Mapped[str] = mapped_column(String(40))
     institution_id: Mapped[str] = mapped_column(String(32), default="rmit")
@@ -281,7 +291,8 @@ class AuditEvents(Base):
     event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     target_type: Mapped[str] = mapped_column(String(32))
     target_id: Mapped[str] = mapped_column(String(64), index=True)
-    actor_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    actor_user_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True)
     action: Mapped[str] = mapped_column(String(64))
     before: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     after: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -352,7 +363,8 @@ class PostgresRepositoryBase:
         self._engine = engine or create_engine(database_url)
         if auto_create:
             Base.metadata.create_all(self._engine)
-        self._session: sessionmaker[Any] = sessionmaker(bind=self._engine, expire_on_commit=False)
+        self._session: sessionmaker[Any] = sessionmaker(
+            bind=self._engine, expire_on_commit=False)
 
     # ------------------------------------------------------------------ utils
     def _try_insert(self, session: Any, model: type[Any], values: dict[str, Any]) -> bool:
@@ -376,12 +388,15 @@ class PostgresRepositoryBase:
         stmt = _dialect_insert(self._engine, table).values(**values)
         return session.execute(stmt.on_conflict_do_nothing())
 
-    def _upsert(self, session: Any, model: type[Any], data: dict[str, Any], keys: list[Any]) -> None:
+    def _upsert(
+        self, session: Any, model: type[Any], data: dict[str, Any], keys: list[Any]
+    ) -> None:
         stmt = _dialect_insert(self._engine, model).values(**data)
         session.execute(
             stmt.on_conflict_do_update(
                 index_elements=keys,
-                set_={column: getattr(stmt.excluded, column) for column in data},
+                set_={column: getattr(stmt.excluded, column)
+                      for column in data},
             )
         )
 

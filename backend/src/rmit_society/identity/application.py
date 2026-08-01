@@ -11,11 +11,12 @@ from rmit_society.errors import (
     ValidationError_,
 )
 from rmit_society.identity.domain import (
+    User,
+    UserProfileUpdate,
     derive_username_from_email,
     validate_display_name,
     validate_study_area,
 )
-from rmit_society.identity.domain import User, UserProfileUpdate
 from rmit_society.repositories.interfaces import Repository
 
 __all__ = [

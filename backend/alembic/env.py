@@ -12,7 +12,7 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 from rmit_society.config import get_settings
-from rmit_society.repositories.postgres import Base
+from rmit_society.shared.repositories.metadata import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

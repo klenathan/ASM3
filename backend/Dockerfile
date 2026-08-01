@@ -1,15 +1,29 @@
-FROM python:3.12-slim AS runtime
+FROM python:3.12-alpine AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ENV UV_NO_CACHE=1 \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+RUN pip install --no-cache-dir "uv==0.11.19"
+
+# Cache production dependencies independently from application source changes.
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY src ./src
+RUN uv sync --frozen --no-dev --no-editable
+
+FROM python:3.12-alpine AS runtime
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
-COPY src ./src
-RUN pip install --no-cache-dir .
+COPY --from=builder /app/.venv /app/.venv
 
-RUN useradd --create-home appuser
-USER appuser
+RUN addgroup -S app && adduser -S -D -H -G app app
+USER app
 
 EXPOSE 8000
 

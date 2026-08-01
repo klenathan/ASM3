@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from rmit_society.analytics.providers import AnalyticsProvider
+from rmit_society.analytics.services.exports import sanitize_event
 from rmit_society.base import utc_now
-from rmit_society.community.application import EngagementService
 from rmit_society.config import get_settings
+from rmit_society.notifications.services.notifications import NotificationService
 from rmit_society.repositories.factory import get_repository
 from rmit_society.repositories.interfaces import Repository
 
@@ -33,8 +34,9 @@ def _handle_moderated(repo: Repository, data: dict[str, Any]) -> None:
     author = getattr(content, "author_user_id", "")
     if not author:
         return
-    engagements = EngagementService(repo)
-    engagements.notify_moderation(recipient=author, content_id=content_id)
+    NotificationService(repo).create(
+        recipient_user_id=author, notification_type="MODERATION", content_id=content_id
+    )
 
 
 def _export_analytics(event_type: str, data: dict[str, Any]) -> None:
@@ -42,11 +44,6 @@ def _export_analytics(event_type: str, data: dict[str, Any]) -> None:
     settings = get_settings()
     if not settings.analytics_bucket:
         return
-    record = {
-        "event": event_type,
-        "action": str(data.get("state", "")).lower() if "state" in data else event_type,
-        "content_type": data.get("content_type"),
-        "occurred_at": utc_now(),
-    }
-    date = utc_now()[:10]
-    AnalyticsProvider().write_analytics_partition(date, [record])
+    record = sanitize_event(event_type, data, utc_now())
+    date = record.occurred_at[:10]
+    AnalyticsProvider().write_analytics_partition(date, [record.model_dump()])
