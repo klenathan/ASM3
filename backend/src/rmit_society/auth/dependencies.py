@@ -8,11 +8,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from rmit_society.auth.claims import Claims, Role
 from rmit_society.auth.jwt import claims_from_token
-from rmit_society.domain.users import User
 from rmit_society.errors import AuthenticationError, AuthorizationError
+from rmit_society.identity.application import resolve_profile
+from rmit_society.identity.domain import User
 from rmit_society.repositories.factory import get_repository
 from rmit_society.repositories.interfaces import Repository
-from rmit_society.services.identity import resolve_profile
 
 
 @lru_cache

@@ -1,9 +1,13 @@
+"""Combined Lambda entry points dispatching to bounded-context workers."""
+
 from __future__ import annotations
 
 import json
 from typing import Any
 
-from rmit_society.workers import events, image, moderation
+from rmit_society.analytics import workers as analytics_workers
+from rmit_society.media import workers as media_workers
+from rmit_society.moderation import workers as moderation_workers
 
 
 def _bodies(event: dict[str, Any]) -> list[Any]:
@@ -21,16 +25,16 @@ def _bodies(event: dict[str, Any]) -> list[Any]:
 def moderation_handler(event: dict[str, Any], context: Any) -> None:
     del context
     for message in _bodies(event):
-        moderation.moderate_content(message)
+        moderation_workers.moderate_content(message)
 
 
 def image_handler(event: dict[str, Any], context: Any) -> None:
     del context
     for message in _bodies(event):
-        image.process_upload(message)
+        media_workers.process_upload(message)
 
 
 def event_handler(event: dict[str, Any], context: Any) -> None:
     del context
     for message in _bodies(event):
-        events.process_event(message)
+        analytics_workers.process_event(message)

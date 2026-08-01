@@ -21,9 +21,9 @@ locals {
   api_env = {
     ENVIRONMENT          = var.stage
     AWS_REGION           = var.aws_region
-    DATABASE_DRIVER      = "dynamodb"
-    DATABASE_AUTO_CREATE = "false"
-    TABLE_NAME           = aws_dynamodb_table.main.name
+    DATABASE_DRIVER      = "postgres"
+    DATABASE_URL         = "postgresql+psycopg://${var.db_username}:${var.db_password}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${var.db_name}"
+    DATABASE_AUTO_CREATE = "true"
     MEDIA_BUCKET         = aws_s3_bucket.media.id
     MODERATION_QUEUE_URL = aws_sqs_queue.moderation.url
     IMAGE_QUEUE_URL      = aws_sqs_queue.image.url
@@ -31,16 +31,12 @@ locals {
     CORS_ORIGINS         = "*"
     MODERATION_PROVIDER  = "aws"
     IMAGE_PROVIDER       = "aws"
-    COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
-    COGNITO_AUDIENCE     = aws_cognito_user_pool_client.web.id
-    COGNITO_ISSUER       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
-    COGNITO_JWKS_URL     = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}/.well-known/jwks.json"
   }
   image_registry = var.backend_image == "" ? "" : split("/", var.backend_image)[0]
 }
 
 # One public subnet and an internet gateway. There is deliberately no NAT gateway,
-# private subnet, load balancer, RDS instance, or multi-AZ deployment.
+# load balancer, or multi-AZ deployment.
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
@@ -52,6 +48,18 @@ resource "aws_subnet" "public" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = var.availability_zone
   map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "database_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = var.availability_zone
+}
+
+resource "aws_subnet" "database_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = var.database_availability_zone
 }
 
 resource "aws_internet_gateway" "main" {
@@ -103,6 +111,26 @@ resource "aws_security_group" "api" {
   }
 }
 
+resource "aws_security_group" "database" {
+  name   = "${local.name}-database"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    description     = "PostgreSQL from the API instance"
+    protocol        = "tcp"
+    from_port       = 5432
+    to_port         = 5432
+    security_groups = [aws_security_group.api.id]
+  }
+
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_s3_bucket" "media" {
   bucket = "${local.name}-${data.aws_caller_identity.current.account_id}-media"
 }
@@ -113,6 +141,79 @@ resource "aws_s3_bucket_public_access_block" "media" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_cloudfront_origin_access_control" "media" {
+  name                              = "${local.name}-media"
+  description                       = "CloudFront access to the private media bucket"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_distribution" "media" {
+  enabled     = true
+  comment     = "${local.name} media"
+  price_class = "PriceClass_100"
+
+  origin {
+    domain_name              = aws_s3_bucket.media.bucket_regional_domain_name
+    origin_id                = aws_s3_bucket.media.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.media.id
+  }
+
+  default_cache_behavior {
+    target_origin_id       = aws_s3_bucket.media.id
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS"]
+    cached_methods  = ["GET", "HEAD", "OPTIONS"]
+
+    forwarded_values {
+      query_string = true
+
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = 3600
+    max_ttl     = 86400
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+}
+
+resource "aws_s3_bucket_policy" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  depends_on = [aws_s3_bucket_public_access_block.media]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCloudFrontRead"
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.media.arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.media.arn
+        }
+      }
+    }]
+  })
 }
 
 resource "aws_s3_bucket" "web" {
@@ -140,7 +241,7 @@ resource "aws_s3_bucket_public_access_block" "web" {
 }
 
 resource "aws_s3_bucket_policy" "web" {
-  bucket = aws_s3_bucket.web.id
+  bucket     = aws_s3_bucket.web.id
   depends_on = [aws_s3_bucket_public_access_block.web]
   policy = jsonencode({
     Version = "2012-10-17"
@@ -153,78 +254,34 @@ resource "aws_s3_bucket_policy" "web" {
   })
 }
 
-resource "aws_dynamodb_table" "main" {
-  name         = "${local.name}-data"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
+resource "aws_db_subnet_group" "main" {
+  name       = local.name
+  subnet_ids = [aws_subnet.database_a.id, aws_subnet.database_b.id]
+}
 
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  dynamic "attribute" {
-    for_each = toset([
-      "gsi_handle_pk", "gsi_handle_sk", "gsi_slug_pk", "gsi_slug_sk",
-      "gsi_content_pk", "gsi_content_sk", "gsi_user_society_pk", "gsi_user_society_sk",
-      "gsi_mod_pk", "gsi_mod_sk", "gsi_report_pk", "gsi_report_sk",
-      "gsi_appeal_pk", "gsi_appeal_sk", "gsi_society_pin_pk", "gsi_society_pin_sk"
-    ])
-    content {
-      name = attribute.value
-      type = "S"
-    }
-  }
-
-  dynamic "global_secondary_index" {
-    for_each = {
-      handle       = ["gsi_handle", "gsi_handle_pk", "gsi_handle_sk"]
-      slug         = ["gsi_slug", "gsi_slug_pk", "gsi_slug_sk"]
-      content      = ["gsi_content", "gsi_content_pk", "gsi_content_sk"]
-      user_society = ["gsi_user_society", "gsi_user_society_pk", "gsi_user_society_sk"]
-      modqueue     = ["gsi_modqueue", "gsi_mod_pk", "gsi_mod_sk"]
-      report       = ["gsi_report", "gsi_report_pk", "gsi_report_sk"]
-      appeal       = ["gsi_appeal", "gsi_appeal_pk", "gsi_appeal_sk"]
-      society_pin  = ["gsi_society_pin", "gsi_society_pin_pk", "gsi_society_pin_sk"]
-    }
-    content {
-      name            = global_secondary_index.value[0]
-      hash_key        = global_secondary_index.value[1]
-      range_key       = global_secondary_index.value[2]
-      projection_type = "ALL"
-    }
-  }
+resource "aws_db_instance" "main" {
+  identifier              = local.name
+  engine                  = "postgres"
+  instance_class          = var.db_instance_class
+  allocated_storage       = var.db_allocated_storage
+  db_name                 = var.db_name
+  username                = var.db_username
+  password                = var.db_password
+  port                    = 5432
+  db_subnet_group_name    = aws_db_subnet_group.main.name
+  vpc_security_group_ids  = [aws_security_group.database.id]
+  publicly_accessible     = false
+  storage_encrypted       = true
+  backup_retention_period = 0
+  skip_final_snapshot     = true
+  deletion_protection     = false
+  multi_az                = false
+  apply_immediately       = true
 }
 
 resource "aws_sqs_queue" "moderation" { name = "${local.name}-moderation" }
-resource "aws_sqs_queue" "image"      { name = "${local.name}-image" }
-resource "aws_sqs_queue" "events"     { name = "${local.name}-events" }
-
-resource "aws_cognito_user_pool" "main" {
-  name                = local.name
-  username_attributes = ["email"]
-
-  auto_verified_attributes = ["email"]
-
-  password_policy {
-    minimum_length    = 8
-    require_lowercase = false
-    require_numbers   = false
-    require_symbols   = false
-    require_uppercase = false
-  }
-}
-
-resource "aws_cognito_user_pool_client" "web" {
-  name         = "${local.name}-web"
-  user_pool_id = aws_cognito_user_pool.main.id
-}
+resource "aws_sqs_queue" "image" { name = "${local.name}-image" }
+resource "aws_sqs_queue" "events" { name = "${local.name}-events" }
 
 resource "aws_ecr_repository" "backend" {
   name                 = local.name
@@ -250,11 +307,6 @@ resource "aws_iam_role_policy" "ec2" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["dynamodb:*"]
-        Resource = [aws_dynamodb_table.main.arn, "${aws_dynamodb_table.main.arn}/index/*"]
-      },
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]

@@ -1,0 +1,1 @@
+"""community bounded context."""

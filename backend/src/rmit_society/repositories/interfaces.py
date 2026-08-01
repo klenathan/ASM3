@@ -2,12 +2,26 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from rmit_society.domain.content import Comment, ContentVersion, Post
-from rmit_society.domain.engagement import Block, Follow, Notification, Report, Vote
-from rmit_society.domain.events import AuditEvent, Upload
-from rmit_society.domain.moderation import Appeal, ModerationDecisionRecord, ModerationJob
-from rmit_society.domain.societies import Society, SocietyMembership
-from rmit_society.domain.users import User
+from rmit_society.community.domain import (
+    Block,
+    Comment,
+    ContentVersion,
+    Follow,
+    Notification,
+    Post,
+    Report,
+    Society,
+    SocietyMembership,
+    Vote,
+)
+from rmit_society.identity.domain import User
+from rmit_society.media.domain import Upload
+from rmit_society.moderation.domain import (
+    Appeal,
+    ModerationDecisionRecord,
+    ModerationJob,
+)
+from rmit_society.shared.events import AuditEvent
 
 
 class Page[T](Protocol):

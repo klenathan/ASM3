@@ -2,11 +2,14 @@
 
 This folder contains the complete replacement for the old boto3 deployer.
 It intentionally uses one public subnet in one Availability Zone and has no
-NAT gateway, private subnet, ALB, CloudFront, RDS, ECS, or Azure resources.
+NAT gateway, ALB, ECS, or Azure resources. RDS
+provides HTTPS delivery for private media objects in S3 through Origin Access
+Control; the media bucket is not publicly readable.
 
-The API runs on one public `t3.micro` EC2 instance. DynamoDB on-demand replaces
-RDS, and S3 website hosting replaces Amplify. The web bucket is public by
-design to keep the deployment small and inexpensive.
+The API runs on one public `t3.micro` EC2 instance and uses a private,
+single-AZ `db.t3.micro` PostgreSQL RDS instance. S3 website hosting replaces
+Amplify. The web bucket is public by design to keep the deployment small and
+inexpensive. CloudFront uses `PriceClass_100` to limit edge locations and cost.
 
 ## Use
 
@@ -31,5 +34,4 @@ aws s3 sync apps/web/dist "s3://$(tofu output -raw web_bucket_name)"
 ```
 
 The public-subnet design saves cost but is intentionally not a production
-security baseline. The backend is configured for the existing DynamoDB
-repository (`DATABASE_DRIVER=dynamodb`).
+security baseline. The backend is configured for PostgreSQL on RDS.

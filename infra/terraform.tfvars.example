@@ -1,6 +1,12 @@
 stage              = "dev"
 aws_region         = "us-east-1"
 availability_zone  = "us-east-1a"
+database_availability_zone = "us-east-1b"
+db_name            = "rmit_society"
+db_username        = "rmit_society"
+db_password        = "replace-with-a-strong-password"
+db_instance_class  = "db.t3.micro"
+db_allocated_storage = 20
 instance_type      = "t3.micro"
 backend_image      = ""
 ssh_cidr           = ""

@@ -1,6 +1,6 @@
 import json
 
-from rmit_society.handlers.health import handler
+from rmit_society.workers.health import handler
 
 
 def test_health_handler() -> None:

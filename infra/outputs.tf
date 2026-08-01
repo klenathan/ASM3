@@ -14,19 +14,16 @@ output "backend_repository" {
   value = aws_ecr_repository.backend.repository_url
 }
 
-output "dynamodb_table" {
-  value = aws_dynamodb_table.main.name
+output "database_endpoint" {
+  value = aws_db_instance.main.address
 }
 
 output "media_bucket" {
   value = aws_s3_bucket.media.id
 }
 
-output "cognito" {
-  value = {
-    user_pool_id = aws_cognito_user_pool.main.id
-    client_id    = aws_cognito_user_pool_client.web.id
-  }
+output "media_cdn_url" {
+  value = "https://${aws_cloudfront_distribution.media.domain_name}"
 }
 
 output "queues" {

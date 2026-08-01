@@ -4,7 +4,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from rmit_society.errors import ValidationError_
-from rmit_society.handlers import auth
+from rmit_society.identity import api as auth
 
 
 def test_sign_up_returns_actionable_password_validation_error(

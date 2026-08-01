@@ -1,15 +1,54 @@
 # RMIT Society — host development checks and real AWS deployment targets.
 
 STAGE ?= dev
-AWS_REGION ?= ap-southeast-2
+AWS_REGION ?= us-east-1
 AWS_PROFILE ?=
 AWS_ACCOUNT_ID ?=
 BACKEND_IMAGE ?=
 WEB_DIST ?= apps/web/dist
 MESSAGE ?= "migration"
 N ?= 1
+ENV_FILE ?= .env
+TOFU ?= tofu
+TFVARS ?= terraform.tfvars
 
-.PHONY: bootstrap deploy db-generate db-migrate db-downgrade db-stamp dev-backend web-build lint test fe-check
+.PHONY: bootstrap deploy infra-init infra-fmt infra-validate infra-plan infra-apply infra-destroy aws-whoami db-generate db-migrate db-downgrade db-stamp dev-backend web-build lint test fe-check
+
+WITH_AWS_ENV = set -a; test -f "$(ENV_FILE)" || { printf '%s\n' "Missing $(ENV_FILE). Copy .env.example and add AWS credentials." >&2; exit 1; }; . "$(ENV_FILE)"; set +a;
+
+## Show the AWS identity loaded from .env.
+aws-whoami:
+	@$(WITH_AWS_ENV) aws sts get-caller-identity
+
+## Initialize OpenTofu providers.
+infra-init:
+	@$(WITH_AWS_ENV) $(TOFU) -chdir=infra init
+
+## Format OpenTofu files.
+infra-fmt:
+	@$(TOFU) -chdir=infra fmt -recursive
+
+## Validate the OpenTofu configuration.
+infra-validate: infra-init
+	@$(WITH_AWS_ENV) $(TOFU) -chdir=infra validate
+
+## Preview infrastructure changes.
+infra-plan: infra-validate
+	@$(WITH_AWS_ENV) $(TOFU) -chdir=infra plan -var-file=$(TFVARS)
+
+## Apply infrastructure changes.
+infra-apply: infra-validate
+	@$(WITH_AWS_ENV) $(TOFU) -chdir=infra apply -var-file=$(TFVARS)
+
+## Destroy infrastructure. Use deliberately: make infra-destroy.
+infra-destroy: infra-init
+	@$(WITH_AWS_ENV) $(TOFU) -chdir=infra destroy -var-file=$(TFVARS)
+
+## Backward-compatible deployment alias.
+deploy: infra-apply
+
+## Initialize local development tooling.
+bootstrap: infra-init
 
 
 ## Generate a new Alembic revision by diffing models vs the live DB.

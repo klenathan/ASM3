@@ -12,12 +12,12 @@ import pytest
 from sqlalchemy import StaticPool, create_engine
 
 from rmit_society.base import new_id, utc_now
-from rmit_society.domain.content import ContentVersion, Post
-from rmit_society.domain.enums import ContentState
-from rmit_society.domain.events import AuditEvent, Upload
-from rmit_society.domain.societies import Society, SocietyMembership
-from rmit_society.domain.users import User
+from rmit_society.community.domain import ContentVersion, Post, Society, SocietyMembership
+from rmit_society.identity.domain import User
+from rmit_society.media.domain import Upload
 from rmit_society.repositories.postgres import PostgresRepository
+from rmit_society.shared.enums import ContentState
+from rmit_society.shared.events import AuditEvent
 
 
 @pytest.fixture
@@ -208,7 +208,7 @@ def test_pinned_posts(repo: PostgresRepository) -> None:
 
 
 def test_feed_entries_and_votes(repo: PostgresRepository) -> None:
-    from rmit_society.domain.engagement import Vote
+    from rmit_society.community.domain import Vote
 
     author = _user(repo, "sub-13", "mia")
     society = _society(repo, "chess", author.user_id)
@@ -233,7 +233,7 @@ def test_feed_entries_and_votes(repo: PostgresRepository) -> None:
 
 
 def test_follow_and_block(repo: PostgresRepository) -> None:
-    from rmit_society.domain.engagement import Block, Follow
+    from rmit_society.community.domain import Block, Follow
 
     a = _user(repo, "sub-14", "nina")
     b = _user(repo, "sub-15", "oscar")
@@ -285,7 +285,7 @@ def test_follow_and_block(repo: PostgresRepository) -> None:
 
 
 def test_report_deduplication(repo: PostgresRepository) -> None:
-    from rmit_society.domain.engagement import Report
+    from rmit_society.community.domain import Report
 
     a = _user(repo, "sub-16", "pam")
     s = _society(repo, "painting", a.user_id)
@@ -315,7 +315,7 @@ def test_report_deduplication(repo: PostgresRepository) -> None:
 
 
 def test_notifications(repo: PostgresRepository) -> None:
-    from rmit_society.domain.engagement import Notification
+    from rmit_society.community.domain import Notification
 
     a = _user(repo, "sub-17", "quincy")
     repo.create_notification(
@@ -337,7 +337,7 @@ def test_notifications(repo: PostgresRepository) -> None:
 
 
 def test_moderation_jobs_and_queue(repo: PostgresRepository) -> None:
-    from rmit_society.domain.moderation import ModerationJob
+    from rmit_society.moderation.domain import ModerationJob
 
     a = _user(repo, "sub-18", "rachel")
     s = _society(repo, "robotics", a.user_id)
@@ -360,7 +360,7 @@ def test_moderation_jobs_and_queue(repo: PostgresRepository) -> None:
 
 
 def test_appeals_and_audit(repo: PostgresRepository) -> None:
-    from rmit_society.domain.moderation import Appeal
+    from rmit_society.moderation.domain import Appeal
 
     a = _user(repo, "sub-19", "sam")
     s = _society(repo, "sailing", a.user_id)
