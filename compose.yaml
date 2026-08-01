@@ -1,4 +1,20 @@
 services:
+  stackport:
+    image: ${STACKPORT_IMAGE:-davireis/stackport:latest}
+    ports:
+      - "${STACKPORT_PORT:-8080}:8080"
+    environment:
+      AWS_ENDPOINT_URL: http://ministack:4566
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+    depends_on:
+      ministack:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+
   ministack:
     image: ${MINISTACK_IMAGE:-ministackorg/ministack:latest}
     ports:

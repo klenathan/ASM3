@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir .
 RUN useradd --create-home appuser
 USER appuser
 
-CMD ["python", "-m", "cloudpulse.worker"]
+CMD ["python", "-m", "rmit_society.workers.analytics"]

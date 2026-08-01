@@ -22,7 +22,7 @@ This is a social forum first. AI moderation supports the community; it is not th
 ## Repository map
 
 - `apps/web/` — React 19, TypeScript, Vite, Tailwind CSS, shadcn/Base UI frontend
-- `backend/` — Python 3.12, FastAPI, Pydantic, boto3; Mangum Lambda handlers and ECS worker
+- `backend/` — Python 3.12, FastAPI, Pydantic, boto3; EC2 server app + Lambda SQS consumers and ECS worker
 - `backend/tests/` — pytest tests
 - `infra/` — idempotent boto3 provisioning and Lambda packaging
 - `compose.yaml` — local MiniStack AWS emulator
@@ -36,7 +36,7 @@ Use managed AWS services in production and MiniStack through Docker for local AW
 
 - **Web:** React SPA hosted in private S3 and delivered by CloudFront
 - **Identity:** Amazon Cognito; verified institution membership and role claims
-- **API:** API Gateway HTTP API → FastAPI/Mangum Lambda handlers
+- **API:** FastAPI server on EC2 (`rmit_society.server:app`); SQS consumers (moderation/image/events) stay on Lambda for now
 - **Primary data:** DynamoDB for users, schools/spaces, posts, replies, reactions, reports, moderation state, and audit references
 - **Media:** private S3 uploads through short-lived presigned URLs
 - **Moderation:** Amazon Comprehend `DetectToxicContent` for supported text and Amazon Rekognition moderation labels for images
@@ -121,7 +121,7 @@ uv run pytest
 Local API example:
 
 ```sh
-uv run uvicorn cloudpulse.handlers.health:app --reload --app-dir src --port 8000
+uv run uvicorn cloudpulse.handlers.observations:app --reload --app-dir src --port 8000
 ```
 
 Rename the Python package and handler paths only as a coordinated migration across packaging, tests, Docker, and infrastructure.

@@ -63,6 +63,46 @@ aws --endpoint-url=http://localhost:4566 dynamodb list-tables
 
 Use the same endpoint, region, and fake credentials when constructing application AWS SDK clients. Applications running on the host use `http://localhost:4566`; containers on the `asm3-local` Docker network use `http://ministack:4566`.
 
+## Backend
+
+The backend API runs as a persistent FastAPI server (`rmit_society.server:app`)
+rather than as Lambda functions, so local development is a plain uvicorn process
+against MiniStack — no Lambda zip packaging.
+
+```sh
+make deploy-local
+set -a
+source .env 2>/dev/null || source .env.example
+source .cloudpulse/local.env
+set +a
+cd backend
+uv sync
+uv run uvicorn rmit_society.server:app --app-dir src --port 8000
+# In another terminal:
+curl http://localhost:8000/api/v1/health
+```
+
+`make deploy-local` provisions Cognito and writes pool/client verifier settings to
+`.cloudpulse/local.env`. The local web login can create and sign in accounts
+through Cognito. `make dev-backend` loads this generated file automatically.
+
+Sourcing the root environment file is required: it gives the host-run API the
+MiniStack endpoint and provisioned queue URLs. Without it, async moderation
+messages are not sent to the local queues.
+
+In dev/prod, `infra/deploy.py` launches an EC2 instance that runs the same
+backend image on port 8000. In `--stage local`, the deploy also launches the
+EC2 instance against MiniStack (so the EC2 resource, security group, IAM
+instance profile, AMI lookup, and idempotent reuse are exercised by the deploy
+workflow), but MiniStack only emulates the instance as `running` and cannot
+boot the Docker container, so the real API still runs via host uvicorn against
+MiniStack. SQS consumers (moderation/image/events) remain Lambda functions and
+may move to the EC2 container later.
+
+The real AWS deployment is still a scaffold, not production-ready: hosted Cognito
+UI wiring, TLS/edge routing, CloudFront provisioning, backend health-gated
+deployments, and running-instance image updates remain incomplete.
+
 ## Assessment Service Coverage
 
 The assessment requires services from Compute, Containers, Storage, Networking and Content Delivery, Database, and Analytics. MiniStack can locally emulate suitable services in each category, including Lambda, ECS, S3, API Gateway, DynamoDB/RDS, and EMR/Athena.

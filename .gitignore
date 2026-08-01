@@ -2,3 +2,14 @@
 .env.*
 !.env.example
 /temp-data/
+
+build/
+node_modules/
+
+*/.venv
+*/ruff_cache
+*/.mypy_cache/
+*/.pytest_cache/
+
+__pycache__/
+.cloudpulse/
