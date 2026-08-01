@@ -1,9 +1,0 @@
-from typing import Protocol
-
-from rmit_society.notifications.models import Notification
-
-
-class NotificationRepository(Protocol):
-    def create_notification(self, notification: object) -> None: ...
-    def list_notifications(self, user_id: str) -> list[Notification]: ...
-    def mark_notification_read(self, notification_id: str, user_id: str) -> None: ...
