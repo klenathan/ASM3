@@ -11,16 +11,23 @@ class Settings(BaseSettings):
     environment: str = "local"
     aws_region: str = "ap-southeast-2"
 
+    database_driver: str = "postgres"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/rmit_society"
+    database_auto_create: bool = True
+
     table_name: str = "rmit-society-local"
     media_bucket: str = "rmit-society-local-media"
     analytics_bucket: str = "rmit-society-local-analytics"
+
+    database_host: str = ""
+    database_port: int = 5432
+    database_name: str = "rmit_society"
+    database_secret_arn: str = ""
 
     moderation_queue_url: str = ""
     image_queue_url: str = ""
     event_queue_url: str = ""
 
-    athena_database: str = "rmit_society_local"
-    athena_workgroup: str = "rmit-society-local"
     ecs_cluster: str = "rmit-society-local"
     ecs_task_definition: str = "rmit-society-local-analytics"
     ecs_subnet_ids: str = ""

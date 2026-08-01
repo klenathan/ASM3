@@ -13,6 +13,5 @@ USER appuser
 
 EXPOSE 8000
 
-# Run the unified backend as a persistent server (EC2 in dev/prod, container
-# anywhere). uvicorn is already a declared dependency of the package.
+# Run the unified backend as a persistent ECS Fargate service.
 CMD ["uvicorn", "rmit_society.server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

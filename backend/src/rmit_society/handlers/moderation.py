@@ -20,11 +20,11 @@ from rmit_society.domain.moderation import (
     ModerationDecisionRecord,
     ModerationReview,
 )
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import engagement as engagement_service
 from rmit_society.services.moderation import ModerationService
 
-repo = DynamoDBRepository()
+repo = get_repository()
 moderation = ModerationService(repo, engagement_service.EngagementService(repo))
 router = APIRouter(tags=["moderation"])
 ActiveUser = Annotated[AuthenticatedUser, Depends(require_active_user)]

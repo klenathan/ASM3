@@ -1,0 +1,16 @@
+#!/bin/bash
+set -eux
+
+dnf install -y docker
+systemctl enable --now docker
+
+%{ if image != "" ~}
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${registry}
+docker pull ${image}
+docker rm -f rmit-society-api || true
+docker run -d --restart unless-stopped --name rmit-society-api -p 8000:8000 \
+%{ for key, value in api_env ~}
+  -e '${key}=${value}' \
+%{ endfor ~}
+  ${image}
+%{ endif ~}

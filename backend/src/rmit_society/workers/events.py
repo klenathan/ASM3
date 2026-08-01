@@ -5,7 +5,8 @@ from typing import Any
 from rmit_society.base import utc_now
 from rmit_society.config import get_settings
 from rmit_society.providers.media import AnalyticsProvider
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
+from rmit_society.repositories.interfaces import Repository
 from rmit_society.services import engagement as engagement_service
 
 
@@ -14,13 +15,13 @@ def process_event(event: dict[str, Any]) -> None:
     event_type = payload.get("type", event.get("type", ""))
     data = payload.get("payload", payload)
 
-    repo = DynamoDBRepository()
+    repo = get_repository()
     if event_type.endswith("ContentModerated.v1"):
         _handle_moderated(repo, data)
     _export_analytics(event_type, data)
 
 
-def _handle_moderated(repo: DynamoDBRepository, data: dict[str, Any]) -> None:
+def _handle_moderated(repo: Repository, data: dict[str, Any]) -> None:
     content_id = str(data.get("content_id", ""))
     content = repo.get_post(content_id) or repo.get_comment(content_id)
     if content is None:

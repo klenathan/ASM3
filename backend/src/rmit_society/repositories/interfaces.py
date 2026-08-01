@@ -19,6 +19,8 @@ class Page[T](Protocol):
 
 class UserRepository(Protocol):
     def get_user(self, user_id: str) -> User | None: ...
+    def get_user_by_cognito_sub(self, cognito_sub: str) -> User | None: ...
+    def link_cognito_sub(self, cognito_sub: str, user_id: str) -> None: ...
     def get_user_by_handle(self, handle: str) -> User | None: ...
     def put_user(self, user: User) -> None: ...
     def update_user(self, user_id: str, **changes: object) -> None: ...
@@ -108,3 +110,21 @@ class UploadRepository(Protocol):
 class IdempotencyRepository(Protocol):
     def claim(self, key: str, response: dict[str, object]) -> dict[str, object] | None: ...
     def get(self, key: str) -> dict[str, object] | None: ...
+
+
+class Repository(
+    UserRepository,
+    SocietyRepository,
+    ContentRepository,
+    EngagementRepository,
+    FeedRepository,
+    ModerationRepository,
+    UploadRepository,
+    IdempotencyRepository,
+    Protocol,
+):
+    """Complete persistence surface used by services, handlers, and workers.
+
+    Both the DynamoDB and Postgres implementations satisfy this protocol, so
+    switching the database driver is a configuration change.
+    """

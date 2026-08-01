@@ -3,11 +3,11 @@ from __future__ import annotations
 from rmit_society.base import new_id, utc_now
 from rmit_society.domain.societies import Society, SocietyCreate, SocietyMembership, SocietyUpdate
 from rmit_society.errors import AuthorizationError, ConflictError, NotFoundError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 
 
 def create_society(
-    repo: DynamoDBRepository, *, actor_user_id: str, payload: SocietyCreate
+    repo: Repository, *, actor_user_id: str, payload: SocietyCreate
 ) -> Society:
     if not repo.reserve_slug(payload.slug, "pending"):
         raise ConflictError("Society slug is already taken")
@@ -33,19 +33,19 @@ def create_society(
     return society
 
 
-def get_society(repo: DynamoDBRepository, slug: str) -> Society:
+def get_society(repo: Repository, slug: str) -> Society:
     society = repo.get_society_by_slug(slug)
     if society is None:
         raise NotFoundError("Society not found")
     return society
 
 
-def list_societies(repo: DynamoDBRepository) -> list[Society]:
+def list_societies(repo: Repository) -> list[Society]:
     return repo.list_societies()
 
 
 def update_society(
-    repo: DynamoDBRepository, *, society: Society, actor_user_id: str, payload: SocietyUpdate
+    repo: Repository, *, society: Society, actor_user_id: str, payload: SocietyUpdate
 ) -> Society:
     if actor_user_id != society.owner_user_id and not repo.is_moderator(
         society.society_id, actor_user_id
@@ -65,7 +65,7 @@ def update_society(
     return updated
 
 
-def join_society(repo: DynamoDBRepository, *, society_id: str, user_id: str) -> None:
+def join_society(repo: Repository, *, society_id: str, user_id: str) -> None:
     membership = SocietyMembership(
         society_id=society_id, user_id=user_id, is_moderator=False, joined_at=utc_now()
     )
@@ -73,18 +73,18 @@ def join_society(repo: DynamoDBRepository, *, society_id: str, user_id: str) -> 
         repo.increment_members(society_id, 1)
 
 
-def leave_society(repo: DynamoDBRepository, *, society_id: str, user_id: str) -> None:
+def leave_society(repo: Repository, *, society_id: str, user_id: str) -> None:
     if repo.is_member(society_id, user_id):
         repo.leave(society_id, user_id)
         repo.increment_members(society_id, -1)
 
 
-def list_members(repo: DynamoDBRepository, society_id: str) -> list[SocietyMembership]:
+def list_members(repo: Repository, society_id: str) -> list[SocietyMembership]:
     return repo.list_members(society_id)
 
 
 def set_moderator(
-    repo: DynamoDBRepository,
+    repo: Repository,
     *,
     society_id: str,
     actor_user_id: str,

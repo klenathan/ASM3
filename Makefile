@@ -5,32 +5,30 @@ AWS_REGION ?= ap-southeast-2
 AWS_PROFILE ?=
 AWS_ACCOUNT_ID ?=
 BACKEND_IMAGE ?=
-WORKER_IMAGE ?=
 WEB_DIST ?= apps/web/dist
+MESSAGE ?= "migration"
+N ?= 1
 
-AWS_ARGS = --stage $(STAGE) --region $(AWS_REGION)
-ifneq ($(strip $(AWS_PROFILE)),)
-AWS_ARGS += --profile $(AWS_PROFILE)
-endif
-ifneq ($(strip $(AWS_ACCOUNT_ID)),)
-AWS_ARGS += --expected-account-id $(AWS_ACCOUNT_ID)
-endif
+.PHONY: bootstrap deploy db-generate db-migrate db-downgrade db-stamp dev-backend web-build lint test fe-check
 
-.PHONY: bootstrap deploy dev-backend web-build lint test fe-check
 
-## Provision AWS foundations and print immutable ECR repository URIs.
-bootstrap:
-	cd backend && uv run python ../infra/deploy.py $(AWS_ARGS)
+## Generate a new Alembic revision by diffing models vs the live DB.
+## Usage: make db-generate MESSAGE="add is_pinned flag"
+db-generate:
+	cd backend && uv run alembic revision --autogenerate -m "$(MESSAGE)"
 
-## Reconcile full AWS stack and publish built SPA. Images must use release tags/digests.
-deploy:
-	@test -n "$(BACKEND_IMAGE)" || (echo "BACKEND_IMAGE is required" && exit 2)
-	@test -n "$(WORKER_IMAGE)" || (echo "WORKER_IMAGE is required" && exit 2)
-	@test -d "$(WEB_DIST)" || (echo "WEB_DIST does not exist: $(WEB_DIST)" && exit 2)
-	cd backend && uv run python ../infra/deploy.py $(AWS_ARGS) \
-		--backend-image "$(BACKEND_IMAGE)" \
-		--worker-image "$(WORKER_IMAGE)" \
-		--web-dist "../$(WEB_DIST)"
+## Apply Alembic migrations to the configured DATABASE_URL (e.g. RDS).
+db-migrate:
+	cd backend && uv run alembic upgrade head
+
+## Roll back the most recent migration on the configured DATABASE_URL.
+## Usage: make db-downgrade N=1  (or N=-3 to go back three)
+db-downgrade:
+	cd backend && uv run alembic downgrade $(N)
+
+## Mark the DB at head without running any migrations (rare, for baselines).
+db-stamp:
+	cd backend && uv run alembic stamp head
 
 ## Run FastAPI directly on host. Use explicit test/dev environment variables.
 dev-backend:

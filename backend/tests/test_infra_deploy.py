@@ -19,34 +19,50 @@ def _infrastructure(stage: str = "dev") -> Infrastructure:
     infrastructure.endpoint_url = None
     infrastructure.names = Names(stage=stage, account_id="000000000000")
     infrastructure.partition = "aws"
+    infrastructure.db_instance_class = "db.t4g.micro"
+    infrastructure.db_engine_version = None
     return infrastructure
 
 
-def test_app_environment_is_aws_only() -> None:
+def test_app_environment_contains_private_service_configuration() -> None:
     environment = _infrastructure().app_environment(
-        {"subnets": ["subnet-1"], "security_groups": ["sg-1"]},
-        {"moderation": "moderation-url", "image": "image-url", "events": "events-url"},
+        {
+            "host": "database.internal",
+            "port": 5432,
+            "database_name": "rmit_society",
+            "secret_arn": "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:db",
+        },
+        "https://dev.example.amplifyapp.com",
     )
 
     values = {item["name"]: item["value"] for item in environment}
     assert "AWS_ENDPOINT_URL" not in values
+    assert "DATABASE_PASSWORD" not in values
     assert values["ENVIRONMENT"] == "dev"
-    assert values["MODERATION_PROVIDER"] == "aws"
-    assert values["IMAGE_PROVIDER"] == "aws"
+    assert values["DATABASE_HOST"] == "database.internal"
+    assert values["DATABASE_SECRET_ARN"].startswith("arn:aws:secretsmanager:")
+    assert values["CORS_ORIGINS"] == "https://dev.example.amplifyapp.com"
 
 
-def test_names_make_s3_buckets_globally_unique() -> None:
+def test_names_make_s3_bucket_globally_unique() -> None:
     names = Names(stage="prod", account_id="123456789012")
 
     assert names.media_bucket == "rmit-society-prod-123456789012-media"
-    assert names.web_bucket == "rmit-society-prod-123456789012-web"
+    assert names.database == "rmit-society-prod-postgres"
+    assert names.ecr_repository == "rmit-society-prod-backend"
 
 
 def test_deployment_rejects_latest_or_wrong_repository() -> None:
     infrastructure = _infrastructure()
-    repository = "000000000000.dkr.ecr.ap-southeast-2.amazonaws.com/rmit-society-dev-backend"
+    repository = (
+        "000000000000.dkr.ecr.ap-southeast-2.amazonaws.com/"
+        "rmit-society-dev-backend"
+    )
 
     infrastructure._validate_image("backend", f"{repository}:release-abc", repository)
+    infrastructure._validate_image(
+        "backend", f"{repository}@sha256:{'a' * 64}", repository
+    )
     with pytest.raises(ValueError, match="immutable"):
         infrastructure._validate_image("backend", f"{repository}:latest", repository)
     with pytest.raises(ValueError, match="provisioned repository"):
@@ -57,48 +73,55 @@ def test_deployment_rejects_latest_or_wrong_repository() -> None:
         )
 
 
-def test_ec2_role_can_pull_backend_image_and_query_indexes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_latest_postgres_version_uses_highest_available_version() -> None:
+    infrastructure = _infrastructure()
+
+    class RdsClient:
+        def describe_db_engine_versions(self, **kwargs: object) -> dict[str, Any]:
+            assert kwargs["Engine"] == "postgres"
+            return {
+                "DBEngineVersions": [
+                    {"EngineVersion": "16.8"},
+                    {"EngineVersion": "17.4"},
+                    {"EngineVersion": "17.10"},
+                ]
+            }
+
+    infrastructure.aws = lambda service: RdsClient()  # type: ignore[method-assign]
+
+    assert infrastructure.latest_postgres_version() == "17.10"
+
+
+def test_roles_limit_database_secret_to_task_bootstrap() -> None:
     infrastructure = _infrastructure()
     policies: dict[str, dict[str, Any]] = {}
 
-    def capture_role(
-        name: str,
-        principals: list[str],
-        policy: dict[str, Any],
-    ) -> str:
-        del principals
+    def capture_role(name: str, policy: dict[str, Any]) -> str:
         policies[name] = policy
         return f"arn:aws:iam::000000000000:role/{name}"
 
-    class Waiter:
-        def wait(self, **kwargs: object) -> None:
-            del kwargs
+    infrastructure._ensure_role = capture_role  # type: ignore[method-assign]
+    infrastructure.ensure_roles(
+        infrastructure.names.media_bucket,
+        "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:database",
+    )
 
-    class IamClient:
-        def get_waiter(self, name: str) -> Waiter:
-            assert name == "role_exists"
-            return Waiter()
-
-    infrastructure.ensure_role = capture_role  # type: ignore[method-assign]
-    infrastructure.aws = lambda service: IamClient()  # type: ignore[method-assign]
-    monkeypatch.setattr("iac.iam.time.sleep", lambda _: None)
-    infrastructure.ensure_roles()
-
-    statements = policies[infrastructure.names.backend_role]["Statement"]
+    task_statements = policies[f"{infrastructure.names.prefix}-ecs-task"]["Statement"]
+    execution_statements = policies[f"{infrastructure.names.prefix}-ecs-execution"][
+        "Statement"
+    ]
     actions = {
         action
-        for statement in statements
+        for statement in task_statements
         for action in (
             statement["Action"]
             if isinstance(statement["Action"], list)
             else [statement["Action"]]
         )
     }
-    resources = {
+    task_resources = {
         resource
-        for statement in statements
+        for statement in task_statements
         for resource in (
             statement["Resource"]
             if isinstance(statement["Resource"], list)
@@ -106,14 +129,27 @@ def test_ec2_role_can_pull_backend_image_and_query_indexes(
         )
     }
 
-    assert {
-        "ecr:GetAuthorizationToken",
-        "ecr:BatchGetImage",
-        "ecr:GetDownloadUrlForLayer",
-    } <= actions
-    assert "s3:HeadObject" not in actions
-    assert "s3:CopyObject" not in actions
-    assert (
-        "arn:aws:dynamodb:ap-southeast-2:000000000000:"
-        "table/rmit-society-dev/index/*"
-    ) in resources
+    execution_actions = {
+        action
+        for statement in execution_statements
+        for action in (
+            statement["Action"]
+            if isinstance(statement["Action"], list)
+            else [statement["Action"]]
+        )
+    }
+
+    assert "secretsmanager:GetSecretValue" not in actions
+    assert "secretsmanager:GetSecretValue" in execution_actions
+    assert "s3:PutObject" in actions
+    assert f"arn:aws:s3:::{infrastructure.names.media_bucket}/*" in task_resources
+
+
+def test_database_start_command_constructs_url_without_logging_secret() -> None:
+    command = _infrastructure()._database_start_command()
+
+    compile(command, "<fargate-start-command>", "exec")
+    assert "DATABASE_USERNAME" in command
+    assert "DATABASE_PASSWORD" in command
+    assert "postgresql+psycopg://" in command
+    assert "print" not in command

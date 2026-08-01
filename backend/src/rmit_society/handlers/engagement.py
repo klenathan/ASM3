@@ -14,12 +14,12 @@ from rmit_society.auth.dependencies import (
 )
 from rmit_society.domain.content import Post
 from rmit_society.domain.engagement import Notification, Report, ReportCreate
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import feeds
 from rmit_society.services import identity as identity_service
 from rmit_society.services.engagement import EngagementService
 
-repo = DynamoDBRepository()
+repo = get_repository()
 engagements = EngagementService(repo)
 router = APIRouter(tags=["engagement"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(resolve_current_user)]

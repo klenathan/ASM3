@@ -35,7 +35,7 @@ Use managed AWS services in deployed dev/prod stages. Use moto and deterministic
 - **Web:** React SPA hosted in private S3 and delivered by CloudFront
 - **Identity:** Amazon Cognito; verified institution membership and role claims
 - **API:** FastAPI server on EC2 (`rmit_society.server:app`); SQS consumers (moderation/image/events) stay on Lambda for now
-- **Primary data:** DynamoDB for users, schools/spaces, posts, replies, reactions, reports, moderation state, and audit references
+- **Primary data:** PostgreSQL (RDS) for users, schools/spaces, posts, replies, reactions, reports, moderation state, and audit references, accessed via the SQLAlchemy repository adapter
 - **Media:** private S3 uploads through short-lived presigned URLs
 - **Moderation:** Amazon Comprehend `DetectToxicContent` for supported text and Amazon Rekognition moderation labels for images
 - **Async work:** SQS/EventBridge and Lambda for moderation and notifications; retries must be idempotent and failed jobs must enter a DLQ
@@ -69,7 +69,7 @@ Do not introduce another cloud, database, auth provider, or infrastructure frame
 - Deleting content removes it from user views immediately while retaining only the minimum audit record required by policy.
 - Use UTC ISO 8601 timestamps at API boundaries and timezone-aware `datetime` values internally.
 - Generate opaque IDs server-side. Do not expose emails or encode sensitive data in IDs, object keys, logs, or analytics.
-- Feed and list endpoints use stable cursor pagination; never add unbounded DynamoDB scans to request paths.
+- Feed and list endpoints use stable cursor pagination; never add unbounded scans to request paths.
 - Mutation retries must be idempotent. Moderation workers must safely handle duplicate delivery.
 
 ## Security and privacy
@@ -92,7 +92,7 @@ Do not introduce another cloud, database, auth provider, or infrastructure frame
 - Use Pydantic models for request, response, configuration, and event schemas.
 - Preserve strict mypy and Ruff settings. Add explicit types; do not spread `Any` beyond boto3 boundaries.
 - Convert provider exceptions to stable domain/API errors. Do not leak AWS internals to clients.
-- Use conditional DynamoDB writes for uniqueness, state transitions, reactions, and counters where races matter.
+- Use conditional upserts (PostgreSQL `ON CONFLICT`) for uniqueness, state transitions, reactions, and counters where races matter.
 - Prefer queryable key design and denormalized read models over scans. Document new partition/sort keys and GSIs.
 - Version asynchronous event payloads from their first release.
 - Test domain decisions separately from AWS adapter behavior.

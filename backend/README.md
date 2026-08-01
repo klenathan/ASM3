@@ -1,6 +1,8 @@
 # RMIT Society backend
 
-FastAPI application deployed as persistent EC2 service. SQS moderation, image, and event consumers deploy as Lambda functions; aggregate analytics runs as on-demand ECS Fargate task.
+FastAPI application packaged for a persistent ECS Fargate service. The AWS target uses
+RDS PostgreSQL in isolated subnets and a private S3 media bucket. See the root
+`README.md` for the deployment architecture and credential-injection flow.
 
 ## Host development
 
@@ -21,7 +23,8 @@ Use moto-backed tests for AWS adapters. For explicit integration testing, config
 - `rmit_society/config.py` — Pydantic runtime configuration
 - `rmit_society/auth/` — Cognito JWT verification and authorization dependencies
 - `rmit_society/domain/` — Pydantic entities and enums
-- `rmit_society/repositories/` — protocols and DynamoDB single-table adapter
+- `rmit_society/repositories/` — protocols, the SQLAlchemy PostgreSQL adapter (`postgres.py`), the legacy DynamoDB adapter, and a driver factory (`factory.py`)
+- `alembic/` — schema migrations for the PostgreSQL (RDS) persistence layer
 - `rmit_society/services/` — application/domain services
 - `rmit_society/providers/` — Comprehend, Rekognition, SQS, and S3 adapters
 - `rmit_society/handlers/` — FastAPI routers

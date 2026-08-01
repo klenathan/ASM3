@@ -4,12 +4,12 @@ from rmit_society.base import new_id, utc_now
 from rmit_society.domain.engagement import Block, Follow, Notification, Report, ReportCreate, Vote
 from rmit_society.errors import ConflictError, NotFoundError
 from rmit_society.providers.queues import SQSQueuePublisher
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 
 
 class EngagementService:
     def __init__(
-        self, repo: DynamoDBRepository, publisher: SQSQueuePublisher | None = None
+        self, repo: Repository, publisher: SQSQueuePublisher | None = None
     ) -> None:
         self.repo = repo
         self.publisher = publisher or SQSQueuePublisher()

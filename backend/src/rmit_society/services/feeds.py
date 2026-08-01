@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from rmit_society.domain.content import Post
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 
 FEED_RMIT = "RMIT"
 FEED_SOCIETY = "SOCIETY"
@@ -10,7 +10,7 @@ FEED_AUTHOR = "AUTHOR"
 _HOME_SOCIETY_ID = "rmit"
 
 
-def publish_post(repo: DynamoDBRepository, post: Post) -> None:
+def publish_post(repo: Repository, post: Post) -> None:
     """Fan out feed projection records for approved/flagged posts."""
     repo.add_feed_entry(FEED_RMIT, "rmit", post.post_id, post.created_at)
     repo.add_feed_entry(FEED_AUTHOR, post.author_user_id, post.post_id, post.created_at)
@@ -18,7 +18,7 @@ def publish_post(repo: DynamoDBRepository, post: Post) -> None:
         repo.add_feed_entry(FEED_SOCIETY, post.society_id, post.post_id, post.created_at)
 
 
-def suppress_post(repo: DynamoDBRepository, post: Post) -> None:
+def suppress_post(repo: Repository, post: Post) -> None:
     """Idempotently remove all feed projections for a post."""
     repo.remove_feed_entry(FEED_RMIT, "rmit", post.post_id)
     repo.remove_feed_entry(FEED_AUTHOR, post.author_user_id, post.post_id)
@@ -26,19 +26,19 @@ def suppress_post(repo: DynamoDBRepository, post: Post) -> None:
         repo.remove_feed_entry(FEED_SOCIETY, post.society_id, post.post_id)
 
 
-def school_feed(repo: DynamoDBRepository) -> list[str]:
+def school_feed(repo: Repository) -> list[str]:
     return repo.list_feed(FEED_RMIT, "rmit")
 
 
-def society_feed(repo: DynamoDBRepository, society_id: str) -> list[str]:
+def society_feed(repo: Repository, society_id: str) -> list[str]:
     return repo.list_feed(FEED_SOCIETY, society_id)
 
 
-def author_feed(repo: DynamoDBRepository, author_user_id: str) -> list[str]:
+def author_feed(repo: Repository, author_user_id: str) -> list[str]:
     return repo.list_feed(FEED_AUTHOR, author_user_id)
 
 
-def joined_feed(repo: DynamoDBRepository, user_id: str, *, include_home: bool = True) -> list[str]:
+def joined_feed(repo: Repository, user_id: str, *, include_home: bool = True) -> list[str]:
     seen: set[str] = set()
     if include_home:
         seen.update(school_feed(repo))
@@ -47,7 +47,7 @@ def joined_feed(repo: DynamoDBRepository, user_id: str, *, include_home: bool = 
     return _ordered(seen)
 
 
-def following_feed(repo: DynamoDBRepository, user_id: str) -> list[str]:
+def following_feed(repo: Repository, user_id: str) -> list[str]:
     seen: set[str] = set()
     for target_user_id in repo.list_following(user_id):
         seen.update(author_feed(repo, target_user_id))

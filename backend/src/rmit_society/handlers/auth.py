@@ -14,12 +14,12 @@ from rmit_society.domain.registration import (
     validate_study_area,
 )
 from rmit_society.errors import AuthenticationError, ValidationError_
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import identity as identity_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-repo = DynamoDBRepository()
+repo = get_repository()
 
 
 class Credentials(BaseModel):

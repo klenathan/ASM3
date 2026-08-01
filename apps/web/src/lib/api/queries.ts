@@ -57,10 +57,11 @@ export function useUserPosts(handle: string | undefined, enabled = true) {
   });
 }
 
-export function useSocieties() {
+export function useSocieties(enabled = true) {
   return useQuery({
     queryKey: queryKeys.societies,
     queryFn: () => endpoints.societies.list(),
+    enabled,
   });
 }
 

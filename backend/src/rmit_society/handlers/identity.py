@@ -15,10 +15,10 @@ from rmit_society.auth.dependencies import (
 )
 from rmit_society.domain.users import User, UserProfileUpdate
 from rmit_society.errors import NotFoundError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import identity as identity_service
 
-repo = DynamoDBRepository()
+repo = get_repository()
 router = APIRouter(tags=["identity"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(resolve_current_user)]
 TokenClaims = Annotated[Claims, Depends(resolve_claims)]

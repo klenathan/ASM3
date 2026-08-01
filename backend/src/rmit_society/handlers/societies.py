@@ -20,10 +20,10 @@ from rmit_society.domain.societies import (
     SocietyUpdate,
 )
 from rmit_society.errors import NotFoundError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import societies as societies_service
 
-repo = DynamoDBRepository()
+repo = get_repository()
 router = APIRouter(tags=["societies"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(resolve_current_user)]
 ActiveUser = Annotated[AuthenticatedUser, Depends(require_active_user)]

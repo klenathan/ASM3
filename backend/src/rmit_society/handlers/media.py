@@ -14,11 +14,11 @@ from rmit_society.auth.dependencies import (
 )
 from rmit_society.domain.events import Upload
 from rmit_society.errors import NotFoundError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import societies as societies_service
 from rmit_society.services.media import MediaService
 
-repo = DynamoDBRepository()
+repo = get_repository()
 media = MediaService(repo)
 router = APIRouter(tags=["media"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(resolve_current_user)]

@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 export function EntryPage() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
-  const { data: societies, isLoading } = useSocieties();
+  const { data: societies, isLoading } = useSocieties(Boolean(token && user));
   const join = useJoinSociety();
 
   const [joined, setJoined] = useState<Set<string>>(

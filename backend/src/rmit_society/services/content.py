@@ -10,7 +10,7 @@ from rmit_society.errors import (
     ValidationError_,
 )
 from rmit_society.providers.queues import SQSQueuePublisher
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 from rmit_society.services import feeds
 
 
@@ -27,7 +27,7 @@ def _require_editable(user_id: str, author_user_id: str, created_at: str, window
 
 class ContentService:
     def __init__(
-        self, repo: DynamoDBRepository, publisher: SQSQueuePublisher | None = None
+        self, repo: Repository, publisher: SQSQueuePublisher | None = None
     ) -> None:
         self.repo = repo
         self.publisher = publisher or SQSQueuePublisher()

@@ -276,9 +276,9 @@ Core entities:
 - `Notification`
 - `AuditEvent`
 
-Each tenant-owned record carries `institution_id`. Content records separate author-visible content state from moderation details. Store large media in S3, not DynamoDB. Keep provider payloads minimized/redacted and outside general API responses.
+Each tenant-owned record carries `institution_id`. Content records separate author-visible content state from moderation details. Store large media in S3, not in the primary database. Keep provider payloads minimized/redacted and outside general API responses.
 
-Exact DynamoDB partition/sort keys and GSIs belong in an architecture decision record before implementation. Required access patterns include:
+Exact PostgreSQL tables, constraints, indexes, and migration strategy belong in an architecture decision record before implementation. Required access patterns include:
 
 - User/institution membership and role lookup
 - Space membership and moderator lookup
@@ -291,21 +291,21 @@ Exact DynamoDB partition/sort keys and GSIs belong in an architecture decision r
 - Notifications by recipient/time
 - Audit timeline by target
 
-No request-path access pattern may rely on an unbounded scan.
+No request-path access pattern may rely on an unbounded table scan.
 
 ## 11. AWS architecture
 
 | Capability          | AWS service               | Application use                                                    |
 | ------------------- | ------------------------- | ------------------------------------------------------------------ |
-| Web hosting         | S3 + CloudFront           | Private SPA origin and cached delivery                             |
+| Web hosting         | AWS Amplify Hosting       | React SPA build artifacts, HTTPS delivery, and SPA/API rewrites    |
 | Authentication      | Cognito                   | Sign-in, verified membership, role/tenant claims                   |
-| API                 | EC2 + CloudFront          | Persistent FastAPI service behind same-origin HTTPS routing         |
-| Database            | DynamoDB                  | Social graph, content metadata, workflow state, notifications      |
+| API                 | ECS Fargate + ALB         | Persistent FastAPI containers in private application subnets       |
+| Database            | RDS PostgreSQL            | Relational forum data in isolated, encrypted database subnets      |
 | Media               | S3                        | Quarantined and approved user uploads; analytics artifacts         |
 | Text moderation     | Comprehend                | Toxic-content classification                                       |
 | Image moderation    | Rekognition               | Explicit/unsafe image labels only                                  |
 | Async orchestration | SQS/EventBridge + Lambda  | Moderation, retries, notifications, audit/event fan-out            |
-| Container compute   | ECS Fargate + ECR         | Scheduled/on-demand aggregate analytics worker                     |
+| Container compute   | ECS Fargate + ECR         | FastAPI service and justified scheduled/batch workers               |
 | Analytics           | S3 + Glue + Athena        | Sanitized product/safety metrics queried by the app/admin workflow |
 | Networking/security | VPC, security groups, IAM | Controlled compute access and least privilege                      |
 | Operations          | CloudWatch                | Logs, metrics, alarms, traces/correlation                          |
@@ -405,8 +405,8 @@ Metrics must not incentivize suppressing legitimate reports or maximizing engage
 ### Phase 0 — Foundation
 
 - Rename/remove CloudPulse legacy domain safely
-- Define DynamoDB access patterns and event schemas
-- Provision real AWS dev/prod identity, API, tables, buckets, queues, and observability through boto3 IaC
+- Migrate the primary store to PostgreSQL: repository adapter, driver factory, Alembic baseline, and RDS-friendly schema/indexes
+- Provision real AWS dev/prod networking, Fargate API, RDS, buckets, identity, queues, and observability through boto3 IaC
 - Establish CI checks and synthetic moderation fixtures
 
 ### Phase 1 — Forum core
@@ -427,7 +427,7 @@ Metrics must not incentivize suppressing legitimate reports or maximizing engage
 
 - ECS analytics worker and ECR image flow
 - Sanitized S3 event export, Glue catalog, and Athena admin queries
-- CloudFront deployment, CloudWatch alarms, security review, load test, and demo evidence
+- Amplify/Fargate deployment, CloudWatch alarms, security review, load test, and demo evidence
 - Confirm every claimed AWS service is triggered by normal application operations
 
 ## 16. MVP release acceptance

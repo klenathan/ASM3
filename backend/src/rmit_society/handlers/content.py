@@ -19,12 +19,12 @@ from rmit_society.domain.content import (
     PostCreate,
 )
 from rmit_society.errors import NotFoundError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 from rmit_society.services import content as content_service
 from rmit_society.services import feeds
 from rmit_society.services import societies as societies_service
 
-repo = DynamoDBRepository()
+repo = get_repository()
 content = content_service.ContentService(repo)
 router = APIRouter(tags=["content"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(resolve_current_user)]

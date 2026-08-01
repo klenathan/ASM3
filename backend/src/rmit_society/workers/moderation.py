@@ -13,7 +13,8 @@ from rmit_society.errors import ProviderError
 from rmit_society.providers.comprehend import ComprehendTextModerator
 from rmit_society.providers.local_moderation import LocalTextModerator
 from rmit_society.providers.queues import SQSQueuePublisher
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
+from rmit_society.repositories.interfaces import Repository
 from rmit_society.services import feeds
 
 
@@ -25,7 +26,7 @@ def build_text_moderator() -> Any:
 
 
 def moderate_content(event: dict[str, Any]) -> None:
-    repo = DynamoDBRepository()
+    repo = get_repository()
     publisher = SQSQueuePublisher()
 
     payload = event.get("payload", {})
@@ -81,12 +82,12 @@ def moderate_content(event: dict[str, Any]) -> None:
         _fan_out(repo, publisher, content_id, content_type, new_state)
 
 
-def _fail(repo: DynamoDBRepository, content_id: str, version: int) -> None:
+def _fail(repo: Repository, content_id: str, version: int) -> None:
     repo.transition_state(content_id, ContentState.PENDING.value, ContentState.FAILED.value)
 
 
 def _fan_out(
-    repo: DynamoDBRepository,
+    repo: Repository,
     publisher: SQSQueuePublisher,
     content_id: str,
     content_type: str,

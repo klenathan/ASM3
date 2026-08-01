@@ -20,7 +20,7 @@ from rmit_society.domain.moderation import (
     ModerationReview,
 )
 from rmit_society.errors import AuthorizationError, ConflictError, NotFoundError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 from rmit_society.services import engagement as engagement_service
 
 
@@ -38,7 +38,7 @@ def _resolve_risk(labels: list[LabelResult]) -> RiskLevel:
 class ModerationService:
     def __init__(
         self,
-        repo: DynamoDBRepository,
+        repo: Repository,
         engagements: engagement_service.EngagementService | None = None,
     ) -> None:
         self.repo = repo

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
@@ -13,16 +13,6 @@ from rmit_society.services import analytics as analytics_service
 
 router = APIRouter(tags=["analytics"])
 AdminUser = Annotated[AuthenticatedUser, Depends(require_admin)]
-
-
-@router.post("/analytics/query", status_code=status.HTTP_202_ACCEPTED)
-async def start_query(user: AdminUser) -> dict[str, str]:
-    return await run_in_threadpool(analytics_service.start_forum_query)
-
-
-@router.get("/analytics/query/{query_execution_id}")
-async def query_result(user: AdminUser, query_execution_id: str) -> dict[str, Any]:
-    return await run_in_threadpool(analytics_service.get_query_result, query_execution_id)
 
 
 @router.post("/analytics/run", status_code=status.HTTP_202_ACCEPTED)

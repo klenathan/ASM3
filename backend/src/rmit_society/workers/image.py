@@ -9,12 +9,12 @@ from rmit_society.errors import ProviderError
 from rmit_society.providers.local_moderation import LocalTextModerator
 from rmit_society.providers.media import S3ObjectStore
 from rmit_society.providers.rekognition import RekognitionImageModerator
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
 
 
 def process_upload(event: dict[str, Any]) -> None:
     settings = get_settings()
-    repo = DynamoDBRepository()
+    repo = get_repository()
     store = S3ObjectStore()
 
     detail = event.get("detail", event)

@@ -104,7 +104,7 @@ class S3ObjectStore:
 
 
 class AnalyticsProvider:
-    """Sanitized event export to the analytics bucket and Athena orchestration."""
+    """Sanitized event export to the analytics bucket."""
 
     def __init__(self) -> None:
         self._settings = get_settings()

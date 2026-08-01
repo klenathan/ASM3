@@ -41,6 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refresh = React.useCallback(async () => {
+    if (!token) {
+      setUser(null);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -51,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   const completeSignIn = React.useCallback(async (next: string) => {
     setAuthToken(next);
@@ -114,10 +120,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
   }, [setToken]);
-
-  React.useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({

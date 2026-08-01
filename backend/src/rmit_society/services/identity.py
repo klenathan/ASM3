@@ -14,11 +14,11 @@ from rmit_society.errors import (
     NotFoundError,
     ValidationError_,
 )
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 
 
 def create_user_profile(
-    repo: DynamoDBRepository,
+    repo: Repository,
     *,
     cognito_sub: str,
     handle: str,
@@ -64,7 +64,7 @@ def create_user_profile(
     return user
 
 
-def resolve_profile(repo: DynamoDBRepository, claims: Claims) -> User:
+def resolve_profile(repo: Repository, claims: Claims) -> User:
     """Return the authenticated user's existing profile, rejecting unknowns.
 
     Bootstrap is read-only: profiles are created during registration, so a
@@ -86,21 +86,21 @@ def resolve_profile(repo: DynamoDBRepository, claims: Claims) -> User:
     return user
 
 
-def get_current_user(repo: DynamoDBRepository, user_id: str) -> User:
+def get_current_user(repo: Repository, user_id: str) -> User:
     user = repo.get_user(user_id)
     if user is None:
         raise NotFoundError("User not found")
     return user
 
 
-def get_user_by_handle(repo: DynamoDBRepository, handle: str) -> User:
+def get_user_by_handle(repo: Repository, handle: str) -> User:
     user = repo.get_user_by_handle(handle)
     if user is None or user.status in (UserStatus.DEACTIVATED, UserStatus.SUSPENDED):
         raise NotFoundError("User not found")
     return user
 
 
-def update_profile(repo: DynamoDBRepository, user_id: str, update: UserProfileUpdate) -> User:
+def update_profile(repo: Repository, user_id: str, update: UserProfileUpdate) -> User:
     get_current_user(repo, user_id)
     changes: dict[str, object] = {"updated_at": utc_now()}
     if update.display_name is not None:
@@ -113,5 +113,5 @@ def update_profile(repo: DynamoDBRepository, user_id: str, update: UserProfileUp
     return get_current_user(repo, user_id)
 
 
-def deactivate(repo: DynamoDBRepository, user_id: str) -> None:
+def deactivate(repo: Repository, user_id: str) -> None:
     repo.update_user(user_id, status=UserStatus.DEACTIVATED.value, updated_at=utc_now())

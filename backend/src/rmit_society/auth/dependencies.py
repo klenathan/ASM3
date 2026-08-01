@@ -10,13 +10,14 @@ from rmit_society.auth.claims import Claims, Role
 from rmit_society.auth.jwt import claims_from_token
 from rmit_society.domain.users import User
 from rmit_society.errors import AuthenticationError, AuthorizationError
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.factory import get_repository
+from rmit_society.repositories.interfaces import Repository
 from rmit_society.services.identity import resolve_profile
 
 
 @lru_cache
-def _repository() -> DynamoDBRepository:
-    return DynamoDBRepository()
+def _repository() -> Repository:
+    return get_repository()
 
 
 _bearer_scheme = HTTPBearer(
@@ -80,7 +81,7 @@ def _bearer_token(
     return token.strip()
 
 
-def resolve_authenticated_user(claims: Claims, repo: DynamoDBRepository) -> AuthenticatedUser:
+def resolve_authenticated_user(claims: Claims, repo: Repository) -> AuthenticatedUser:
     profile = resolve_profile(repo, claims)
     return AuthenticatedUser.from_profile(claims, profile)
 

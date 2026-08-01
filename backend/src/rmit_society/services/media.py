@@ -7,7 +7,7 @@ from rmit_society.config import get_settings
 from rmit_society.domain.events import Upload
 from rmit_society.errors import AuthorizationError, NotFoundError, ValidationError_
 from rmit_society.providers.media import S3MediaProvider
-from rmit_society.repositories.dynamodb import DynamoDBRepository
+from rmit_society.repositories.interfaces import Repository
 
 _ALLOWED_TYPES = {
     "image/jpeg": ".jpg",
@@ -18,7 +18,7 @@ _ALLOWED_TYPES = {
 
 
 class MediaService:
-    def __init__(self, repo: DynamoDBRepository, media: S3MediaProvider | None = None) -> None:
+    def __init__(self, repo: Repository, media: S3MediaProvider | None = None) -> None:
         self.repo = repo
         self.media = media or S3MediaProvider()
         self.settings = get_settings()

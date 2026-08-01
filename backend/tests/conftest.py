@@ -9,6 +9,13 @@ from moto import mock_aws
 
 from rmit_society.config import get_settings
 
+# Legacy AWS-backed suite runs against DynamoDB via moto. Postgres driver is
+# exercised by the dedicated Postgres repository tests. This must be set at
+# module import time (before handlers construct their module-level repository).
+# Also clear any early-cached Settings so the driver env var takes effect.
+os.environ["DATABASE_DRIVER"] = "dynamodb"
+get_settings.cache_clear()
+
 REGION = "ap-southeast-2"
 TABLE = "rmit-society-local"
 MEDIA_BUCKET = "rmit-society-local-media"
@@ -141,6 +148,10 @@ def test_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TABLE_NAME", TABLE)
     monkeypatch.setenv("MEDIA_BUCKET", MEDIA_BUCKET)
     monkeypatch.setenv("ANALYTICS_BUCKET", ANALYTICS_BUCKET)
+    from rmit_society.repositories.factory import reset_repository
+
+    reset_repository()
     get_settings.cache_clear()
     yield
+    reset_repository()
     get_settings.cache_clear()
