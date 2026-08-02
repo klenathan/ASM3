@@ -13,20 +13,21 @@ import {
 } from "../../features/profile/use-profile";
 
 export function UserProfilePage() {
-  const { sid = "" } = useParams()
-  const profileQuery = usePublicProfile(sid)
-  const profile = profileQuery.data
+  const { sid = "" } = useParams();
+  const profileQuery = usePublicProfile(sid);
+  const profile = profileQuery.data;
 
-  const viewable = profile !== undefined && (profile.isPublic || profile.isOwner)
-  const threadsQuery = useUserThreads(sid, viewable)
-  const commentsQuery = useUserComments(sid, viewable)
+  const viewable =
+    profile !== undefined && (profile.isPublic || profile.isOwner);
+  const threadsQuery = useUserThreads(sid, viewable);
+  const commentsQuery = useUserComments(sid, viewable);
 
   if (profileQuery.isPending) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
         <Spinner />
       </div>
-    )
+    );
   }
 
   if (profileQuery.isError || profile === undefined) {
@@ -46,17 +47,25 @@ export function UserProfilePage() {
           </Link>
         </Button>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-12 sm:py-16 lg:px-10">
+    <div className="mx-auto w-full max-w-4xl flex-1 px-6 lg:px-10">
       <ProfileHeader owner={profile.isOwner} profile={profile} />
 
       {viewable ? (
-        <section aria-labelledby="activity-title" className="mt-14 border-t-2 border-foreground pt-10">
-          <h2 id="activity-title" className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase">
-            {profile.isOwner ? "Your activity" : `${profile.displayName}’s activity`}
+        <section
+          aria-labelledby="activity-title"
+          className="mt-14 border-t-2 border-foreground pt-10"
+        >
+          <h2
+            id="activity-title"
+            className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase"
+          >
+            {profile.isOwner
+              ? "Your activity"
+              : `${profile.displayName}’s activity`}
           </h2>
           <div className="mt-6">
             <ActivityFeed
@@ -65,9 +74,9 @@ export function UserProfilePage() {
               loading={threadsQuery.isPending || commentsQuery.isPending}
               error={
                 threadsQuery.isError
-                  ? threadsQuery.error?.message ?? null
+                  ? (threadsQuery.error?.message ?? null)
                   : commentsQuery.isError
-                    ? commentsQuery.error?.message ?? null
+                    ? (commentsQuery.error?.message ?? null)
                     : null
               }
               threadsEmptyLabel={
@@ -87,5 +96,5 @@ export function UserProfilePage() {
         <PrivateProfileState displayName={profile.displayName} />
       )}
     </div>
-  )
+  );
 }

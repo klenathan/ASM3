@@ -101,7 +101,7 @@ export function SocietyDetailPage() {
   const threads = threadsQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-12 sm:py-16 lg:px-10">
+    <div className="mx-auto w-full max-w-4xl flex-1 px-6 lg:px-10">
       <section
         aria-labelledby="society-title"
         className="mt-8 border-t-2 border-foreground pt-8"

@@ -8,6 +8,7 @@ import { ForumPage } from "../pages/forum/ForumPage";
 import { BrowseSocietiesPage } from "../pages/societies/BrowseSocietiesPage";
 import { SocietyDetailPage } from "../pages/societies/SocietyDetailPage";
 import { ProfilePage } from "../pages/profile/ProfilePage";
+import { SettingsPage } from "../pages/settings/SettingsPage";
 import { UserProfilePage } from "../pages/u/UserProfilePage";
 import { ForbiddenPage, UnauthorizedPage } from "../pages/status";
 import { ThreadPage } from "../pages/thread/ThreadPage";
@@ -22,6 +23,7 @@ export function AppRoutes() {
           <Route path="s/:slug" element={<SocietyDetailPage />} />
           <Route path="s/:slug/t/:id" element={<ThreadPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="u/:sid" element={<UserProfilePage />} />
         </Route>
       </Route>

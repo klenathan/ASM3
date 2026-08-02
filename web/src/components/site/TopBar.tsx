@@ -15,20 +15,17 @@ import {
 import { Input } from "../ui/input";
 import { LogoMark } from "./LogoMark";
 
-const menuItems: {
-  label: string;
-  icon: LucideIcon;
-  onClick?: () => void;
-  disabled?: boolean;
-}[] = [
-  { label: "Profile", icon: UserRound },
-  { label: "Settings", icon: Settings, disabled: true },
-];
-
 export function TopBar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const openProfile = () => navigate("/profile");
+  const menuItems: {
+    label: string;
+    icon: LucideIcon;
+    onClick?: () => void;
+  }[] = [
+    { label: "Profile", icon: UserRound, onClick: () => navigate("/profile") },
+    { label: "Settings", icon: Settings, onClick: () => navigate("/settings") },
+  ];
   const initials = (user?.displayName ?? "?")
     .split(" ")
     .map((part) => part[0])
@@ -107,14 +104,10 @@ export function TopBar() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {menuItems.map(({ label, icon: Icon, onClick, disabled }) => (
+              {menuItems.map(({ label, icon: Icon, onClick }) => (
                 <DropdownMenuItem
                   key={label}
-                  disabled={disabled}
-                  onSelect={() => {
-                    const action = onClick ?? (label === "Profile" ? openProfile : undefined);
-                    if (action !== undefined) action();
-                  }}
+                  onSelect={() => onClick?.()}
                 >
                   <Icon aria-hidden="true" /> {label}
                 </DropdownMenuItem>

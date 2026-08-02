@@ -10,47 +10,54 @@ import { SocietyCard } from "../../features/societies/society-card";
 import { useSocietyDiscovery } from "../../features/societies/use-society";
 
 export function BrowseSocietiesPage() {
-  const [params, setParams] = useSearchParams()
-  const urlQuery = params.get("q") ?? ""
-  const [draft, setDraft] = useState(urlQuery)
+  const [params, setParams] = useSearchParams();
+  const urlQuery = params.get("q") ?? "";
+  const [draft, setDraft] = useState(urlQuery);
 
   useEffect(() => {
-    setDraft(urlQuery)
-  }, [urlQuery])
+    setDraft(urlQuery);
+  }, [urlQuery]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (draft === urlQuery) return
-      const next = new URLSearchParams()
-      if (draft.trim() !== "") next.set("q", draft.trim())
-      setParams(next, { replace: true })
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [draft, urlQuery, setParams])
+      if (draft === urlQuery) return;
+      const next = new URLSearchParams();
+      if (draft.trim() !== "") next.set("q", draft.trim());
+      setParams(next, { replace: true });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [draft, urlQuery, setParams]);
 
-  const { data, status, error, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching } =
-    useSocietyDiscovery(urlQuery)
+  const {
+    data,
+    status,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+  } = useSocietyDiscovery(urlQuery);
 
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const node = sentinelRef.current
-    if (node === null) return
-    if (!hasNextPage) return
+    const node = sentinelRef.current;
+    if (node === null) return;
+    if (!hasNextPage) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) void fetchNextPage()
+        if (entries[0]?.isIntersecting) void fetchNextPage();
       },
       { rootMargin: "400px" },
-    )
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [hasNextPage, fetchNextPage])
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage]);
 
-  const societies = data?.pages.flatMap((page) => page.items) ?? []
-  const searching = draft.trim() !== ""
+  const societies = data?.pages.flatMap((page) => page.items) ?? [];
+  const searching = draft.trim() !== "";
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-12 sm:py-16 lg:px-10">
+    <div className="mx-auto w-full max-w-4xl flex-1 px-6 lg:px-10">
       <section aria-labelledby="browse-title">
         <h1
           id="browse-title"
@@ -76,7 +83,9 @@ export function BrowseSocietiesPage() {
             type="search"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={searching ? "Refine your search…" : "Search societies…"}
+            placeholder={
+              searching ? "Refine your search…" : "Search societies…"
+            }
             aria-label="Search societies"
             className="h-13 w-full rounded-none border-foreground/20 bg-card py-3.5 pr-4 pl-12 text-base focus-visible:border-primary focus-visible:ring-primary/40"
           />
@@ -108,7 +117,9 @@ export function BrowseSocietiesPage() {
         ) : societies.length === 0 ? (
           <div className="border-t border-foreground/15 py-14">
             <h2 className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase">
-              {searching ? "No pages match." : "This shelf is waiting to be written."}
+              {searching
+                ? "No pages match."
+                : "This shelf is waiting to be written."}
             </h2>
             <p className="mt-3 max-w-md text-muted-foreground">
               {searching
@@ -141,14 +152,17 @@ export function BrowseSocietiesPage() {
         )}
       </section>
 
-      {isFetching && status === "success" && !isFetchingNextPage && societies.length > 0 && (
-        <p
-          aria-live="polite"
-          className="mt-4 text-center text-xs text-muted-foreground"
-        >
-          Refining…
-        </p>
-      )}
+      {isFetching &&
+        status === "success" &&
+        !isFetchingNextPage &&
+        societies.length > 0 && (
+          <p
+            aria-live="polite"
+            className="mt-4 text-center text-xs text-muted-foreground"
+          >
+            Refining…
+          </p>
+        )}
     </div>
-  )
+  );
 }

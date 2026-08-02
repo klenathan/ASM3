@@ -99,15 +99,9 @@ export function ThreadPage() {
 
   return (
     <ThreadShell>
-      <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
+      <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10 ">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-16">
           <main className="min-w-0">
-            <Link
-              to={`/s/${slug}`}
-              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-            >
-              <ArrowLeft aria-hidden="true" className="size-4" /> {society.name}
-            </Link>
             <article className="mt-5 border-y-2 border-foreground py-7 sm:py-9">
               <div className="flex gap-3">
                 <div className="flex w-8 shrink-0 flex-col items-center pt-1 text-xs font-semibold text-muted-foreground">

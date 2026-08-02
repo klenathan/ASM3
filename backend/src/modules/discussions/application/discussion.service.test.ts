@@ -119,6 +119,25 @@ describe("discussion services", () => {
     await expect(service.getThread(moderator, thread.id)).resolves.toMatchObject({ status: "deleted" });
   });
 
+  it("includes the requesting user's vote in a thread detail", async () => {
+    const repository = new FakeDiscussionRepository();
+    const threadService = createThreadService(repository);
+    const voteService = createVoteService(repository);
+    const thread = await threadService.createThread(member, society.id, {
+      title: "Vote detail",
+      body: "Body",
+    });
+
+    await voteService.voteThread(member, thread.id, -1);
+
+    await expect(threadService.getThread(member, thread.id)).resolves.toMatchObject({
+      myVote: -1,
+    });
+    await expect(threadService.getThread(undefined, thread.id)).resolves.toMatchObject({
+      myVote: 0,
+    });
+  });
+
   it("sets votes idempotently and applies only score deltas", async () => {
     const repository = new FakeDiscussionRepository();
     const threadService = createThreadService(repository);

@@ -1,13 +1,8 @@
-import { SocietyIndex } from "../../features/societies/society-index";
 import { HomeFeed } from "../../features/feed/home-feed";
 
 export function ForumPage() {
   return (
-    <main className="mx-auto grid w-full max-w-7xl flex-1 gap-10 px-6 py-10 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-14 lg:px-10 lg:py-14">
-      <aside aria-label="Society index">
-        <SocietyIndex />
-      </aside>
-
+    <main className="px-5 sm:px-8 lg:px-10 w-full">
       <section aria-labelledby="forum-title">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-foreground pb-4">
           <h1

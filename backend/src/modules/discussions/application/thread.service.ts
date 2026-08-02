@@ -100,7 +100,15 @@ export class ThreadService {
       throw new ApplicationError("NOT_FOUND", "Thread was not found");
     }
 
-    return toThreadDto(thread, await this.repository.listThreadMedia(thread.id));
+    const vote = principal === undefined
+      ? null
+      : await this.repository.findThreadVote(thread.id, principal.userId);
+    return toThreadDto(
+      thread,
+      await this.repository.listThreadMedia(thread.id),
+      undefined,
+      vote?.value ?? 0,
+    );
   }
 
   async updateThread(
