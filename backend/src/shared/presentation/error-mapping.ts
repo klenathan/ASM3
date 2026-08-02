@@ -1,0 +1,52 @@
+import { AppError, DomainError } from "../domain/errors.js";
+
+export interface ErrorResponse {
+  readonly status: number;
+  readonly body: {
+    readonly error: {
+      readonly code: string;
+      readonly message: string;
+      readonly requestId: string;
+      readonly details: Record<string, unknown>;
+    };
+  };
+}
+
+const statusByCode: Readonly<Record<string, number>> = {
+  UNAUTHENTICATED: 401,
+  AUTH_REQUIRED: 401,
+  FORBIDDEN: 403,
+  SOCIETY_FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  INVALID_CURSOR: 400,
+  VALIDATION_ERROR: 400,
+};
+
+export function mapError(error: unknown, requestId: string): ErrorResponse {
+  if (error instanceof AppError) {
+    return {
+      status: statusByCode[error.code] ?? (error instanceof DomainError ? 409 : 400),
+      body: {
+        error: {
+          code: error.code,
+          message: error.message,
+          requestId,
+          details: { ...error.details },
+        },
+      },
+    };
+  }
+
+  return {
+    status: 500,
+    body: {
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+        requestId,
+        details: {},
+      },
+    },
+  };
+}

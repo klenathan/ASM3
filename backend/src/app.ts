@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
@@ -7,15 +8,23 @@ import { secureHeaders } from "hono/secure-headers";
 import type { Logger } from "pino";
 
 import type { AppEnvironment } from "./app-types.js";
+import type { IdentityRouteDependencies } from "./modules/identity/index.js";
+import { registerIdentityRoutes } from "./modules/identity/index.js";
 import type { AppConfig } from "./config/env.js";
-import { API_VERSION, SERVICE_NAME } from "./constants.js";
+import {
+  OPENAPI_CONFIG,
+  OPENAPI_PATH,
+  OPENAPI_UI_PATH,
+} from "./config/openapi.js";
+import { SERVICE_NAME } from "./constants.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { registerHealthRoutes } from "./routes/health.js";
 
 interface AppDependencies {
-  readonly config: Pick<AppConfig, "webOrigin">;
+  readonly config: Pick<AppConfig, "webOrigin"> & Partial<Pick<AppConfig, "nodeEnv">>;
   readonly logger: Logger;
   readonly checkReadiness: () => Promise<void>;
+  readonly identity?: IdentityRouteDependencies;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -55,14 +64,15 @@ export function createApp(dependencies: AppDependencies) {
 
   registerHealthRoutes(app, dependencies);
 
-  app.doc("/api/v1/openapi.json", {
-    openapi: "3.1.0",
-    info: {
-      title: "RMIT Society API",
-      version: API_VERSION,
-      description: "Backend API for RMIT Society.",
-    },
-  });
+  if (dependencies.identity !== undefined) {
+    registerIdentityRoutes(app, {
+      ...dependencies.identity,
+      secureCookies: dependencies.config.nodeEnv === "production",
+    });
+  }
+
+  app.doc(OPENAPI_PATH, OPENAPI_CONFIG);
+  app.get(OPENAPI_UI_PATH, swaggerUI({ url: OPENAPI_PATH }));
 
   app.notFound((context) =>
     context.json(

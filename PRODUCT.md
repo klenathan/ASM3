@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-The `web` frontend uses React 19, Vite 8, TypeScript 7, Tailwind CSS 4, shadcn/ui, React Router 7, TanStack Query, and pnpm. The backend framework remains open. AWS deployment choices are confirmed below; prefer a simple backend that one student can implement, explain, deploy, and demonstrate reliably.
+The `web` frontend uses React 19, Vite 8, TypeScript 7, Tailwind CSS 4, shadcn/ui, React Router 7, TanStack Query, and pnpm. The backend uses Node.js 22, Hono, TypeScript, Drizzle ORM, and PostgreSQL as a domain-oriented modular monolith. See `docs/BACKEND_ARCHITECTURE.md`. AWS deployment choices are confirmed below; keep the system simple enough for one student to implement, explain, deploy, and demonstrate reliably.
 
 ## Users
 
@@ -74,9 +74,7 @@ Minimize ongoing deployment cost. Begin with small, Single-AZ resources and avoi
 ### Open decisions
 
 - Exact approved RMIT AU, VN, and EU email-domain allow-list
-- Backend framework
 - Authentication implementation and email-verification mechanism
-- RDS engine
 - Final Analytics service and user-visible analytics workflow
 - Whether society creation is limited to system admins or can be requested by students
 
@@ -84,7 +82,12 @@ Minimize ongoing deployment cost. Begin with small, Single-AZ resources and avoi
 
 - Product name: **RMIT Society**
 - Use the terms **society** and **thread**, not subreddit and post, in product UI.
-- Product should feel specific to RMIT community life without claiming official RMIT endorsement unless approval exists.
+- Use a modern red-orange visual identity inspired by RMIT's energy, contrast, and creative culture.
+- Keep the identity unofficial: do not imply RMIT endorsement or reproduce official logos, lockups, or campaign assets without approval.
+
+## Visual Direction
+
+RMIT Society uses red-orange as its lead action and navigation color against warm publication-paper neutrals. Deep ink surfaces support a deliberate dark mode. A restrained yellow signal color is reserved for focus, unread, and time-sensitive states; every state also uses text, icons, or shape. The forum should feel like a contemporary student publication: confident, editorial, and easy to scan rather than institutional or overly branded.
 
 ## Evidence on Hand
 

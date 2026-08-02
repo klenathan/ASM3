@@ -1,3 +1,12 @@
-export default function App() {
-  return <main aria-label="RMIT Society application root" />
+import { AuthProvider } from "./features/auth/auth-context";
+import { AppRoutes } from "./app/routes";
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
 }
+
+export default App;

@@ -9,15 +9,18 @@ import { loadConfig } from "./config/env.js";
 import { SERVICE_NAME } from "./constants.js";
 import { createDatabase } from "./db/client.js";
 import { createLogger } from "./lib/logger.js";
+import { createIdentityModule } from "./modules/identity/index.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const database = createDatabase(config, logger);
+  const identity = createIdentityModule({ database: database.db });
   const app = createApp({
     config,
     logger,
     checkReadiness: database.checkConnection,
+    identity,
   });
 
   const server = serve(

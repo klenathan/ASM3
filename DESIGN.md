@@ -10,7 +10,7 @@ description: A trusted digital common room for RMIT student societies and discus
 
 **Creative North Star: "The After-Hours Zine Exchange"**
 
-RMIT Society should feel like the unofficial publication shelf and shared reading table in a student common room: active, authored, and collectively maintained. Its visual language comes from independent campus publishing rather than official university communications. Strong typographic issue marks, index tabs, ruled structure, and restrained ink colors give societies distinct voices without imitating RMIT branding.
+RMIT Society should feel like the unofficial publication shelf and shared reading table in a student common room: active, authored, and collectively maintained. Its visual language combines contemporary RMIT energy with independent campus publishing rather than official university communications. Red-orange issue marks, index tabs, ruled structure, and warm paper neutrals give societies distinct voices without imitating RMIT branding.
 
 The product retains the interaction clarity students already understand from mature forums: communities, feeds, votes, sorting, comments, and moderation states behave predictably. The identity must not depend on copying Reddit's visual language. Familiar behavior sits inside a publication system built for focused reading, clear ownership, and visible accountability.
 
@@ -26,40 +26,42 @@ The interface is adaptive. Daylight mode resembles cool, clean publication stock
 
 ## Colors
 
-Use a restrained two-ink strategy. Neutral surfaces and text carry almost all information; one lead ink creates identity and action, while one highlighter ink signals live or exceptional state. Exact values are **[to be resolved during implementation]**.
+Use a restrained red-orange ink strategy. Warm neutral surfaces and deep ink carry the atmosphere; red-orange creates identity, action, and wayfinding. A yellow signal color appears only for focus, unread changes, and time-sensitive states. This is an RMIT-inspired student-community palette, not a claim of official RMIT brand usage.
 
 ### Primary
 
-- **Electric Ultramarine:** The lead publication ink for primary actions, active navigation, selected society tabs, links, and focus treatment. It should read as energetic and independent rather than institutional.
+- **Studio Red-Orange:** `oklch(0.53 0.18 32)` in daylight and `oklch(0.72 0.17 32)` in dark mode. Use for primary actions, active navigation, selected society tabs, links, issue marks, and focus treatment. It should feel energetic and creative without becoming alarm red.
 
 ### Secondary
 
-- **Highlighter Signal:** A rare functional ink for unread changes, active participation, and time-sensitive status. It is not a decorative accent and must never carry meaning without text or an icon.
+- **Signal Yellow:** `oklch(0.84 0.16 82)` in daylight and `oklch(0.84 0.14 80)` in dark mode. Reserve for focus, unread changes, active participation, and time-sensitive status. Pair with text, icons, or shape; never use it as the only status cue.
 
 ### Neutral
 
-- **Cool Publication Stock:** The daylight ground; clean and cool rather than warm, nostalgic, or parchment-like.
-- **Fresh Sheet:** A lifted light surface for focused reading areas and controls when tonal separation is necessary.
-- **Registration Black:** Primary text, rules, icons, and high-contrast controls in daylight mode.
-- **Deep Ink:** The night-mode ground; chromatic and quiet rather than absolute black.
-- **Night Paper:** Primary text and key marks on deep-ink surfaces.
-- **Proof Grey:** Secondary text, disabled states, dividers, and low-emphasis regions in both modes.
+- **Warm Publication Stock:** `oklch(0.972 0.014 45)` daylight ground; clean, warm, and contemporary rather than parchment-like.
+- **Fresh Sheet:** `oklch(0.99 0.008 48)` lifted light surface for focused reading areas and controls.
+- **Registration Ink:** `oklch(0.18 0.026 32)` primary text, rules, icons, and high-contrast controls in daylight mode.
+- **Deep Ink:** `oklch(0.16 0.026 30)` dark-mode ground; chromatic and quiet rather than absolute black.
+- **Night Paper:** `oklch(0.95 0.012 45)` primary text and key marks on deep-ink surfaces.
+- **Proof Grey:** `oklch(0.47 0.035 32)` daylight secondary text; `oklch(0.73 0.03 40)` dark-mode secondary text.
 
 ### Named Rules
 
-**The Two-Ink Rule.** Neutral ink plus the lead ink should resolve almost every screen. The highlighter enters only when a state genuinely needs immediate attention.
+**The Red-Orange Signal Rule.** Red-orange is the memorable lead and belongs to action, orientation, and identity—not scattered decoration.
+
+**The Two-Ink Rule.** Neutral ink plus red-orange should resolve almost every screen. Yellow enters only when a state genuinely needs immediate attention.
 
 **The Meaning Survives Rule.** Removing color must not remove status, hierarchy, vote state, report outcome, or moderation ownership.
 
-**The Unofficial Rule.** Do not reproduce official RMIT red, lockups, campaign graphics, or institutional brand arrangements unless authorized assets and usage guidance are later provided.
+**The Unofficial Rule.** Use this palette as an RMIT-inspired community expression. Do not reproduce official RMIT red, logos, lockups, campaign graphics, or institutional brand arrangements unless authorized assets and usage guidance are later provided.
 
 ## Typography
 
-**Display Font:** A bold, condensed publication face **[to be resolved during implementation]**
+**Display Font:** A bold, condensed publication face using the current condensed display fallback.
 
-**Body Font:** A highly legible workhorse sans serif **[to be resolved during implementation]**
+**Body Font:** Geist Variable, a highly legible workhorse sans serif.
 
-**Label/Mono Font:** A compact annotation or tab face, only if needed **[to be resolved during implementation]**
+**Label/Mono Font:** The body sans in compact uppercase treatments; use a mono face only for technical identifiers or measurements.
 
 **Character:** Display type acts like a zine masthead or issue marker: direct, compressed, and unmistakable. Reading type stays calm through long threads and dense metadata. Personality must come from the contrast between these jobs, not from making every label expressive.
 
@@ -108,7 +110,7 @@ Borders behave as editorial rules: crisp, purposeful, and used to organize readi
 ### Do:
 
 - **Do** preserve familiar forum workflows while giving them a distinct RMIT Society identity.
-- **Do** let society identity appear through typography, a controlled ink assignment, tabs, and issue marks within the shared system.
+- **Do** let society identity appear through typography, controlled red-orange assignments, tabs, and issue marks within the shared system.
 - **Do** keep thread content and comments optimized for sustained reading in both light and dark modes.
 - **Do** pair every report, moderation, vote, and membership state with explicit words or recognizable icons.
 - **Do** use rules, rhythm, and tonal layering before adding containers or shadows.
@@ -117,7 +119,7 @@ Borders behave as editorial rules: crisp, purposeful, and used to organize readi
 ### Don't:
 
 - **Don't** reproduce Reddit's card styling, spacing, icon arrangements, or brand cues even when using familiar forum behavior.
-- **Don't** imply official RMIT endorsement or recreate official identity assets without authorization.
+- **Don't** imply official RMIT endorsement or recreate official red, logos, lockups, or identity assets without authorization.
 - **Don't** turn the zine concept into distressed textures, fake tape, illegible handwriting, or decoration behind discussion text.
 - **Don't** scatter accent colors across badges, counters, and icons; color rarity is part of the hierarchy.
 - **Don't** use shadows to make every content block appear equally elevated.

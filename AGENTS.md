@@ -6,6 +6,41 @@
 - **Thread** means a post within a society.
 - Roles follow: **User / Student → Moderator / Society Admin → System Admin**.
 
+## Backend architecture
+
+- Treat `backend` as a domain-oriented modular monolith. Follow `docs/BACKEND_ARCHITECTURE.md` as the backend structure and logical-schema baseline.
+- Organize product code by bounded context under `backend/src/modules/<context>/`, then by `domain`, `application`, `infrastructure`, and `presentation`.
+- Required dependency flow: **Route → Controller → Service → Repository port → Infrastructure adapter**.
+- Controllers own Hono/OpenAPI/Zod transport concerns only. They must not contain business rules, authorization decisions, transactions, or Drizzle queries.
+- Services own use cases, authorization, orchestration, and transaction boundaries. Keep services framework-agnostic and inject dependencies explicitly.
+- Domain code must not import Hono, Drizzle, AWS SDKs, or PostgreSQL types.
+- Repository interfaces live in the application/domain boundary; Drizzle implementations and table definitions live in the owning module's infrastructure layer.
+- Modules communicate through public services or explicit ports, never another module's controller, concrete repository, or tables.
+- Keep moderator authority society-scoped through membership. Only `system_admin` is a global elevated role.
+- Re-export module-owned Drizzle tables from `backend/src/db/schema.ts` for migration tooling. Generate and review migrations; do not hand-edit generated migration metadata.
+- Add focused domain/service/controller tests plus PostgreSQL integration tests for repository and constraint behavior.
+
+## Frontend stack and architecture
+
+- Frontend lives in `web/`. Use existing stack: React 19, Vite 8, TypeScript, pnpm, Tailwind CSS 4, shadcn/ui Radix Nova, React Router 7, TanStack Query, `next-themes`, and `lucide-react`.
+- Use `pnpm` commands from `web/`: `pnpm dev`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `pnpm preview`.
+- Do not introduce a different frontend framework, router, state library, CSS framework, component library, or package manager. Do not add Next.js, Vue, Redux, Material UI, Bootstrap, or npm/yarn without explicit approval.
+- Use Tailwind CSS 4 and existing tokens in `web/src/index.css`. Reuse generated primitives in `web/src/components/ui/`; do not replace shadcn/ui with another UI kit.
+- Use React Router for navigation and route guards. Keep providers, routing, and auth protection in `web/src/app/`; keep `web/src/App.tsx` as a thin application shell.
+- Use TanStack Query for server state and request caching. Reuse `web/src/features/auth/` for session state and auth API behavior; do not create duplicate auth or data-fetching layers.
+- Organize `web/src` by feature and page, not by one large global component folder:
+  - `app/`: providers, routing, and cross-page guards.
+  - `pages/<page>/`: route-level screens and page composition.
+  - `features/<feature>/`: feature-specific components, hooks, types, and API/services.
+  - `components/ui/`: reusable shadcn/ui design-system primitives only.
+  - `components/site/`: small cross-page site primitives only.
+- A page composes feature components; feature components own feature-specific UI, hooks, types, and API calls. Keep dependency flow explicit: page → feature component/hook → feature API/service.
+- Keep components small, focused, and independently understandable. Split components when they mix layout, data fetching, business rules, and presentation, or become difficult to test/reuse.
+- Prefer several manageable components over one large page/component. Never grow `App.tsx` into a feature implementation.
+- Keep domain-specific components inside their feature or page. Share code only for clear cross-feature use cases; avoid premature generic abstractions and cross-feature implementation imports.
+- Preserve current theme behavior: `next-themes` starts dark and uses the `.dark` selector. Keep design tokens in `web/src/index.css`.
+- Add focused tests for feature behavior and page-level composition when frontend behavior changes.
+
 ## Product constraints
 
 - Product is an RMIT-only community forum.

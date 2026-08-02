@@ -66,12 +66,24 @@ describe("health API", () => {
     const response = await app.request("/api/v1/openapi.json");
     const document = (await response.json()) as {
       openapi: string;
+      info: { title: string; version: string };
       paths: Record<string, unknown>;
     };
 
     expect(response.status).toBe(200);
     expect(document.openapi).toBe("3.1.0");
+    expect(document.info).toMatchObject({
+      title: "RMIT Society API",
+      version: "0.1.0",
+    });
     expect(document.paths).toHaveProperty("/api/v1/health/live");
     expect(document.paths).toHaveProperty("/api/v1/health/ready");
+
+    const docsResponse = await app.request("/docs");
+    const docsHtml = await docsResponse.text();
+
+    expect(docsResponse.status).toBe(200);
+    expect(docsResponse.headers.get("content-type")).toContain("text/html");
+    expect(docsHtml).toContain("/api/v1/openapi.json");
   });
 });

@@ -2,6 +2,8 @@
 
 Node.js 22 backend for RMIT Society. Built with Hono, TypeScript 7, Drizzle ORM, and PostgreSQL 17.
 
+Accepted modular-monolith structure, DDD layer boundaries, logical data model, and implementation order are documented in [`../docs/BACKEND_ARCHITECTURE.md`](../docs/BACKEND_ARCHITECTURE.md). Product schema migrations remain deferred until implementation of each tested vertical slice.
+
 ## Phase-one scope
 
 Included:
@@ -48,6 +50,7 @@ API listens on `http://localhost:3000` by default. If host port `5432` is occupi
 | --- | --- |
 | `GET /api/v1/health/live` | Process liveness; does not access PostgreSQL |
 | `GET /api/v1/health/ready` | Readiness; runs a lightweight PostgreSQL query |
+| `GET /docs` | Swagger UI for interactive API exploration |
 | `GET /api/v1/openapi.json` | Generated OpenAPI 3.1 document |
 
 ## Commands

@@ -1,0 +1,73 @@
+import type { Clock } from "../../../shared/application/clock.js";
+import type { TransactionManager } from "../../../shared/application/transaction.js";
+import { ApplicationError } from "../../../shared/domain/errors.js";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import { assertAccountUsable } from "../domain/access.policy.js";
+import { normalizeBio, normalizeDisplayName } from "../domain/registration.policy.js";
+import type { UpdateProfileCommand, UserDto } from "./identity.dto.js";
+import { toUserDto } from "./identity.mappers.js";
+import type { IdentityRepository } from "./identity.repository.js";
+
+export interface UserServiceDependencies {
+  readonly repository: IdentityRepository;
+  readonly transactions: TransactionManager<IdentityRepository>;
+  readonly clock: Clock;
+}
+
+export class UserService {
+  private readonly repository: IdentityRepository;
+  private readonly transactions: TransactionManager<IdentityRepository>;
+  private readonly clock: Clock;
+
+  constructor(dependencies: UserServiceDependencies) {
+    this.repository = dependencies.repository;
+    this.transactions = dependencies.transactions;
+    this.clock = dependencies.clock;
+  }
+
+  async getProfile(principal: RequestPrincipal): Promise<UserDto> {
+    const account = await this.accountForPrincipal(principal);
+    return toUserDto(account);
+  }
+
+  async updateProfile(
+    principal: RequestPrincipal,
+    command: UpdateProfileCommand,
+  ): Promise<UserDto> {
+    const account = await this.accountForPrincipal(principal);
+    const input = {
+      updatedAt: this.clock.now(),
+      ...(command.displayName === undefined
+        ? {}
+        : { displayName: normalizeDisplayName(command.displayName) }),
+      ...(command.bio === undefined ? {} : { bio: normalizeBio(command.bio) }),
+      ...(command.avatarMediaId === undefined ? {} : { avatarMediaId: command.avatarMediaId }),
+    };
+
+    if (Object.keys(input).length === 1) {
+      return toUserDto(account);
+    }
+
+    return toUserDto(
+      await this.transactions.withTransaction(async (repository) => {
+        await repository.updateProfile(principal.userId, input);
+        const updatedAccount = await repository.findAccountByUserId(principal.userId);
+        if (updatedAccount === null) {
+          throw new ApplicationError("USER_NOT_FOUND", "User was not found");
+        }
+
+        return updatedAccount;
+      }),
+    );
+  }
+
+  private async accountForPrincipal(principal: RequestPrincipal) {
+    const account = await this.repository.findAccountByUserId(principal.userId);
+    if (account === null) {
+      throw new ApplicationError("AUTH_REQUIRED", "Authentication is required");
+    }
+
+    assertAccountUsable(account, this.clock.now());
+    return account;
+  }
+}
