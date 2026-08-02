@@ -74,7 +74,7 @@ resource "aws_s3_bucket_cors_configuration" "media" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "HEAD", "PUT"]
-    allowed_origins = [local.public_origin]
+    allowed_origins = [local.web_origin]
     expose_headers  = ["ETag"]
     max_age_seconds = 3600
   }
@@ -82,19 +82,6 @@ resource "aws_s3_bucket_cors_configuration" "media" {
 
 resource "aws_ecr_repository" "backend" {
   name                 = "${local.name}-backend"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  encryption_configuration {
-    encryption_type = "AES256"
-  }
-}
-
-resource "aws_ecr_repository" "web" {
-  name                 = "${local.name}-web"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
@@ -130,9 +117,4 @@ resource "aws_ecr_lifecycle_policy" "backend" {
       action = { type = "expire" }
     }]
   })
-}
-
-resource "aws_ecr_lifecycle_policy" "web" {
-  repository = aws_ecr_repository.web.name
-  policy     = aws_ecr_lifecycle_policy.backend.policy
 }

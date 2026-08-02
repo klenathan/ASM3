@@ -63,7 +63,8 @@ The application is an individual cloud-computing assessment project. It must run
 - **Storage:** Amazon S3 for media objects
 - **Database:** Amazon RDS
 - **Analytics:** Deferred for the current milestone; must be revisited because the assessment requires an Analytics-category AWS service
-- **Networking and content delivery:** API Gateway provides the HTTPS entry point for the Nginx-served web client and backend API; CloudFront is unavailable in Learner Lab
+- **Frontend hosting and content delivery:** AWS Amplify serves the React client and proxies its API requests to API Gateway
+- **Networking:** API Gateway provides the HTTPS backend API; CloudFront is unavailable as a directly managed service in Learner Lab
 
 Every graded AWS service must be fully implemented and invoked automatically by the client, application code, or another service—not only through CLI or AWS Console.
 

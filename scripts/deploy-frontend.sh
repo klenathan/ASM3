@@ -16,8 +16,10 @@ if [[ -f "$ROOT_DIR/.env" ]]; then
 fi
 
 command -v aws >/dev/null || { echo "aws CLI not found" >&2; exit 1; }
-command -v docker >/dev/null || { echo "docker not found" >&2; exit 1; }
+command -v curl >/dev/null || { echo "curl not found" >&2; exit 1; }
+command -v pnpm >/dev/null || { echo "pnpm not found" >&2; exit 1; }
 command -v tofu >/dev/null || { echo "tofu not found" >&2; exit 1; }
+command -v zip >/dev/null || { echo "zip not found" >&2; exit 1; }
 
 test -f "$WEB_DIR/package.json" || {
   echo "Frontend package manifest not found: $WEB_DIR/package.json" >&2
@@ -33,33 +35,36 @@ if [[ -z "$AWS_REGION" ]]; then
   exit 1
 fi
 
-API_URL=$(tofu -chdir="$INFRA_DIR" output -raw api_url)
-REPOSITORY_URL="${ECR_REPOSITORY_URL:-$(tofu -chdir="$INFRA_DIR" output -raw web_ecr_repository_url)}"
-REGISTRY="${REPOSITORY_URL%%/*}"
-IMAGE_TAG="${1:-${IMAGE_TAG:-latest}}"
-TARGET_PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
-IMAGE_URI="$REPOSITORY_URL:$IMAGE_TAG"
+SITE_URL=$(tofu -chdir="$INFRA_DIR" output -raw site_url)
+APP_ID=$(tofu -chdir="$INFRA_DIR" output -raw amplify_app_id)
+BRANCH_NAME=$(tofu -chdir="$INFRA_DIR" output -raw amplify_branch_name)
 
-case "$TARGET_PLATFORM" in
-  linux/amd64|linux/arm64) ;;
-  *)
-    echo "TARGET_PLATFORM must be linux/amd64 or linux/arm64; got: $TARGET_PLATFORM" >&2
-    exit 1
-    ;;
-esac
+TEMP_DIR=$(mktemp -d)
+ARCHIVE="$TEMP_DIR/frontend.zip"
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
 aws sts get-caller-identity >/dev/null
 
-echo "Building $IMAGE_URI for $API_URL"
-aws ecr get-login-password --region "$AWS_REGION" |
-  docker login --username AWS --password-stdin "$REGISTRY" >/dev/null
+echo "Building frontend for $SITE_URL"
+VITE_API_URL="$SITE_URL" pnpm --dir "$WEB_DIR" build
 
-docker buildx build \
-  --platform "$TARGET_PLATFORM" \
-  --provenance=false \
-  --build-arg "VITE_API_URL=$API_URL" \
-  --tag "$IMAGE_URI" \
-  --push \
-  "$WEB_DIR"
+(cd "$WEB_DIR/dist" && zip -qr "$ARCHIVE" .)
 
-echo "Pushed frontend image $IMAGE_URI"
+read -r JOB_ID UPLOAD_URL < <(
+  aws amplify create-deployment \
+    --app-id "$APP_ID" \
+    --branch-name "$BRANCH_NAME" \
+    --region "$AWS_REGION" \
+    --query '[jobId,zipUploadUrl]' \
+    --output text
+)
+
+curl --fail --silent --show-error --upload-file "$ARCHIVE" "$UPLOAD_URL"
+
+aws amplify start-deployment \
+  --app-id "$APP_ID" \
+  --branch-name "$BRANCH_NAME" \
+  --job-id "$JOB_ID" \
+  --region "$AWS_REGION" >/dev/null
+
+echo "Started Amplify deployment $JOB_ID for $SITE_URL"

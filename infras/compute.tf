@@ -68,8 +68,8 @@ resource "aws_ecs_task_definition" "backend" {
     name      = "backend"
     image     = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
     essential = true
-    cpu       = 192
-    memory    = 320
+    cpu       = 256
+    memory    = 384
     portMappings = [{
       containerPort = 3000
       hostPort      = 3000
@@ -79,7 +79,7 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "NODE_ENV", value = "production" },
       { name = "HOST", value = "0.0.0.0" },
       { name = "PORT", value = "3000" },
-      { name = "WEB_ORIGIN", value = local.public_origin },
+      { name = "WEB_ORIGIN", value = local.web_origin },
       { name = "DATABASE_SSL", value = "true" },
       { name = "DATABASE_POOL_MAX", value = "5" },
       { name = "AWS_REGION", value = var.aws_region },
@@ -102,32 +102,6 @@ resource "aws_ecs_task_definition" "backend" {
         awslogs-group         = aws_cloudwatch_log_group.backend.name
         awslogs-region        = var.aws_region
         awslogs-stream-prefix = "backend"
-      }
-    }
-    }, {
-    name      = "web"
-    image     = "${aws_ecr_repository.web.repository_url}:${var.web_image_tag}"
-    essential = true
-    cpu       = 64
-    memory    = 64
-    portMappings = [{
-      containerPort = 8080
-      hostPort      = 8080
-      protocol      = "tcp"
-    }]
-    healthCheck = {
-      command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/healthz || exit 1"]
-      interval    = 30
-      timeout     = 5
-      retries     = 3
-      startPeriod = 10
-    }
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = aws_cloudwatch_log_group.backend.name
-        awslogs-region        = var.aws_region
-        awslogs-stream-prefix = "web"
       }
     }
   }])

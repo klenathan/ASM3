@@ -34,7 +34,7 @@ help:
 		'  make bootstrap-output                Show bootstrap outputs.' \
 		'  make init STATE_BUCKET=<bucket>      Initialize the root remote-state backend.' \
 		'  make plan|apply|destroy|output       Manage the root infrastructure stack.' \
-		'  make deploy-frontend                 Build and push the React web-server image to ECR.' \
+		'  make deploy-frontend                 Build and publish the React app to Amplify.' \
 		'  make push-backend                    Build/push x86 backend image to ECR.' \
 		'  make validate|fmt                    Validate or format both stacks.' \
 		'  make tofu ARGS="<command>"           Run an authenticated root OpenTofu command.' \

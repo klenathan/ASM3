@@ -59,14 +59,6 @@ resource "aws_security_group" "ecs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "API Gateway public HTTP proxy to web container"
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
     description = "Outbound HTTPS, package, and AWS service access"
     from_port   = 0

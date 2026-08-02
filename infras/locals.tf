@@ -1,8 +1,9 @@
 locals {
   name = "${var.project_name}-${var.environment}"
-  public_origin = var.api_custom_domain_name == null ? (
+  api_origin = var.api_custom_domain_name == null ? (
     aws_apigatewayv2_api.backend.api_endpoint
   ) : "https://${aws_apigatewayv2_domain_name.public[0].domain_name}"
+  web_origin = "https://${aws_amplify_branch.web.branch_name}.${aws_amplify_app.web.default_domain}"
 
   common_tags = {
     Project     = var.project_name

@@ -2,14 +2,14 @@
 
 OpenTofu provisions a low-cost demo environment in AWS:
 
-- API Gateway provides one public HTTPS endpoint for the React client and backend API.
-- API Gateway proxies to two containers on one ECS service and one EC2 container instance.
-- Nginx serves the React client with an SPA fallback; S3 stores public media objects.
+- AWS Amplify hosts the React client and rewrites its `/api/*` requests to API Gateway.
+- API Gateway proxies API requests to the backend container on one ECS service and one EC2 container instance.
+- S3 stores public media objects.
 - RDS PostgreSQL is Single-AZ and private across two database subnets.
-- Secrets Manager injects `DATABASE_URL`; ECR stores backend and web images.
+- Secrets Manager injects `DATABASE_URL`; ECR stores backend images.
 - CloudWatch keeps application logs for 7 days and SSM provides shell access without SSH.
 
-The design deliberately omits CloudFront, NAT Gateway, load balancers, Fargate, Multi-AZ RDS, and paid container insights. Learner Lab uses its pre-created `LabRole` and `LabInstanceProfile`. API Gateway's generated `https://*.execute-api.*.amazonaws.com` endpoint terminates HTTPS and routes `/api/*` to the backend and all other paths to Nginx. This is a coursework-only setup: the EC2 ports remain public because HTTP API Gateway has no stable source CIDR, and public media still uses an S3 policy. The application remains the authorization boundary. Add an NLB with an API Gateway VPC Link before using this beyond coursework/demo scope.
+The design deliberately omits a directly managed CloudFront distribution, NAT Gateway, load balancers, Fargate, Multi-AZ RDS, and paid container insights. Learner Lab uses its pre-created `LabRole` and `LabInstanceProfile`. Amplify's generated `https://*.amplifyapp.com` site hosts the SPA and proxies `/api/*` to API Gateway, keeping session cookies first-party. API Gateway then routes those requests to the backend. This is a coursework-only setup: the EC2 backend port remains public because HTTP API Gateway has no stable source CIDR, and public media still uses an S3 policy. The application remains the authorization boundary. Add an NLB with an API Gateway VPC Link before using this beyond coursework/demo scope.
 
 ## Prerequisites
 
@@ -17,6 +17,7 @@ The design deliberately omits CloudFront, NAT Gateway, load balancers, Fargate, 
 - AWS CLI authenticated with SSO or a named profile
 - AWS Academy Learner Lab with pre-created `LabRole` and `LabInstanceProfile`
 - Docker for building the backend image
+- pnpm, zip, and curl for publishing the frontend artifact
 
 Never put AWS keys, database passwords, or other secrets in `.tfvars` or source control.
 
@@ -46,11 +47,11 @@ tofu plan -out=deployment.tfplan
 tofu apply deployment.tfplan
 ```
 
-The initial `app_desired_count = 0` is intentional because both ECR repositories are empty. It does not stop EC2, RDS, EIP, and storage charges; destroy the root stack whenever the demo is not in active use. The deployed web client and API share the API Gateway origin, so cookie CORS is exact without an extra `web_origin` setting.
+The initial `app_desired_count = 0` is intentional because the backend ECR repository is empty. It does not stop EC2, RDS, EIP, Amplify, and storage charges; destroy the root stack whenever the demo is not in active use. The Amplify site proxies API requests through its own origin, so session cookies remain first-party.
 
 ## 3. Publish application artifacts
 
-Build and push the frontend Nginx image. The script embeds the API Gateway origin into the Vite build:
+Build and publish the frontend artifact to the Amplify production branch:
 
 ```sh
 ./scripts/deploy-frontend.sh
@@ -58,8 +59,9 @@ Build and push the frontend Nginx image. The script embeds the API Gateway origi
 make deploy-frontend
 ```
 
-The script sources an optional root `.env` for AWS credentials, builds `web/` for
-Linux, and pushes it to `web_ecr_repository_url` with `VITE_API_URL` set to `api_url`.
+The script sources an optional root `.env`, builds `web/`, then creates and starts
+an Amplify deployment using a signed archive upload. It sets `VITE_API_URL` to the
+Amplify site origin so API requests use Amplify's `/api/*` rewrite rule.
 
 Build and push the backend image from an authenticated development machine:
 

@@ -18,26 +18,6 @@ resource "aws_apigatewayv2_route" "backend" {
   target    = "integrations/${aws_apigatewayv2_integration.backend.id}"
 }
 
-resource "aws_apigatewayv2_integration" "web" {
-  api_id                 = aws_apigatewayv2_api.backend.id
-  integration_type       = "HTTP_PROXY"
-  integration_method     = "ANY"
-  integration_uri        = "http://${aws_eip.ecs.public_dns}:8080"
-  payload_format_version = "1.0"
-  timeout_milliseconds   = 29000
-  request_parameters = {
-    "overwrite:path" = "$request.path"
-  }
-}
-
-# The default HTTP API endpoint is HTTPS. The more-specific /api route above
-# continues to select the backend integration.
-resource "aws_apigatewayv2_route" "web" {
-  api_id    = aws_apigatewayv2_api.backend.id
-  route_key = "$default"
-  target    = "integrations/${aws_apigatewayv2_integration.web.id}"
-}
-
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/apigateway/${local.name}"
   retention_in_days = var.log_retention_days

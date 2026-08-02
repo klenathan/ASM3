@@ -1,11 +1,11 @@
 output "site_url" {
-  description = "Public HTTPS URL for the React application through API Gateway."
-  value       = local.public_origin
+  description = "Public HTTPS URL for the React application through Amplify Hosting."
+  value       = local.web_origin
 }
 
 output "api_url" {
   description = "Public HTTPS API Gateway origin. The client appends /api/v1 paths."
-  value       = local.public_origin
+  value       = local.api_origin
 }
 
 output "api_custom_domain_target" {
@@ -18,9 +18,14 @@ output "api_custom_domain_hosted_zone_id" {
   value       = var.api_custom_domain_name == null ? null : aws_apigatewayv2_domain_name.public[0].domain_name_configuration[0].hosted_zone_id
 }
 
-output "web_ecr_repository_url" {
-  description = "ECR repository URL for the web server image."
-  value       = aws_ecr_repository.web.repository_url
+output "amplify_app_id" {
+  description = "Amplify app ID used by the manual frontend deployment script."
+  value       = aws_amplify_app.web.id
+}
+
+output "amplify_branch_name" {
+  description = "Amplify branch used by the manual frontend deployment script."
+  value       = aws_amplify_branch.web.branch_name
 }
 
 output "media_bucket_name" {

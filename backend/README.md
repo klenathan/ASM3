@@ -93,7 +93,7 @@ Approved RMIT domains live in `src/config/email-domains.ts`, not environment var
 Target request path:
 
 ```text
-Browser → API Gateway (HTTPS) → Nginx or backend ECS container on EC2 → RDS PostgreSQL
+Browser → Amplify Hosting → API Gateway (HTTPS) → backend ECS container on EC2 → RDS PostgreSQL
 ```
 
-API Gateway routing and ECS infrastructure are separate deployment work. API responses remain non-cacheable unless a future route explicitly defines safe caching.
+Amplify rewrites `/api/*` to API Gateway so browser sessions remain first-party. API Gateway routing and ECS infrastructure are separate deployment work. API responses remain non-cacheable unless a future route explicitly defines safe caching.

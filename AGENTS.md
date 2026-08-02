@@ -54,10 +54,11 @@
 
 - **Compute:** Amazon EC2. Do not replace primary compute with Lambda unless requirements change.
 - **Containers:** Use Amazon ECS with EC2 launch type where orchestration is needed. Reuse EC2 capacity instead of adding Fargate baseline cost.
-- **Storage:** Amazon S3 for uploaded media and static assets.
+- **Storage:** Amazon S3 for uploaded media.
 - **Database:** Amazon RDS. Do not substitute DynamoDB without approval.
 - **Analytics:** Deferred for current milestone. Do not provision analytics services yet; assessment requires this category before final submission.
-- **Networking/content delivery:** Amazon CloudFront. Use it for cached delivery of the web client and S3 media while keeping request volume and cache behavior cost-conscious.
+- **Frontend hosting/content delivery:** AWS Amplify serves the web client and proxies its API requests to API Gateway.
+- **Networking:** API Gateway provides the backend HTTPS API. Use CloudFront directly only when Amplify cannot satisfy a confirmed product need.
 
 ## Cost and infrastructure rules
 

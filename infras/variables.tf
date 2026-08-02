@@ -113,14 +113,8 @@ variable "backend_image_tag" {
   default     = "latest"
 }
 
-variable "web_image_tag" {
-  description = "Frontend ECR image tag deployed by ECS."
-  type        = string
-  default     = "latest"
-}
-
 variable "app_desired_count" {
-  description = "Number of application tasks. Keep at 0 until both images have been pushed to ECR."
+  description = "Number of backend tasks. Keep at 0 until an image has been pushed to ECR."
   type        = number
   default     = 0
 
