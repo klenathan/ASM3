@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALLOWED_EMAIL_DOMAINS } from "./email-domains";
 
 const postgresUrl = z.string().min(1).refine(
   (value) => {
@@ -27,6 +28,10 @@ const environmentSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+  ALLOWED_EMAIL_DOMAINS: z
+    .string()
+    .default(ALLOWED_EMAIL_DOMAINS.join(","))
+    .transform((value) => value.split(",").map((domain) => domain.trim().toLowerCase()).filter(Boolean)),
 });
 
 export interface AppConfig {
@@ -38,6 +43,7 @@ export interface AppConfig {
   readonly databaseUrl: string;
   readonly databaseSsl: boolean;
   readonly databasePoolMax: number;
+  readonly allowedEmailDomains: readonly string[];
 }
 
 export function loadConfig(
@@ -62,5 +68,6 @@ export function loadConfig(
     databaseUrl: result.data.DATABASE_URL,
     databaseSsl: result.data.DATABASE_SSL,
     databasePoolMax: result.data.DATABASE_POOL_MAX,
+    allowedEmailDomains: result.data.ALLOWED_EMAIL_DOMAINS,
   };
 }

@@ -22,7 +22,7 @@ Never put AWS keys, database passwords, or other secrets in `.tfvars` or source 
 
 ## 1. Create remote state
 
-The bootstrap stack stays in local state and creates an encrypted, versioned S3 bucket. Keep its local state secure.
+The bootstrap stack stays in local state and creates an encrypted, versioned S3 bucket. Noncurrent state versions expire after 90 days; keep its local state secure. Use the same region in both stacks. The supplied configuration uses US East (N. Virginia) (`us-east-1`).
 
 ```sh
 cd infras/bootstrap
@@ -41,12 +41,12 @@ cp terraform.tfvars.example terraform.tfvars
 tofu init \
   -backend-config="bucket=STATE_BUCKET_NAME" \
   -backend-config="key=demo/infrastructure.tfstate" \
-  -backend-config="region=ap-southeast-2"
+  -backend-config="region=us-east-1"
 tofu plan -out=deployment.tfplan
 tofu apply deployment.tfplan
 ```
 
-The initial `app_desired_count = 0` is intentional because ECR is empty. Set `web_origin` to the `site_url` output before starting the backend so cookie CORS is exact.
+The initial `app_desired_count = 0` is intentional because ECR is empty. It does not stop EC2, RDS, EIP, and storage charges; destroy the root stack whenever the demo is not in active use. Set `web_origin` to the `site_url` output before starting the backend so cookie CORS is exact.
 
 ## 3. Publish application artifacts
 
@@ -66,7 +66,7 @@ Build and push the backend image:
 cd ../backend
 REPOSITORY=$(tofu -chdir=../infras output -raw backend_ecr_repository_url)
 REGISTRY=${REPOSITORY%/*}
-aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin "$REGISTRY"
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin "$REGISTRY"
 docker build -t "$REPOSITORY:latest" .
 docker push "$REPOSITORY:latest"
 ```
@@ -84,7 +84,7 @@ Use immutable image tags in repeatable CI deployments rather than `latest`.
 
 ## Teardown
 
-Empty the content buckets first, or set `force_destroy_buckets = true` for the final apply, then destroy the root stack:
+Empty the content buckets first, or set `force_destroy_buckets = true` for the final apply, then destroy the root stack. This releases the EC2 instance, public IPv4 address, RDS instance, and other recurring-cost resources:
 
 ```sh
 tofu plan -destroy -out=destroy.tfplan

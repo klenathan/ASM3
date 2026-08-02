@@ -20,13 +20,13 @@ export function AppRoutes() {
           <Route index element={<ForumPage />} />
           <Route path="societies" element={<BrowseSocietiesPage />} />
           <Route path="s/:slug" element={<SocietyDetailPage />} />
+          <Route path="s/:slug/t/:id" element={<ThreadPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="u/:sid" element={<UserProfilePage />} />
         </Route>
       </Route>
       <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/s/:slug/t/:id" element={<ThreadPage />} />
       <Route path="/society/:slug/thread/:id" element={<ThreadRedirect />} />
       <Route path="/401" element={<UnauthorizedPage />} />
       <Route path="/403" element={<ForbiddenPage />} />

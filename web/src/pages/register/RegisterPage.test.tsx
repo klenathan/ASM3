@@ -78,9 +78,13 @@ describe("RegisterPage", () => {
   });
 
   it("submits valid data to the register endpoint and enters the forum", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({ user: currentUser, sessionToken: "token", expiresAt: "" }, 201),
-    );
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/auth/me")) {
+        return Promise.resolve(jsonResponse({ error: { code: "AUTH_REQUIRED" } }, 401));
+      }
+
+      return Promise.resolve(jsonResponse({ user: currentUser, sessionToken: "token", expiresAt: "" }, 201));
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
@@ -96,7 +100,9 @@ describe("RegisterPage", () => {
       expect(screen.getByText("Home marker")).toBeInTheDocument(),
     );
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls.find(([requestUrl]) => (
+      String(requestUrl).endsWith("/auth/register")
+    )) as [string, RequestInit];
     expect(url).toContain("/api/v1/auth/register");
     expect(init.method).toBe("POST");
     expect(JSON.parse(String(init.body))).toEqual({

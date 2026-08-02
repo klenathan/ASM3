@@ -35,10 +35,14 @@ export class LocalPasswordAdapter implements PasswordAdapter {
     this.credentials = credentials;
   }
 
-  async setPassword(userId: string, password: string): Promise<void> {
+  async hashPassword(password: string): Promise<string> {
     const salt = randomBytes(16);
     const digest = await deriveKey(password, salt);
-    await this.credentials.set(userId, formatHash(salt, digest));
+    return formatHash(salt, digest);
+  }
+
+  async setPassword(userId: string, password: string): Promise<void> {
+    await this.credentials.set(userId, await this.hashPassword(password));
   }
 
   async verifyPassword(userId: string, password: string): Promise<boolean> {

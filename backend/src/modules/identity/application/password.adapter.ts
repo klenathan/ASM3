@@ -5,6 +5,7 @@ export interface PasswordCredentialStore {
 }
 
 export interface PasswordAdapter {
+  hashPassword(password: string): Promise<string>;
   setPassword(userId: string, password: string): Promise<void>;
   verifyPassword(userId: string, password: string): Promise<boolean>;
   removePassword(userId: string): Promise<void>;

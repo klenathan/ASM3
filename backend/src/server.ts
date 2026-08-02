@@ -20,7 +20,10 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const database = createDatabase(config, logger);
-  const identity = createIdentityModule({ database: database.db });
+  const identity = createIdentityModule({
+    database: database.db,
+    allowedEmailDomains: config.allowedEmailDomains,
+  });
   const societies = createSocietyModule({ database: database.db });
   const discussions = createDiscussionsModule({
     database: database.db,

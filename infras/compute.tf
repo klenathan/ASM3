@@ -28,6 +28,10 @@ resource "aws_instance" "ecs" {
   user_data_replace_on_change = true
   monitoring                  = false
 
+  credit_specification {
+    cpu_credits = "standard"
+  }
+
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"

@@ -15,7 +15,6 @@ import type { ThreadService } from "../application/thread.service";
 import type { VoteService } from "../application/vote.service";
 import {
   discussionErrorResponse,
-  getInjectedPrincipal,
   requireInjectedPrincipal,
   validated,
 } from "./discussion.http.helpers";
@@ -54,7 +53,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       try {
         const { societySlug } = validated<SocietyPathParams>(context, "param");
         const result = await dependencies.feedService.listSocietyThreads(
-          getInjectedPrincipal(context),
+          requireInjectedPrincipal(context),
           societySlug,
           pageFrom(validated<PageQuery>(context, "query")),
         );
@@ -92,7 +91,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       try {
         const { threadId } = validated<ThreadPathParams>(context, "param");
         const result = await dependencies.threadService.getThread(
-          getInjectedPrincipal(context),
+          requireInjectedPrincipal(context),
           threadId,
         );
         return context.json(result, 200);
@@ -128,7 +127,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       try {
         const { threadId } = validated<ThreadPathParams>(context, "param");
         const result = await dependencies.feedService.listThreadComments(
-          getInjectedPrincipal(context),
+          requireInjectedPrincipal(context),
           threadId,
           pageFrom(validated<PageQuery>(context, "query")),
         );
@@ -154,7 +153,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       try {
         const { userId } = validated<PublicUserIdParams>(context, "param");
         const result = await dependencies.feedService.listUserThreads(
-          getInjectedPrincipal(context),
+          requireInjectedPrincipal(context),
           userId,
           pageFrom(validated<PageQuery>(context, "query")),
         );
@@ -168,7 +167,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       try {
         const { userId } = validated<PublicUserIdParams>(context, "param");
         const result = await dependencies.feedService.listUserComments(
-          getInjectedPrincipal(context),
+          requireInjectedPrincipal(context),
           userId,
           pageFrom(validated<PageQuery>(context, "query")),
         );
@@ -194,7 +193,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       try {
         const { commentId } = validated<CommentPathParams>(context, "param");
         const result = await dependencies.commentService.getComment(
-          getInjectedPrincipal(context),
+          requireInjectedPrincipal(context),
           commentId,
         );
         return context.json(result, 200);

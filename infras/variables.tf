@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region in which to deploy the application."
   type        = string
-  default     = "ap-southeast-2"
+  default     = "us-east-1"
 }
 
 variable "project_name" {
@@ -102,7 +102,7 @@ variable "app_desired_count" {
 variable "log_retention_days" {
   description = "CloudWatch application log retention."
   type        = number
-  default     = 14
+  default     = 7
 }
 
 variable "force_destroy_buckets" {

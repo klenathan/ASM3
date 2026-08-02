@@ -38,6 +38,7 @@ const listThreadsRoute = createRoute({
   responses: {
     200: { description: "Thread feed", content: { "application/json": { schema: threadPageSchema } } },
     400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });
@@ -82,6 +83,7 @@ const getThreadRoute = createRoute({
   request: { params: threadIdParams },
   responses: {
     200: { description: "Thread", content: { "application/json": { schema: threadSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });
@@ -127,6 +129,7 @@ const listCommentsRoute = createRoute({
   responses: {
     200: { description: "Comment feed", content: { "application/json": { schema: commentPageSchema } } },
     400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });
@@ -177,6 +180,7 @@ const listUserThreadsRoute = createRoute({
   responses: {
     200: { description: "Thread activity", content: { "application/json": { schema: userThreadActivityPageSchema } } },
     400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "Profile activity is private", content: { "application/json": { schema: errorSchema } } },
     404: { description: "User was not found", content: { "application/json": { schema: errorSchema } } },
   },
@@ -191,6 +195,7 @@ const listUserCommentsRoute = createRoute({
   responses: {
     200: { description: "Comment activity", content: { "application/json": { schema: userCommentActivityPageSchema } } },
     400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "Profile activity is private", content: { "application/json": { schema: errorSchema } } },
     404: { description: "User was not found", content: { "application/json": { schema: errorSchema } } },
   },
@@ -204,6 +209,7 @@ const getCommentRoute = createRoute({
   request: { params: commentIdParams },
   responses: {
     200: { description: "Comment", content: { "application/json": { schema: commentSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Comment was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });

@@ -58,3 +58,22 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
     }
   }
 }
+
+resource "aws_s3_bucket_lifecycle_configuration" "state" {
+  bucket = aws_s3_bucket.state.id
+
+  rule {
+    id     = "cleanup-old-state-versions"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+}

@@ -25,14 +25,6 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 const SESSION_RESTORE_HINT_KEY = 'rmit-session-restore'
 
-function hasSessionRestoreHint(): boolean {
-  try {
-    return window.localStorage.getItem(SESSION_RESTORE_HINT_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
-
 function setSessionRestoreHint(isPresent: boolean): void {
   try {
     if (isPresent) {
@@ -46,9 +38,7 @@ function setSessionRestoreHint(isPresent: boolean): void {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>(() => (
-    hasSessionRestoreHint() ? 'loading' : 'unauthenticated'
-  ))
+  const [status, setStatus] = useState<AuthStatus>('loading')
   const hasRestoredSession = useRef(false)
   const [user, setUser] = useState<User | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
@@ -74,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!hasSessionRestoreHint() || hasRestoredSession.current) return
+    if (hasRestoredSession.current) return
     hasRestoredSession.current = true
     void refresh()
   }, [refresh])

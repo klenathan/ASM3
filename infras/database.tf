@@ -16,10 +16,9 @@ resource "aws_db_instance" "this" {
   engine_version = "16"
   instance_class = var.db_instance_class
 
-  allocated_storage     = 20
-  max_allocated_storage = 50
-  storage_type          = "gp3"
-  storage_encrypted     = true
+  allocated_storage = 20
+  storage_type      = "gp3"
+  storage_encrypted = true
 
   db_name  = var.db_name
   username = var.db_username

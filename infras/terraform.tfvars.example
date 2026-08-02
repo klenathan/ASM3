@@ -1,5 +1,5 @@
 # Authentication is intentionally absent. Use AWS SSO or AWS_PROFILE.
-aws_region  = "ap-southeast-2"
+aws_region   = "ap-southeast-2"
 project_name = "rmit-society"
 environment  = "demo"
 owner        = "s1234567"

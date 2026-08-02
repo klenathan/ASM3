@@ -10,6 +10,7 @@ import type {
 export interface CreateAuthUserInput {
   readonly id: string;
   readonly email: string;
+  readonly passwordHash: string;
 }
 
 export interface CreateUserProfileInput {

@@ -117,6 +117,8 @@ export function createApp(dependencies: AppDependencies) {
       app.use("/api/v1/comments/*", principalMiddleware);
       app.use("/api/v1/feed", principalMiddleware);
       app.use("/api/v1/feed/*", principalMiddleware);
+      app.use("/api/v1/users", principalMiddleware);
+      app.use("/api/v1/users/*", principalMiddleware);
     }
     registerDiscussionRoutes(app, dependencies.discussions);
   }

@@ -46,14 +46,33 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "content" {
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "media" {
-  bucket = aws_s3_bucket.media.id
+resource "aws_s3_bucket_lifecycle_configuration" "content" {
+  for_each = {
+    web = {
+      bucket                  = aws_s3_bucket.web.id
+      noncurrent_version_days = 7
+    }
+    media = {
+      bucket                  = aws_s3_bucket.media.id
+      noncurrent_version_days = 30
+    }
+  }
+
+  bucket = each.value.bucket
 
   rule {
-    id     = "abort-incomplete-uploads"
+    id     = "cleanup-old-versions"
     status = "Enabled"
 
     filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = each.value.noncurrent_version_days
+    }
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
@@ -91,11 +110,21 @@ resource "aws_ecr_lifecycle_policy" "backend" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep the ten newest images"
+      description  = "Expire untagged images after one day"
+      selection = {
+        tagStatus   = "untagged"
+        countType   = "sinceImagePushed"
+        countUnit   = "days"
+        countNumber = 1
+      }
+      action = { type = "expire" }
+      }, {
+      rulePriority = 2
+      description  = "Keep the three newest images"
       selection = {
         tagStatus   = "any"
         countType   = "imageCountMoreThan"
-        countNumber = 10
+        countNumber = 3
       }
       action = { type = "expire" }
     }]

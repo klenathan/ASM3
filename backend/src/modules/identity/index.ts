@@ -22,7 +22,6 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
   const repository = new DrizzleIdentityRepository(dependencies.database);
   const transactions = new DrizzleIdentityTransactionManager(dependencies.database);
   const clock = dependencies.clock ?? systemClock;
-  // The supplied auth schema has no password-hash field; inject a durable store before deployment.
   const passwordAdapter = dependencies.passwordAdapter
     ?? new LocalPasswordAdapter(new DrizzlePasswordCredentialStore(dependencies.database));
   const sessionAdapter = dependencies.sessionAdapter ?? new OpaqueSessionAdapter();

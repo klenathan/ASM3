@@ -58,37 +58,31 @@ export class AuthService {
     const now = this.clock.now();
     const session = this.sessionAdapter.issue();
     const expiresAt = new Date(now.getTime() + SESSION_DURATION_MS);
+    const passwordHash = await this.passwordAdapter.hashPassword(command.password);
 
-    await this.passwordAdapter.setPassword(userId, command.password);
+    const account = await this.transactions.withTransaction(async (repository) => {
+      const existingUser = await repository.findUserByEmail(email);
+      if (existingUser !== null) {
+        throw new DomainError("EMAIL_ALREADY_REGISTERED", "An account already uses this email");
+      }
 
-    try {
-      const account = await this.transactions.withTransaction(async (repository) => {
-        const existingUser = await repository.findUserByEmail(email);
-        if (existingUser !== null) {
-          throw new DomainError("EMAIL_ALREADY_REGISTERED", "An account already uses this email");
-        }
-
-        const user = await repository.createUser({ id: userId, email });
-        await repository.createProfile({ userId: user.id, displayName, bio });
-        await repository.createSession({
-          id: session.hash,
-          userId: user.id,
-          expiresAt,
-        });
-
-        const createdAccount = await repository.findAccountByUserId(user.id);
-        if (createdAccount === null) {
-          throw new ApplicationError("IDENTITY_DATA_INVALID", "The account profile could not be created");
-        }
-
-        return createdAccount;
+      const user = await repository.createUser({ id: userId, email, passwordHash });
+      await repository.createProfile({ userId: user.id, displayName, bio });
+      await repository.createSession({
+        id: session.hash,
+        userId: user.id,
+        expiresAt,
       });
 
-      return this.authResult(account, session.token, expiresAt);
-    } catch (error) {
-      await this.passwordAdapter.removePassword(userId);
-      throw error;
-    }
+      const createdAccount = await repository.findAccountByUserId(user.id);
+      if (createdAccount === null) {
+        throw new ApplicationError("IDENTITY_DATA_INVALID", "The account profile could not be created");
+      }
+
+      return createdAccount;
+    });
+
+    return this.authResult(account, session.token, expiresAt);
   }
 
   async signIn(command: SignInCommand): Promise<AuthResultDto> {

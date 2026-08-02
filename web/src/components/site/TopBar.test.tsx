@@ -40,7 +40,7 @@ function setup() {
 
 describe("TopBar", () => {
   beforeEach(() => {
-    localStorage.setItem("rmit-session-restore", "true");
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -48,7 +48,7 @@ describe("TopBar", () => {
     localStorage.clear();
   });
 
-  it("renders brand, search, and user avatar", async () => {
+  it("restores a cookie session even when local storage has been cleared", async () => {
     setup();
     expect(await screen.findByLabelText(/search societies/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /rmit society/i })).toBeInTheDocument();
