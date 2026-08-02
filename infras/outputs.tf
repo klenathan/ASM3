@@ -48,6 +48,21 @@ output "ecs_service_name" {
   value       = aws_ecs_service.backend.name
 }
 
+output "database_bootstrap_task_definition_arn" {
+  description = "One-shot ECS task definition that applies migrations and seeds initial data."
+  value       = aws_ecs_task_definition.database_bootstrap.arn
+}
+
+output "database_bootstrap_image_uri" {
+  description = "ECR image URI expected by the one-shot database bootstrap task."
+  value       = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}-database-bootstrap"
+}
+
+output "database_bootstrap_log_group_name" {
+  description = "CloudWatch log group for one-shot migration and seed runs."
+  value       = aws_cloudwatch_log_group.database_bootstrap.name
+}
+
 output "database_url_secret_arn" {
   description = "Secrets Manager ARN containing DATABASE_URL."
   value       = aws_secretsmanager_secret.database_url.arn

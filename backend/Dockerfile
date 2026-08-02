@@ -20,11 +20,48 @@ COPY package.json tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN pnpm build
 
+FROM base AS rds-ca
+
+ARG RDS_CA_BUNDLE_URL=https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl \
+  && curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
+       "$RDS_CA_BUNDLE_URL" \
+       --output /rds-global-bundle.pem \
+  && test -s /rds-global-bundle.pem \
+  && grep -q 'BEGIN CERTIFICATE' /rds-global-bundle.pem \
+  && rm -rf /var/lib/apt/lists/*
+
+FROM base AS database-bootstrap
+
+ENV NODE_ENV=production
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/aws-rds-global-bundle.pem
+
+COPY --from=rds-ca /rds-global-bundle.pem /etc/ssl/certs/aws-rds-global-bundle.pem
+COPY --from=development-dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node package.json drizzle.config.ts ./
+COPY --chown=node:node src ./src
+COPY --chown=node:node drizzle ./drizzle
+
+USER node
+
+# This target is run once by the ECS database-bootstrap task, never as a service.
+CMD ["sh", "-c", "./node_modules/.bin/drizzle-kit migrate && ./node_modules/.bin/tsx src/db/seed.ts"]
+
 FROM node:22.23.1-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
+# AWS RDS CA roots are not guaranteed to exist in the base image trust store.
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/aws-rds-global-bundle.pem
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=rds-ca /rds-global-bundle.pem /etc/ssl/certs/aws-rds-global-bundle.pem
 
 WORKDIR /app
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules

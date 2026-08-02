@@ -13,7 +13,7 @@ TARGET_PLATFORM ?= linux/amd64
 
 .DEFAULT_GOAL := help
 
-.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend
+.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend migrate-seed
 
 define with_env
 	@set -a; \
@@ -36,6 +36,7 @@ help:
 		'  make plan|apply|destroy|output       Manage the root infrastructure stack.' \
 		'  make deploy-frontend                 Build and publish the React app to Amplify.' \
 		'  make push-backend                    Build/push x86 backend image to ECR.' \
+		'  make migrate-seed                    Run the one-shot ECS migration and seed task.' \
 		'  make validate|fmt                    Validate or format both stacks.' \
 		'  make tofu ARGS="<command>"           Run an authenticated root OpenTofu command.' \
 		'  make bootstrap-tofu ARGS="<command>" Run an authenticated bootstrap OpenTofu command.'
@@ -75,6 +76,9 @@ output:
 
 push-backend:
 	@IMAGE_TAG="$(BACKEND_IMAGE_TAG)" TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/push-backend-ecr.sh
+
+migrate-seed:
+	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/run-database-bootstrap.sh
 
 deploy-frontend:
 	@./scripts/deploy-frontend.sh

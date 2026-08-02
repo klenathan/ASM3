@@ -35,11 +35,20 @@ fi
 
 IMAGE_TAG="${1:-${IMAGE_TAG:-latest}}"
 TARGET_PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
+BUILD_TARGET="${BUILD_TARGET:-runtime}"
 
 case "$TARGET_PLATFORM" in
   linux/amd64|linux/arm64) ;;
   *)
     echo "TARGET_PLATFORM must be linux/amd64 or linux/arm64; got: $TARGET_PLATFORM" >&2
+    exit 1
+    ;;
+esac
+
+case "$BUILD_TARGET" in
+  runtime|database-bootstrap) ;;
+  *)
+    echo "BUILD_TARGET must be runtime or database-bootstrap; got: $BUILD_TARGET" >&2
     exit 1
     ;;
 esac
@@ -52,10 +61,11 @@ aws sts get-caller-identity >/dev/null
 aws ecr get-login-password --region "$AWS_REGION" |
   docker login --username AWS --password-stdin "$REGISTRY" >/dev/null
 
-echo "Building $IMAGE_URI for $TARGET_PLATFORM"
+echo "Building $IMAGE_URI ($BUILD_TARGET) for $TARGET_PLATFORM"
 docker buildx build \
   --platform "$TARGET_PLATFORM" \
   --provenance=false \
+  --target "$BUILD_TARGET" \
   --tag "$IMAGE_URI" \
   --push \
   "$BACKEND_DIR"

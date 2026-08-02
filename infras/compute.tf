@@ -12,6 +12,11 @@ resource "aws_cloudwatch_log_group" "backend" {
   retention_in_days = var.log_retention_days
 }
 
+resource "aws_cloudwatch_log_group" "database_bootstrap" {
+  name              = "/ecs/${local.name}/database-bootstrap"
+  retention_in_days = var.log_retention_days
+}
+
 resource "aws_instance" "ecs" {
   ami                    = data.aws_ssm_parameter.ecs_ami.value
   instance_type          = var.ec2_instance_type
@@ -102,6 +107,41 @@ resource "aws_ecs_task_definition" "backend" {
         awslogs-group         = aws_cloudwatch_log_group.backend.name
         awslogs-region        = var.aws_region
         awslogs-stream-prefix = "backend"
+      }
+    }
+  }])
+}
+
+resource "aws_ecs_task_definition" "database_bootstrap" {
+  family                   = "${local.name}-database-bootstrap"
+  requires_compatibilities = ["EC2"]
+  network_mode             = "host"
+  cpu                      = "256"
+  memory                   = "384"
+  execution_role_arn       = data.aws_iam_role.learner_lab.arn
+  task_role_arn            = data.aws_iam_role.learner_lab.arn
+
+  container_definitions = jsonencode([{
+    name      = "database-bootstrap"
+    image     = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}-database-bootstrap"
+    essential = true
+    cpu       = 256
+    memory    = 384
+    environment = [
+      { name = "NODE_ENV", value = "production" },
+      { name = "DATABASE_SSL", value = "true" },
+      { name = "DATABASE_POOL_MAX", value = "2" },
+    ]
+    secrets = [{
+      name      = "DATABASE_URL"
+      valueFrom = aws_secretsmanager_secret.database_url.arn
+    }]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.database_bootstrap.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "database-bootstrap"
       }
     }
   }])

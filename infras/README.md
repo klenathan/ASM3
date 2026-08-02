@@ -8,6 +8,7 @@ OpenTofu provisions a low-cost demo environment in AWS:
 - RDS PostgreSQL is Single-AZ and private across two database subnets.
 - Secrets Manager injects `DATABASE_URL`; ECR stores backend images.
 - CloudWatch keeps application logs for 7 days and SSM provides shell access without SSH.
+- An ad hoc ECS task applies committed migrations and idempotently seeds initial data before the API service starts.
 
 The design deliberately omits a directly managed CloudFront distribution, NAT Gateway, load balancers, Fargate, Multi-AZ RDS, and paid container insights. Learner Lab uses its pre-created `LabRole` and `LabInstanceProfile`. Amplify's generated `https://*.amplifyapp.com` site hosts the SPA and proxies `/api/*` to API Gateway, keeping session cookies first-party. API Gateway then routes those requests to the backend. This is a coursework-only setup: the EC2 backend port remains public because HTTP API Gateway has no stable source CIDR, and public media still uses an S3 policy. The application remains the authorization boundary. Add an NLB with an API Gateway VPC Link before using this beyond coursework/demo scope.
 
@@ -63,7 +64,7 @@ The script sources an optional root `.env`, builds `web/`, then creates and star
 an Amplify deployment using a signed archive upload. It sets `VITE_API_URL` to the
 Amplify site origin so API requests use Amplify's `/api/*` rewrite rule.
 
-Build and push the backend image from an authenticated development machine:
+Build and push the backend runtime image from an authenticated development machine. The image downloads AWS's global RDS CA bundle at build time and keeps PostgreSQL certificate verification enabled; rebuild after AWS publishes a required CA update:
 
 ```sh
 ./scripts/push-backend-ecr.sh latest
@@ -81,6 +82,18 @@ TARGET_PLATFORM=linux/arm64 ./scripts/push-backend-ecr.sh latest
 
 The backend GitHub Actions workflow builds pull requests. Learner Lab blocks
 creation of GitHub OIDC providers and roles, so image publishing stays manual.
+
+Before starting the API service, run the one-shot database task. It builds the `database-bootstrap` Docker target, pushes the exact image tag referenced by the current OpenTofu task definition, waits for it to complete, and returns a failure exit code if either the migration or seed step fails. The seed is idempotent, so rerunning it is safe.
+
+```sh
+make migrate-seed
+```
+
+Inspect a failed run in the CloudWatch log group reported by the command, or retrieve it with:
+
+```sh
+tofu output -raw database_bootstrap_log_group_name
+```
 
 Set `app_desired_count = 1` in the ignored `terraform.tfvars`, then run `tofu plan` and `tofu apply`. For later same-tag deployments, force ECS to pull the new images:
 

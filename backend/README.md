@@ -82,7 +82,7 @@ Copy `.env.example` to `.env` for local development. Never commit `.env`.
 | `DATABASE_SSL` | No | `false` | Enable verified TLS for PostgreSQL |
 | `DATABASE_POOL_MAX` | No | `10` | Maximum PostgreSQL pool clients |
 
-Production values will be injected through the ECS task definition. Set `DATABASE_SSL=true` for RDS after validating the RDS certificate chain in the deployment image. Secrets must come from ECS-supported SSM Parameter Store or Secrets Manager references, never image layers or source files.
+Production values are injected through the ECS task definition. ECS sets `DATABASE_SSL=true`; the production image includes AWS's RDS CA bundle through `NODE_EXTRA_CA_CERTS`, so certificate verification remains enabled. Secrets must come from ECS-supported SSM Parameter Store or Secrets Manager references, never image layers or source files.
 
 ## Registration-domain policy
 
