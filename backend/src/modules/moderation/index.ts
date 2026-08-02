@@ -1,12 +1,12 @@
-import type { Database } from "../../db/client.js";
-import { systemClock, type Clock } from "../../shared/application/clock.js";
-import type { SocietyRepository } from "../societies/application/society.repository.js";
-import { ModerationService } from "./application/moderation.service.js";
-import { ReportService } from "./application/report.service.js";
+import type { Database } from "../../db/client";
+import { systemClock, type Clock } from "../../shared/application/clock";
+import type { SocietyRepository } from "../societies/application/society.repository";
+import { ModerationService } from "./application/moderation.service";
+import { ReportService } from "./application/report.service";
 import {
   DrizzleModerationRepository,
   DrizzleModerationTransactionManager,
-} from "./infrastructure/drizzle-moderation.repository.js";
+} from "./infrastructure/drizzle-moderation.repository";
 
 export interface ModerationModuleDependencies {
   readonly database: Database;
@@ -37,17 +37,17 @@ export function createModerationModule(dependencies: ModerationModuleDependencie
   };
 }
 
-export { ModerationService } from "./application/moderation.service.js";
-export type { ModerationServiceDependencies } from "./application/moderation.service.js";
-export { ReportService } from "./application/report.service.js";
-export type { ReportServiceDependencies } from "./application/report.service.js";
+export { ModerationService } from "./application/moderation.service";
+export type { ModerationServiceDependencies } from "./application/moderation.service";
+export { ReportService } from "./application/report.service";
+export type { ReportServiceDependencies } from "./application/report.service";
 export type {
   CreateReportCommand,
   DismissReportCommand,
   ReportDto,
   ReportPageDto,
   ResolveReportCommand,
-} from "./application/moderation.dto.js";
+} from "./application/moderation.dto";
 export type {
   CreateModerationActionInput,
   CreateReportInput,
@@ -55,13 +55,13 @@ export type {
   UpdateModerationMembershipInput,
   UpdateModerationUserInput,
   UpdateReportInput,
-} from "./application/moderation.repository.js";
+} from "./application/moderation.repository";
 export {
   DrizzleModerationRepository,
   DrizzleModerationTransactionManager,
-} from "./infrastructure/drizzle-moderation.repository.js";
+} from "./infrastructure/drizzle-moderation.repository";
 export {
   registerModerationRoutes,
   registerReportsRoutes,
-} from "./presentation/moderation.routes.js";
-export type { ModerationRouteDependencies } from "./presentation/moderation.routes.js";
+} from "./presentation/moderation.routes";
+export type { ModerationRouteDependencies } from "./presentation/moderation.routes";

@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
+import { TopBar } from "../components/site/TopBar";
 import { useAuth } from "../features/auth/auth-context";
 import { ForbiddenPage, LoadingPage } from "../pages/status";
 
@@ -21,5 +22,12 @@ export function ProtectedLayout({ children }: { children?: ReactNode }) {
     );
   }
 
-  return children ?? <Outlet />;
+  return (
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <TopBar />
+      <main className="flex w-full flex-1">
+        {children ?? <Outlet />}
+      </main>
+    </div>
+  );
 }

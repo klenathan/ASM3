@@ -8,12 +8,19 @@ import { secureHeaders } from "hono/secure-headers";
 import type { Logger } from "pino";
 
 import type { AppEnvironment } from "./app-types";
-import type { IdentityRouteDependencies } from "./modules/identity/index";
-import { registerIdentityRoutes, sessionPrincipalMiddleware } from "./modules/identity/index";
-import type { SocietyRouteDependencies } from "./modules/societies/index";
-import { registerSocietyRoutes } from "./modules/societies/index";
-import type { DiscussionRouteDependencies } from "./modules/discussions/index";
-import { registerDiscussionRoutes } from "./modules/discussions/index";
+import type { IdentityRouteDependencies } from "./modules/identity";
+import {
+  registerIdentityRoutes,
+  sessionPrincipalMiddleware,
+} from "./modules/identity";
+import type { SocietyRouteDependencies } from "./modules/societies";
+import { registerSocietyRoutes } from "./modules/societies";
+import type { DiscussionRouteDependencies } from "./modules/discussions";
+import { registerDiscussionRoutes } from "./modules/discussions";
+import type { ModerationRouteDependencies } from "./modules/moderation";
+import { registerModerationRoutes } from "./modules/moderation";
+import type { MediaRouteDependencies } from "./modules/media";
+import { registerMediaRoutes } from "./modules/media";
 import type { AppConfig } from "./config/env";
 import {
   OPENAPI_CONFIG,
@@ -23,20 +30,29 @@ import {
 import { SERVICE_NAME } from "./constants";
 import { requestLogger } from "./middleware/request-logger";
 import { registerHealthRoutes } from "./routes/health";
+import { AppError } from "./shared/domain/errors";
+import { mapError } from "./shared/presentation/error-mapping";
 
 interface AppDependencies {
-  readonly config: Pick<AppConfig, "webOrigin"> & Partial<Pick<AppConfig, "nodeEnv">>;
+  readonly config: Pick<AppConfig, "webOrigin"> &
+    Partial<Pick<AppConfig, "nodeEnv">>;
   readonly logger: Logger;
   readonly checkReadiness: () => Promise<void>;
   readonly identity?: IdentityRouteDependencies;
   readonly societies?: SocietyRouteDependencies;
   readonly discussions?: DiscussionRouteDependencies;
+  readonly moderation?: ModerationRouteDependencies;
+  readonly media?: MediaRouteDependencies;
 }
 
 export function createApp(dependencies: AppDependencies) {
   const app = new OpenAPIHono<AppEnvironment>();
 
   app.use("*", requestId());
+  app.use("*", async (context, next) => {
+    context.set("logger", dependencies.logger);
+    await next();
+  });
   app.use("*", requestLogger(dependencies.logger));
   app.use("*", secureHeaders());
   app.use(
@@ -101,6 +117,30 @@ export function createApp(dependencies: AppDependencies) {
     registerDiscussionRoutes(app, dependencies.discussions);
   }
 
+  if (dependencies.moderation !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/reports", principalMiddleware);
+      app.use("/api/v1/reports/*", principalMiddleware);
+      app.use("/api/v1/mod", principalMiddleware);
+      app.use("/api/v1/mod/*", principalMiddleware);
+    }
+    registerModerationRoutes(app, dependencies.moderation);
+  }
+
+  if (dependencies.media !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/media", principalMiddleware);
+      app.use("/api/v1/media/*", principalMiddleware);
+    }
+    registerMediaRoutes(app, dependencies.media);
+  }
+
   app.doc(OPENAPI_PATH, OPENAPI_CONFIG);
   app.get(OPENAPI_UI_PATH, swaggerUI({ url: OPENAPI_PATH }));
 
@@ -111,6 +151,7 @@ export function createApp(dependencies: AppDependencies) {
           code: "NOT_FOUND",
           message: "Route not found",
           requestId: context.get("requestId"),
+          details: {},
         },
       },
       404,
@@ -119,6 +160,18 @@ export function createApp(dependencies: AppDependencies) {
 
   app.onError((error, context) => {
     const isHttpError = error instanceof HTTPException;
+
+    if (error instanceof AppError) {
+      const mapped = mapError(error, context.get("requestId"));
+      if (mapped.status >= 500) {
+        dependencies.logger.error(
+          { err: error, requestId: context.get("requestId") },
+          "request failed",
+        );
+      }
+      return context.json(mapped.body, mapped.status as never);
+    }
+
     const status = isHttpError ? error.status : 500;
 
     dependencies.logger.error(
@@ -132,9 +185,10 @@ export function createApp(dependencies: AppDependencies) {
     return context.json(
       {
         error: {
-          code: isHttpError ? "REQUEST_ERROR" : "INTERNAL_SERVER_ERROR",
+          code: isHttpError ? "REQUEST_ERROR" : "INTERNAL_ERROR",
           message: isHttpError ? error.message : "Unexpected server error",
           requestId: context.get("requestId"),
+          details: {},
         },
       },
       status,

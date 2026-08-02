@@ -20,11 +20,14 @@ import { SocietyService } from "./society.service";
 import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
 import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 
+const AVATAR_ID = "00000000-0000-4000-8000-00000000000a";
+
 const society: SocietyRecord = {
   id: "society-id",
   slug: "cloud",
   name: "Cloud Computing",
   description: "Cloud Computing students",
+  avatarMediaId: AVATAR_ID,
   status: "active",
   createdBy: "admin-id",
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -52,6 +55,7 @@ describe("SocietyService", () => {
         slug: "new-society",
         name: "New Society",
         description: "A new society",
+        avatarMediaId: AVATAR_ID,
       }),
     ).rejects.toMatchObject({ code: "SOCIETY_FORBIDDEN" });
 
@@ -59,9 +63,30 @@ describe("SocietyService", () => {
       slug: "new-society",
       name: "New Society",
       description: "A new society",
+      avatarMediaId: AVATAR_ID,
     });
     expect(created.slug).toBe("new-society");
     expect(repository.createdBy).toBe(admin.userId);
+  });
+
+  it("resolves the current user's active membership during discovery", async () => {
+    const repository = new FakeSocietyRepository(society);
+    const memberships = new FakeMembershipRepository([membership(student.userId, "member")]);
+    const service = new SocietyService({
+      repository,
+      membershipRepository: memberships,
+      transactions: immediateTransaction(repository),
+      clock,
+    });
+
+    const signedIn = await service.discover({ limit: 20 }, student);
+    expect(signedIn.items[0]).toMatchObject({
+      id: society.id,
+      membership: { role: "member", status: "active" },
+    });
+
+    const anonymous = await service.discover({ limit: 20 });
+    expect(anonymous.items[0]?.membership).toBeNull();
   });
 
   it("uses an active society moderator rather than platform role for rules", async () => {
@@ -78,7 +103,7 @@ describe("SocietyService", () => {
     });
 
     await expect(
-      service.createRule(student, society.id, {
+      service.createRule(student, society.slug, {
         position: 1,
         title: "Be respectful",
         description: "Keep discussion constructive",
@@ -86,7 +111,7 @@ describe("SocietyService", () => {
     ).rejects.toMatchObject({ code: "SOCIETY_FORBIDDEN" });
 
     await expect(
-      service.createRule(moderator, society.id, {
+      service.createRule(moderator, society.slug, {
         position: 1,
         title: "Be respectful",
         description: "Keep discussion constructive",
@@ -106,9 +131,9 @@ describe("MembershipService", () => {
       clock,
     });
 
-    await expect(service.leave(moderator, society.id)).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(service.leave(moderator, society.slug)).rejects.toMatchObject({ code: "CONFLICT" });
     await expect(
-      service.removeModerator(moderator, society.id, moderator.userId),
+      service.removeModerator(moderator, society.slug, moderator.userId),
     ).rejects.toMatchObject({ code: "CONFLICT" });
     expect((await memberships.findMembership(society.id, moderator.userId))?.role).toBe("moderator");
   });
@@ -123,7 +148,7 @@ describe("MembershipService", () => {
       clock,
     });
 
-    const result = await service.addModerator(moderator, society.id, { userId: student.userId });
+    const result = await service.addModerator(moderator, society.slug, { userId: student.userId });
     expect(result).toMatchObject({ userId: student.userId, role: "moderator", status: "active" });
     expect(await service.hasModeratorAuthority(student, society.id)).toBe(true);
   });
@@ -199,6 +224,12 @@ class FakeMembershipRepository implements MembershipRepository {
 
   async findMembership(societyId: string, userId: string): Promise<MembershipRecord | null> {
     return this.memberships.get(key(societyId, userId)) ?? null;
+  }
+
+  async findActiveMembershipsByUser(userId: string): Promise<readonly MembershipRecord[]> {
+    return [...this.memberships.values()].filter(
+      (item) => item.userId === userId && item.status === "active",
+    );
   }
 
   async countActiveModerators(societyId: string): Promise<number> {

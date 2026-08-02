@@ -1,27 +1,27 @@
 import { randomUUID } from "node:crypto";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import { normalizePageSize, type PageRequest } from "../../../shared/application/pagination.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import { isActiveModerator, assertModeratorCanBeRemoved } from "../../societies/domain/membership.js";
-import type { SocietyRepository } from "../../societies/application/society.repository.js";
+import type { Clock } from "../../../shared/application/clock";
+import { normalizePageSize, type PageRequest } from "../../../shared/application/pagination";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import { isActiveModerator, assertModeratorCanBeRemoved } from "../../societies/domain/membership";
+import type { SocietyRepository } from "../../societies/application/society.repository";
 import type {
   DismissReportCommand,
   ReportDto,
   ReportPageDto,
   ResolveReportCommand,
-} from "./moderation.dto.js";
-import { toReportDto, toReportPageDto } from "./moderation.mappers.js";
-import type { ModerationRepository } from "./moderation.repository.js";
+} from "./moderation.dto";
+import { toReportDto, toReportPageDto } from "./moderation.mappers";
+import type { ModerationRepository } from "./moderation.repository";
 import {
   assertModerationResolution,
   isVisibleOrRetained,
   normalizeResolutionNote,
   type ModerationResolution,
   type ReportRecord,
-} from "../domain/moderation.js";
+} from "../domain/moderation";
 
 export interface ModerationServiceDependencies {
   readonly repository: ModerationRepository;
@@ -51,9 +51,12 @@ export class ModerationService {
 
   async listSocietyReports(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
     page: PageRequest,
   ): Promise<ReportPageDto> {
+    const society = await this.societyRepository.findSocietyBySlug(slug.trim().toLowerCase());
+    if (society === null) throw new ApplicationError("NOT_FOUND", "Society was not found");
+    const societyId = society.id;
     await this.assertAuthority(principal, societyId);
     return toReportPageDto(
       await this.repository.listSocietyReports(societyId, normalizePage(page)),

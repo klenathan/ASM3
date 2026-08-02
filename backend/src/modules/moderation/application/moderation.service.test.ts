@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import type { PageRequest, PageResult } from "../../../shared/application/pagination.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import type { IdentityAccountRecord, UserProfileRecord } from "../../identity/domain/identity.types.js";
-import type { CommentRecord, ThreadRecord } from "../../discussions/domain/discussion.js";
-import type { MembershipRecord } from "../../societies/domain/membership.js";
-import type { SocietyRecord, SocietyRuleRecord } from "../../societies/domain/society.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import type { IdentityAccountRecord, UserProfileRecord } from "../../identity/domain/identity.types";
+import type { CommentRecord, ThreadRecord } from "../../discussions/domain/discussion";
+import type { MembershipRecord } from "../../societies/domain/membership";
+import type { SocietyRecord, SocietyRuleRecord } from "../../societies/domain/society";
 import type {
   CreateModerationActionInput,
   CreateReportInput,
@@ -15,11 +15,11 @@ import type {
   UpdateModerationMembershipInput,
   UpdateModerationUserInput,
   UpdateReportInput,
-} from "./moderation.repository.js";
-import type { ModerationActionRecord, ReportRecord } from "../domain/moderation.js";
-import { ModerationService } from "./moderation.service.js";
-import { ReportService } from "./report.service.js";
-import type { CreateRuleInput, CreateSocietyInput, SocietyRepository, UpdateRuleInput } from "../../societies/application/society.repository.js";
+} from "./moderation.repository";
+import type { ModerationActionRecord, ReportRecord } from "../domain/moderation";
+import { ModerationService } from "./moderation.service";
+import { ReportService } from "./report.service";
+import type { CreateRuleInput, CreateSocietyInput, SocietyRepository, UpdateRuleInput } from "../../societies/application/society.repository";
 
 const now = new Date("2026-01-02T00:00:00.000Z");
 const clock: Clock = { now: () => now };
@@ -28,6 +28,7 @@ const society: SocietyRecord = {
   slug: "cloud",
   name: "Cloud Computing",
   description: "Cloud Computing students",
+  avatarMediaId: "00000000-0000-4000-8000-00000000000a",
   status: "active",
   createdBy: "admin-id",
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -116,10 +117,10 @@ describe("ModerationService", () => {
       reason: "Needs review",
     });
 
-    await expect(service.listSocietyReports(reporter, society.id, { limit: 20 })).rejects.toMatchObject({
+    await expect(service.listSocietyReports(reporter, society.slug, { limit: 20 })).rejects.toMatchObject({
       code: "SOCIETY_FORBIDDEN",
     });
-    await expect(service.listSocietyReports(admin, society.id, { limit: 20 })).resolves.toMatchObject({
+    await expect(service.listSocietyReports(admin, society.slug, { limit: 20 })).resolves.toMatchObject({
       items: [{ id: report.id }],
     });
 

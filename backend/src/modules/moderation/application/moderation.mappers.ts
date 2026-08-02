@@ -1,7 +1,7 @@
-import type { ReportDto, ReportPageDto } from "./moderation.dto.js";
-import { reportTarget } from "./moderation.dto.js";
-import type { ReportRecord } from "../domain/moderation.js";
-import type { PageResult } from "../../../shared/application/pagination.js";
+import type { ReportDto, ReportPageDto } from "./moderation.dto";
+import { reportTarget } from "./moderation.dto";
+import type { ReportRecord } from "../domain/moderation";
+import type { PageResult } from "../../../shared/application/pagination";
 
 export function toReportDto(record: ReportRecord): ReportDto {
   const target = reportTarget(record);

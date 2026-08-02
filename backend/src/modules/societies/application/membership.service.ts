@@ -7,7 +7,7 @@ import {
   isActiveMember,
   isActiveModerator,
 } from "../domain/membership";
-import { assertActiveSociety, type SocietyRecord } from "../domain/society";
+import { assertActiveSociety, normalizeSlugForLookup, type SocietyRecord } from "../domain/society";
 import type { MembershipDto, AddModeratorCommand } from "./society.dto";
 import { toMembershipDto } from "./membership.mappers";
 import type {
@@ -38,10 +38,10 @@ export class MembershipService {
 
   async getMembership(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
   ): Promise<MembershipDto | null> {
-    await this.societyOrThrow(societyId);
-    const membership = await this.repository.findMembership(societyId, principal.userId);
+    const society = await this.societyBySlugOrThrow(slug);
+    const membership = await this.repository.findMembership(society.id, principal.userId);
     return membership === null ? null : toMembershipDto(membership);
   }
 
@@ -52,9 +52,10 @@ export class MembershipService {
 
   async requireActiveMembership(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
   ): Promise<MembershipDto> {
-    await this.societyOrThrow(societyId);
+    const society = await this.societyBySlugOrThrow(slug);
+    const societyId = society.id;
     const membership = await this.repository.findMembership(societyId, principal.userId);
     if (!isActiveMember(membership)) {
       throw new ApplicationError("SOCIETY_FORBIDDEN", "Active society membership is required");
@@ -63,9 +64,10 @@ export class MembershipService {
     return toMembershipDto(membership);
   }
 
-  async join(principal: RequestPrincipal, societyId: string): Promise<MembershipDto> {
-    const society = await this.societyOrThrow(societyId);
+  async join(principal: RequestPrincipal, slug: string): Promise<MembershipDto> {
+    const society = await this.societyBySlugOrThrow(slug);
     assertActiveSociety(society);
+    const societyId = society.id;
     const now = this.clock.now();
 
     const membership = await this.transactions.withTransaction(async (repository) => {
@@ -108,9 +110,10 @@ export class MembershipService {
     return toMembershipDto(membership);
   }
 
-  async leave(principal: RequestPrincipal, societyId: string): Promise<void> {
-    const society = await this.societyOrThrow(societyId);
+  async leave(principal: RequestPrincipal, slug: string): Promise<void> {
+    const society = await this.societyBySlugOrThrow(slug);
     assertActiveSociety(society);
+    const societyId = society.id;
     const now = this.clock.now();
 
     await this.transactions.withTransaction(async (repository) => {
@@ -139,11 +142,12 @@ export class MembershipService {
 
   async addModerator(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
     command: AddModeratorCommand,
   ): Promise<MembershipDto> {
-    const society = await this.societyOrThrow(societyId);
+    const society = await this.societyBySlugOrThrow(slug);
     assertActiveSociety(society);
+    const societyId = society.id;
     await this.assertModeratorAuthority(principal, societyId);
     const now = this.clock.now();
 
@@ -187,11 +191,12 @@ export class MembershipService {
 
   async removeModerator(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
     userId: string,
   ): Promise<MembershipDto> {
-    const society = await this.societyOrThrow(societyId);
+    const society = await this.societyBySlugOrThrow(slug);
     assertActiveSociety(society);
+    const societyId = society.id;
     await this.assertModeratorAuthority(principal, societyId);
     const now = this.clock.now();
 
@@ -238,8 +243,8 @@ export class MembershipService {
     throw new ApplicationError("SOCIETY_FORBIDDEN", "You cannot moderate this society");
   }
 
-  private async societyOrThrow(societyId: string): Promise<SocietyRecord> {
-    const society = await this.societyRepository.findSocietyById(societyId);
+  private async societyBySlugOrThrow(slug: string): Promise<SocietyRecord> {
+    const society = await this.societyRepository.findSocietyBySlug(normalizeSlugForLookup(slug));
     if (society === null) {
       throw new ApplicationError("NOT_FOUND", "Society was not found");
     }

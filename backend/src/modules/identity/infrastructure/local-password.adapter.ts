@@ -2,6 +2,9 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { PasswordAdapter, PasswordCredentialStore } from "../application/password.adapter";
+import type { Database } from "../../../db/client";
+import { authUsers } from "./auth.tables";
+import { eq } from "drizzle-orm";
 
 const KEY_LENGTH = 64;
 const SCRYPT_COST = 16_384;
@@ -51,6 +54,37 @@ export class LocalPasswordAdapter implements PasswordAdapter {
 
   async removePassword(userId: string): Promise<void> {
     await this.credentials.delete(userId);
+  }
+}
+
+export class DrizzlePasswordCredentialStore implements PasswordCredentialStore {
+  private readonly database: Database;
+
+  constructor(database: Database) {
+    this.database = database;
+  }
+
+  async get(userId: string): Promise<string | null> {
+    const rows = await this.database
+      .select({ passwordHash: authUsers.passwordHash })
+      .from(authUsers)
+      .where(eq(authUsers.id, userId))
+      .limit(1);
+    return rows[0]?.passwordHash ?? null;
+  }
+
+  async set(userId: string, passwordHash: string): Promise<void> {
+    await this.database
+      .update(authUsers)
+      .set({ passwordHash })
+      .where(eq(authUsers.id, userId));
+  }
+
+  async delete(userId: string): Promise<void> {
+    await this.database
+      .update(authUsers)
+      .set({ passwordHash: "" })
+      .where(eq(authUsers.id, userId));
   }
 }
 

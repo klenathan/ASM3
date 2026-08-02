@@ -1,6 +1,12 @@
 import type { PageResult } from "../../../shared/application/pagination";
+import type { MembershipRecord } from "../domain/membership";
 import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
-import type { RuleDto, SocietyDto, SocietyPageDto } from "./society.dto";
+import type {
+  RuleDto,
+  SocietyDto,
+  SocietyPageDto,
+  SocietyMembershipSummary,
+} from "./society.dto";
 
 export function toSocietyDto(record: SocietyRecord): SocietyDto {
   return {
@@ -8,6 +14,7 @@ export function toSocietyDto(record: SocietyRecord): SocietyDto {
     slug: record.slug,
     name: record.name,
     description: record.description,
+    avatarMediaId: record.avatarMediaId,
     status: record.status,
     createdBy: record.createdBy,
     createdAt: record.createdAt.toISOString(),
@@ -15,11 +22,27 @@ export function toSocietyDto(record: SocietyRecord): SocietyDto {
   };
 }
 
-export function toSocietyPageDto(page: PageResult<SocietyRecord>): SocietyPageDto {
+export function toSocietyPageDto(
+  page: PageResult<SocietyRecord>,
+  membershipsBySocietyId: ReadonlyMap<string, MembershipRecord> = new Map(),
+): SocietyPageDto {
   return {
-    items: page.items.map(toSocietyDto),
+    items: page.items.map((record) => {
+      const membership = membershipsBySocietyId.get(record.id);
+      return {
+        ...toSocietyDto(record),
+        membership: membership === undefined ? null : toMembershipSummary(membership),
+      };
+    }),
     nextCursor: page.nextCursor,
     hasMore: page.hasMore,
+  };
+}
+
+function toMembershipSummary(membership: MembershipRecord): SocietyMembershipSummary {
+  return {
+    role: membership.role,
+    status: membership.status,
   };
 }
 

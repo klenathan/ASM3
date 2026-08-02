@@ -2,11 +2,30 @@ import { ApplicationError } from "../../../shared/domain/errors";
 
 export type SocietyStatus = "active" | "archived";
 
+/** Slug pattern(a lowercase letter/digit followed by letters, digits, underscores, or hyphens). */
+export const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+
+/** Slugs that must not be claimable by a society because they conflict with reserved routes. */
+export const RESERVED_SLUGS: readonly string[] = [
+  "all",
+  "admin",
+  "mod",
+  "mods",
+  "feed",
+  "search",
+  "settings",
+  "api",
+  "media",
+  "reports",
+  "moderation",
+];
+
 export interface SocietyRecord {
   readonly id: string;
   readonly slug: string;
   readonly name: string;
   readonly description: string;
+  readonly avatarMediaId: string;
   readonly status: SocietyStatus;
   readonly createdBy: string;
   readonly createdAt: Date;
@@ -28,8 +47,25 @@ export function normalizeSlug(value: string): string {
   if (slug.length === 0 || slug.length > 64) {
     throw new ApplicationError("VALIDATION_ERROR", "Society slug must be between 1 and 64 characters");
   }
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new ApplicationError(
+      "VALIDATION_ERROR",
+      "Society slug may only contain lowercase letters, digits, and underscores",
+    );
+  }
+  if (RESERVED_SLUGS.includes(slug)) {
+    throw new ApplicationError("VALIDATION_ERROR", "This society slug is reserved and cannot be used");
+  }
 
   return slug;
+}
+
+export function normalizeSlugForLookup(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function isReservedSlug(slug: string): boolean {
+  return RESERVED_SLUGS.includes(slug.toLowerCase());
 }
 
 export function normalizeSocietyName(value: string): string {
@@ -38,6 +74,17 @@ export function normalizeSocietyName(value: string): string {
 
 export function normalizeSocietyDescription(value: string): string {
   return normalizeText(value, 1000, "Society description");
+}
+
+export function normalizeAvatarMediaId(value: string | undefined): string {
+  if (value === undefined || value.trim() === "") {
+    throw new ApplicationError(
+      "VALIDATION_ERROR",
+      "A society must have a profile picture (avatarMediaId)",
+    );
+  }
+
+  return value.trim().toLowerCase();
 }
 
 export function normalizeRuleTitle(value: string): string {

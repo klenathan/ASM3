@@ -20,6 +20,7 @@ export interface UpdateMembershipInput {
 
 export interface MembershipRepository {
   findMembership(societyId: string, userId: string): Promise<MembershipRecord | null>;
+  findActiveMembershipsByUser(userId: string): Promise<readonly MembershipRecord[]>;
   countActiveModerators(societyId: string): Promise<number>;
   createMembership(input: CreateMembershipInput): Promise<MembershipRecord>;
   updateMembership(

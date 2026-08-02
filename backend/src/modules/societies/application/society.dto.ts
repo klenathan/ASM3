@@ -5,18 +5,35 @@ export interface SocietyDto {
   readonly slug: string;
   readonly name: string;
   readonly description: string;
+  readonly avatarMediaId: string;
   readonly status: "active" | "archived";
   readonly createdBy: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
-export type SocietyPageDto = PageResult<SocietyDto>;
+export interface SocietyMembershipSummary {
+  readonly role: "member" | "moderator";
+  readonly status: "active" | "left" | "banned";
+}
+
+export interface SocietyDiscoverDto extends SocietyDto {
+  readonly membership: SocietyMembershipSummary | null;
+}
+
+export interface SocietyDiscoveryQuery {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly q?: string;
+}
+
+export type SocietyPageDto = PageResult<SocietyDiscoverDto>;
 
 export interface CreateSocietyCommand {
   readonly slug: string;
   readonly name: string;
   readonly description: string;
+  readonly avatarMediaId: string;
 }
 
 export interface RuleDto {

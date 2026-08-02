@@ -31,6 +31,7 @@ const society: SocietyRecord = {
   slug: "cloud",
   name: "Cloud Computing",
   description: "Cloud Computing students",
+  avatarMediaId: "00000000-0000-4000-8000-00000000000a",
   status: "active",
   createdBy: "admin-id",
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -378,6 +379,7 @@ class FakeMembershipRepository implements MembershipRepository {
   }
 
   async countActiveModerators(_societyId: string): Promise<number> { return 1; }
+  async findActiveMembershipsByUser(_userId: string): Promise<readonly MembershipRecord[]> { return []; }
   async createMembership(input: never): Promise<MembershipRecord> { return input; }
   async updateMembership(): Promise<MembershipRecord | null> { return null; }
 }

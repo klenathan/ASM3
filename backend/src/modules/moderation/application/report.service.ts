@@ -1,20 +1,20 @@
 import { randomUUID } from "node:crypto";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import { normalizePageSize, type PageRequest } from "../../../shared/application/pagination.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import type { SocietyRepository } from "../../societies/application/society.repository.js";
-import type { CommentTargetRecord, CreateReportInput, ModerationRepository } from "./moderation.repository.js";
+import type { Clock } from "../../../shared/application/clock";
+import { normalizePageSize, type PageRequest } from "../../../shared/application/pagination";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import type { SocietyRepository } from "../../societies/application/society.repository";
+import type { CommentTargetRecord, CreateReportInput, ModerationRepository } from "./moderation.repository";
 import {
   assertExactlyOneTarget,
   isVisibleOrRetained,
   normalizeReportDetails,
   normalizeReportReason,
-} from "../domain/moderation.js";
-import type { CreateReportCommand, ReportDto, ReportPageDto } from "./moderation.dto.js";
-import { toReportDto, toReportPageDto } from "./moderation.mappers.js";
+} from "../domain/moderation";
+import type { CreateReportCommand, ReportDto, ReportPageDto } from "./moderation.dto";
+import { toReportDto, toReportPageDto } from "./moderation.mappers";
 
 export interface ReportServiceDependencies {
   readonly repository: ModerationRepository;

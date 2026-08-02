@@ -5,7 +5,7 @@ import type { RequestPrincipal } from "../../../shared/presentation/request-prin
 import {
   canReadRetained,
   hasSocietyModeratorAuthority,
-  requireSociety,
+  requireSocietyBySlug,
   type DiscussionAuthorizationDependencies,
 } from "./discussion.authorization";
 import type { CommentPageDto, ThreadPageDto } from "./discussion.dto";
@@ -27,10 +27,11 @@ export class FeedService {
 
   async listSocietyThreads(
     principal: RequestPrincipal | undefined,
-    societyId: string,
+    slug: string,
     page: PageRequest,
   ): Promise<ThreadPageDto> {
-    await requireSociety(this.authorization, societyId);
+    const society = await requireSocietyBySlug(this.authorization, slug);
+    const societyId = society.id;
     const includeRetained = principal === undefined
       ? false
       : await hasSocietyModeratorAuthority(this.authorization, principal, societyId);

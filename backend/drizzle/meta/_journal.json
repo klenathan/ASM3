@@ -8,6 +8,27 @@
       "when": 1785635865213,
       "tag": "0000_jazzy_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785636947802,
+      "tag": "0001_furry_purple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785638350895,
+      "tag": "0002_easy_hardball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785638574706,
+      "tag": "0003_warm_ultimates",
+      "breakpoints": true
     }
   ]
 }

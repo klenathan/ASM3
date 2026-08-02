@@ -21,17 +21,19 @@ import {
   updateRuleRequestSchema,
 } from "./society.schemas";
 
-const societyIdParams = z.object({
-  societyId: z.string().uuid(),
+const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+
+const societySlugParams = z.object({
+  societySlug: z.string().min(1).max(64).regex(SLUG_PATTERN),
 });
 
 const ruleParams = z.object({
-  societyId: z.string().uuid(),
+  societySlug: z.string().min(1).max(64).regex(SLUG_PATTERN),
   ruleId: z.string().uuid(),
 });
 
 const moderatorParams = z.object({
-  societyId: z.string().uuid(),
+  societySlug: z.string().min(1).max(64).regex(SLUG_PATTERN),
   userId: z.string().uuid(),
 });
 
@@ -64,10 +66,10 @@ const createSocietyRoute = createRoute({
 
 const getSocietyRoute = createRoute({
   method: "get",
-  path: "/api/v1/societies/{societyId}",
+  path: "/api/v1/societies/{societySlug}",
   tags: ["Societies"],
   summary: "Get a society",
-  request: { params: societyIdParams },
+  request: { params: societySlugParams },
   responses: {
     200: { description: "Society", content: { "application/json": { schema: societySchema } } },
     404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
@@ -76,10 +78,10 @@ const getSocietyRoute = createRoute({
 
 const getMembershipRoute = createRoute({
   method: "get",
-  path: "/api/v1/societies/{societyId}/membership",
+  path: "/api/v1/societies/{societySlug}/membership",
   tags: ["Society membership"],
   summary: "Get the current user's membership",
-  request: { params: societyIdParams },
+  request: { params: societySlugParams },
   responses: {
     200: { description: "Current membership", content: { "application/json": { schema: membershipResponseSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
@@ -89,10 +91,10 @@ const getMembershipRoute = createRoute({
 
 const joinRoute = createRoute({
   method: "post",
-  path: "/api/v1/societies/{societyId}/membership",
+  path: "/api/v1/societies/{societySlug}/membership",
   tags: ["Society membership"],
   summary: "Join a society",
-  request: { params: societyIdParams },
+  request: { params: societySlugParams },
   responses: {
     200: { description: "Active membership", content: { "application/json": { schema: membershipSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
@@ -103,10 +105,10 @@ const joinRoute = createRoute({
 
 const leaveRoute = createRoute({
   method: "delete",
-  path: "/api/v1/societies/{societyId}/membership",
+  path: "/api/v1/societies/{societySlug}/membership",
   tags: ["Society membership"],
   summary: "Leave a society",
-  request: { params: societyIdParams },
+  request: { params: societySlugParams },
   responses: {
     204: { description: "Membership left" },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
@@ -118,11 +120,11 @@ const leaveRoute = createRoute({
 
 const addModeratorRoute = createRoute({
   method: "post",
-  path: "/api/v1/societies/{societyId}/membership/moderators",
+  path: "/api/v1/societies/{societySlug}/membership/moderators",
   tags: ["Society membership"],
   summary: "Add a society moderator",
   request: {
-    params: societyIdParams,
+    params: societySlugParams,
     body: { content: { "application/json": { schema: addModeratorRequestSchema } } },
   },
   responses: {
@@ -136,7 +138,7 @@ const addModeratorRoute = createRoute({
 
 const removeModeratorRoute = createRoute({
   method: "delete",
-  path: "/api/v1/societies/{societyId}/membership/moderators/{userId}",
+  path: "/api/v1/societies/{societySlug}/membership/moderators/{userId}",
   tags: ["Society membership"],
   summary: "Remove a society moderator",
   request: { params: moderatorParams },
@@ -151,10 +153,10 @@ const removeModeratorRoute = createRoute({
 
 const listRulesRoute = createRoute({
   method: "get",
-  path: "/api/v1/societies/{societyId}/rules",
+  path: "/api/v1/societies/{societySlug}/rules",
   tags: ["Society rules"],
   summary: "List society rules",
-  request: { params: societyIdParams },
+  request: { params: societySlugParams },
   responses: {
     200: { description: "Society rules", content: { "application/json": { schema: societyRulesSchema } } },
     404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
@@ -163,11 +165,11 @@ const listRulesRoute = createRoute({
 
 const createRuleRoute = createRoute({
   method: "post",
-  path: "/api/v1/societies/{societyId}/rules",
+  path: "/api/v1/societies/{societySlug}/rules",
   tags: ["Society rules"],
   summary: "Create a society rule",
   request: {
-    params: societyIdParams,
+    params: societySlugParams,
     body: { content: { "application/json": { schema: createRuleRequestSchema } } },
   },
   responses: {
@@ -182,7 +184,7 @@ const createRuleRoute = createRoute({
 
 const getRuleRoute = createRoute({
   method: "get",
-  path: "/api/v1/societies/{societyId}/rules/{ruleId}",
+  path: "/api/v1/societies/{societySlug}/rules/{ruleId}",
   tags: ["Society rules"],
   summary: "Get a society rule",
   request: { params: ruleParams },
@@ -194,7 +196,7 @@ const getRuleRoute = createRoute({
 
 const updateRuleRoute = createRoute({
   method: "patch",
-  path: "/api/v1/societies/{societyId}/rules/{ruleId}",
+  path: "/api/v1/societies/{societySlug}/rules/{ruleId}",
   tags: ["Society rules"],
   summary: "Update a society rule",
   request: {
@@ -213,7 +215,7 @@ const updateRuleRoute = createRoute({
 
 const deleteRuleRoute = createRoute({
   method: "delete",
-  path: "/api/v1/societies/{societyId}/rules/{ruleId}",
+  path: "/api/v1/societies/{societySlug}/rules/{ruleId}",
   tags: ["Society rules"],
   summary: "Delete a society rule",
   request: { params: ruleParams },

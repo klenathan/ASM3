@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { authUsers } from "../../identity/infrastructure/auth.tables";
+import { mediaAssets } from "../../media/infrastructure/media.tables";
 
 export const societies = pgTable(
   "societies",
@@ -21,6 +22,9 @@ export const societies = pgTable(
     slug: varchar("slug", { length: 64 }).notNull(),
     name: varchar("name", { length: 100 }).notNull(),
     description: varchar("description", { length: 1000 }).notNull(),
+    avatarMediaId: uuid("avatar_media_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
     status: text("status").notNull().default("active"),
     createdBy: uuid("created_by")
       .notNull()
@@ -37,7 +41,7 @@ export const societies = pgTable(
     index("societies_status_name_idx").on(table.status, table.name),
     check(
       "societies_slug_normalized_check",
-      sql`${table.slug} = lower(btrim(${table.slug})) and length(${table.slug}) > 0`,
+      sql`${table.slug} = lower(btrim(${table.slug})) and length(${table.slug}) > 0 and ${table.slug} ~ '^[a-z0-9][a-z0-9_-]*$'`,
     ),
     check("societies_status_check", sql`${table.status} in ('active', 'archived')`),
   ],

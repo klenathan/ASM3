@@ -46,9 +46,19 @@ export function LandingPage() {
               size="lg"
               className="h-12 rounded-none px-5 text-base font-semibold shadow-none"
             >
+              <Link to="/register">
+                Create account
+                <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="h-12 rounded-none px-5 text-base font-semibold shadow-none"
+            >
               <Link to="/sign-in">
                 Sign in
-                <ArrowUpRight aria-hidden="true" />
               </Link>
             </Button>
             <p className="max-w-xs text-sm leading-6 text-muted-foreground">

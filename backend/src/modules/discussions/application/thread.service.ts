@@ -9,6 +9,7 @@ import {
   assertMutationAuthority,
   canReadRetained,
   requireActiveMember,
+  requireSocietyBySlug,
   type DiscussionAuthorizationDependencies,
 } from "./discussion.authorization";
 import type {
@@ -48,9 +49,11 @@ export class ThreadService {
 
   async createThread(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
     command: CreateThreadCommand,
   ): Promise<ThreadDto> {
+    const society = await requireSocietyBySlug(this.authorization, slug);
+    const societyId = society.id;
     await requireActiveMember(this.authorization, principal, societyId);
     const now = this.clock.now();
     const input: CreateThreadInput = {

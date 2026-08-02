@@ -21,16 +21,16 @@ import {
   voteSchema,
 } from "./discussion.schemas";
 
-const societyIdParams = z.object({ societyId: z.string().uuid() });
+const societySlugParams = z.object({ societySlug: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9_-]*$/) });
 const threadIdParams = z.object({ threadId: z.string().uuid() });
 const commentIdParams = z.object({ commentId: z.string().uuid() });
 
 const listThreadsRoute = createRoute({
   method: "get",
-  path: "/api/v1/societies/{societyId}/threads",
+  path: "/api/v1/societies/{societySlug}/threads",
   tags: ["Discussions"],
   summary: "List threads in a society",
-  request: { params: societyIdParams, query: discussionPageQuerySchema },
+  request: { params: societySlugParams, query: discussionPageQuerySchema },
   responses: {
     200: { description: "Thread feed", content: { "application/json": { schema: threadPageSchema } } },
     400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
@@ -40,11 +40,11 @@ const listThreadsRoute = createRoute({
 
 const createThreadRoute = createRoute({
   method: "post",
-  path: "/api/v1/societies/{societyId}/threads",
+  path: "/api/v1/societies/{societySlug}/threads",
   tags: ["Discussions"],
   summary: "Create a thread",
   request: {
-    params: societyIdParams,
+    params: societySlugParams,
     body: { content: { "application/json": { schema: createThreadRequestSchema } } },
   },
   responses: {

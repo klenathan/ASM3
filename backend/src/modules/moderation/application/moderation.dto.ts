@@ -1,5 +1,5 @@
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { ModerationResolution, ReportRecord, ReportStatus, ReportTargetType } from "../domain/moderation.js";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { ModerationResolution, ReportRecord, ReportStatus, ReportTargetType } from "../domain/moderation";
 
 export interface CreateReportCommand {
   readonly societyId: string;

@@ -22,6 +22,20 @@ export async function requireSociety(
   return society;
 }
 
+export async function requireSocietyBySlug(
+  dependencies: DiscussionAuthorizationDependencies,
+  slug: string,
+): Promise<SocietyRecord> {
+  const society = await dependencies.societyRepository.findSocietyBySlug(
+    slug.trim().toLowerCase(),
+  );
+  if (society === null) {
+    throw new ApplicationError("NOT_FOUND", "Society was not found");
+  }
+
+  return society;
+}
+
 export async function requireActiveMember(
   dependencies: DiscussionAuthorizationDependencies,
   principal: RequestPrincipal,

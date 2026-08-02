@@ -1,9 +1,9 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { ModerationService } from "../application/moderation.service.js";
-import type { ReportService } from "../application/report.service.js";
-import { createModerationController } from "./moderation.controller.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { ModerationService } from "../application/moderation.service";
+import type { ReportService } from "../application/report.service";
+import { createModerationController } from "./moderation.controller";
 import {
   createReportRequestSchema,
   dismissReportRequestSchema,
@@ -13,10 +13,10 @@ import {
   reportPageSchema,
   reportSchema,
   resolveReportRequestSchema,
-} from "./moderation.schemas.js";
+} from "./moderation.schemas";
 
 const reportParams = z.object({ reportId: z.string().uuid() });
-const societyParams = z.object({ societyId: z.string().uuid() });
+const societySlugParams = z.object({ societySlug: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9_-]*$/) });
 
 const listReporterReportsRoute = createRoute({
   method: "get",
@@ -48,10 +48,10 @@ const createReportRoute = createRoute({
 
 const listSocietyReportsRoute = createRoute({
   method: "get",
-  path: "/api/v1/mod/societies/{societyId}/reports",
+  path: "/api/v1/mod/societies/{societySlug}/reports",
   tags: ["Moderation"],
   summary: "List the active moderation queue for a society",
-  request: { params: societyParams, query: moderationPageQuerySchema },
+  request: { params: societySlugParams, query: moderationPageQuerySchema },
   responses: {
     200: { description: "Moderation queue", content: { "application/json": { schema: reportPageSchema } } },
     400: { description: "Invalid pagination", content: { "application/json": { schema: errorSchema } } },

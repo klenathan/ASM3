@@ -1,0 +1,13 @@
+# Authentication is intentionally absent. Use AWS SSO or AWS_PROFILE.
+aws_region  = "ap-southeast-2"
+project_name = "rmit-society"
+environment  = "demo"
+owner        = "s1234567"
+
+# First apply: leave this placeholder and app_desired_count at 0. Then set
+# web_origin to the site_url output after CloudFront is created.
+web_origin       = "https://example.invalid"
+app_desired_count = 0
+
+# Set true only when you want `tofu destroy` to remove non-empty demo buckets.
+force_destroy_buckets = false

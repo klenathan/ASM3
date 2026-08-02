@@ -13,7 +13,7 @@ export interface SocietyRulesControllerDependencies {
 }
 
 interface SocietyPathParams {
-  readonly societyId: string;
+  readonly societySlug: string;
 }
 
 interface RulePathParams extends SocietyPathParams {
@@ -26,8 +26,8 @@ export function createSocietyRulesController(
   return {
     async list(context: Context<AppEnvironment>): Promise<Response> {
       try {
-        const { societyId } = validated<SocietyPathParams>(context, "param");
-        const result = await dependencies.societyService.listRules(societyId);
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
+        const result = await dependencies.societyService.listRules(societySlug);
         return context.json(result, 200);
       } catch (error) {
         return societyErrorResponse(context, error);
@@ -36,8 +36,8 @@ export function createSocietyRulesController(
 
     async get(context: Context<AppEnvironment>): Promise<Response> {
       try {
-        const { societyId, ruleId } = validated<RulePathParams>(context, "param");
-        const result = await dependencies.societyService.getRule(societyId, ruleId);
+        const { societySlug, ruleId } = validated<RulePathParams>(context, "param");
+        const result = await dependencies.societyService.getRule(societySlug, ruleId);
         return context.json(result, 200);
       } catch (error) {
         return societyErrorResponse(context, error);
@@ -47,11 +47,11 @@ export function createSocietyRulesController(
     async create(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
         const command = validated<CreateRuleCommand>(context, "json");
         const result = await dependencies.societyService.createRule(
           principal,
-          societyId,
+          societySlug,
           command,
         );
         return context.json(result, 201);
@@ -63,11 +63,11 @@ export function createSocietyRulesController(
     async update(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId, ruleId } = validated<RulePathParams>(context, "param");
+        const { societySlug, ruleId } = validated<RulePathParams>(context, "param");
         const command = validated<UpdateRuleCommand>(context, "json");
         const result = await dependencies.societyService.updateRule(
           principal,
-          societyId,
+          societySlug,
           ruleId,
           command,
         );
@@ -80,8 +80,8 @@ export function createSocietyRulesController(
     async remove(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId, ruleId } = validated<RulePathParams>(context, "param");
-        await dependencies.societyService.deleteRule(principal, societyId, ruleId);
+        const { societySlug, ruleId } = validated<RulePathParams>(context, "param");
+        await dependencies.societyService.deleteRule(principal, societySlug, ruleId);
         return context.body(null, 204);
       } catch (error) {
         return societyErrorResponse(context, error);

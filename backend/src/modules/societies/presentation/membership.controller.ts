@@ -10,7 +10,7 @@ export interface MembershipControllerDependencies {
 }
 
 interface SocietyPathParams {
-  readonly societyId: string;
+  readonly societySlug: string;
 }
 
 interface ModeratorPathParams extends SocietyPathParams {
@@ -22,8 +22,8 @@ export function createMembershipController(dependencies: MembershipControllerDep
     async get(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
-        const result = await dependencies.membershipService.getMembership(principal, societyId);
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
+        const result = await dependencies.membershipService.getMembership(principal, societySlug);
         return context.json(result, 200);
       } catch (error) {
         return societyErrorResponse(context, error);
@@ -33,8 +33,8 @@ export function createMembershipController(dependencies: MembershipControllerDep
     async join(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
-        const result = await dependencies.membershipService.join(principal, societyId);
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
+        const result = await dependencies.membershipService.join(principal, societySlug);
         return context.json(result, 200);
       } catch (error) {
         return societyErrorResponse(context, error);
@@ -44,8 +44,8 @@ export function createMembershipController(dependencies: MembershipControllerDep
     async leave(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
-        await dependencies.membershipService.leave(principal, societyId);
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
+        await dependencies.membershipService.leave(principal, societySlug);
         return context.body(null, 204);
       } catch (error) {
         return societyErrorResponse(context, error);
@@ -55,11 +55,11 @@ export function createMembershipController(dependencies: MembershipControllerDep
     async addModerator(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
         const command = validated<AddModeratorCommand>(context, "json");
         const result = await dependencies.membershipService.addModerator(
           principal,
-          societyId,
+          societySlug,
           command,
         );
         return context.json(result, 200);
@@ -71,10 +71,10 @@ export function createMembershipController(dependencies: MembershipControllerDep
     async removeModerator(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId, userId } = validated<ModeratorPathParams>(context, "param");
+        const { societySlug, userId } = validated<ModeratorPathParams>(context, "param");
         const result = await dependencies.membershipService.removeModerator(
           principal,
-          societyId,
+          societySlug,
           userId,
         );
         return context.json(result, 200);

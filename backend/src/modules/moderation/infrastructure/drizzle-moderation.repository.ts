@@ -1,37 +1,37 @@
 import { and, asc, desc, eq, gt, isNull, lt, or } from "drizzle-orm";
 
-import type { Database } from "../../../db/client.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
+import type { Database } from "../../../db/client";
+import type { TransactionManager } from "../../../shared/application/transaction";
 import {
   cursorFor,
   decodeCursor,
   encodeCursor,
   type PageRequest,
   type PageResult,
-} from "../../../shared/application/pagination.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
+} from "../../../shared/application/pagination";
+import { ApplicationError } from "../../../shared/domain/errors";
 import type {
   AuthUserRecord,
   IdentityAccountRecord,
   PlatformRole,
   UserProfileRecord,
   UserStatus,
-} from "../../identity/domain/identity.types.js";
-import { authUsers } from "../../identity/infrastructure/auth.tables.js";
-import { userProfiles } from "../../identity/infrastructure/user-profile.tables.js";
+} from "../../identity/domain/identity.types";
+import { authUsers } from "../../identity/infrastructure/auth.tables";
+import { userProfiles } from "../../identity/infrastructure/user-profile.tables";
 import {
   assertCommentStatus,
   assertThreadStatus,
   type CommentRecord,
   type ThreadRecord,
-} from "../../discussions/domain/discussion.js";
-import { comments, threads } from "../../discussions/infrastructure/discussion.tables.js";
+} from "../../discussions/domain/discussion";
+import { comments, threads } from "../../discussions/infrastructure/discussion.tables";
 import {
   assertMembershipRole,
   assertMembershipState,
   type MembershipRecord,
-} from "../../societies/domain/membership.js";
-import { societyMemberships } from "../../societies/infrastructure/society.tables.js";
+} from "../../societies/domain/membership";
+import { societyMemberships } from "../../societies/infrastructure/society.tables";
 import type {
   CommentTargetRecord,
   CreateModerationActionInput,
@@ -40,14 +40,14 @@ import type {
   UpdateModerationMembershipInput,
   UpdateModerationUserInput,
   UpdateReportInput,
-} from "../application/moderation.repository.js";
+} from "../application/moderation.repository";
 import {
   assertReportStatus,
   type ModerationActionRecord,
   type ReportRecord,
   type ReportTargetType,
-} from "../domain/moderation.js";
-import { moderationActions, reports } from "./moderation.tables.js";
+} from "../domain/moderation";
+import { moderationActions, reports } from "./moderation.tables";
 
 type ModerationExecutor = Pick<Database, "select" | "insert" | "update">;
 

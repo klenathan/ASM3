@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, or } from "drizzle-orm";
+import { and, asc, eq, gt, ilike, or } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import type { TransactionManager } from "../../../shared/application/transaction";
@@ -32,15 +32,14 @@ export class DrizzleSocietyRepository implements SocietyRepository {
     this.executor = executor;
   }
 
-  async listSocieties(page: PageRequest): Promise<PageResult<SocietyRecord>> {
+  async listSocieties(page: PageRequest & { readonly q?: string }): Promise<PageResult<SocietyRecord>> {
     const after = page.cursor === undefined ? undefined : societyAfter(page.cursor);
+    const match = societyMatch(page.q);
+    const conditions = [eq(societies.status, "active"), ...(after === undefined ? [] : [after]), ...(match === undefined ? [] : [match])];
     const rows = await this.executor
       .select()
       .from(societies)
-      .where(after === undefined ? eq(societies.status, "active") : and(
-        eq(societies.status, "active"),
-        after,
-      ))
+      .where(conditions.length === 1 ? conditions[0] as never : and(...conditions))
       .orderBy(asc(societies.name), asc(societies.id))
       .limit(page.limit + 1);
     const hasMore = rows.length > page.limit;
@@ -182,6 +181,15 @@ export class DrizzleSocietyTransactionManager implements TransactionManager<Soci
   }
 }
 
+function societyMatch(search: string | undefined) {
+  if (search === undefined || search.trim() === "") {
+    return undefined;
+  }
+
+  const pattern = `%${search.trim()}%`;
+  return or(ilike(societies.name, pattern), ilike(societies.description, pattern));
+}
+
 function societyAfter(encoded: string) {
   const cursor = decodeCursor(encoded);
   if (typeof cursor.value !== "string" || !isUuid(cursor.id)) {
@@ -200,6 +208,7 @@ function toSociety(row: typeof societies.$inferSelect): SocietyRecord {
     slug: row.slug,
     name: row.name,
     description: row.description,
+    avatarMediaId: row.avatarMediaId,
     status: assertSocietyStatus(row.status),
     createdBy: row.createdBy,
     createdAt: row.createdAt,

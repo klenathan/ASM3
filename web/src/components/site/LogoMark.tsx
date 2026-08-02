@@ -9,9 +9,20 @@ export function LogoMark({ to = "/" }: LogoMarkProps) {
     <Link
       to={to}
       aria-label="RMIT Society home"
-      className="rounded-none font-heading text-xl font-semibold tracking-[0.01em] text-foreground uppercase transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+      className="group inline-flex items-center gap-2.5 rounded-none text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
     >
-      <span className="text-primary">RMIT</span> Society
+      <span
+        aria-hidden="true"
+        className="flex size-8 items-center justify-center bg-primary font-heading text-[1.35rem] leading-none font-bold tracking-[-0.06em] text-primary-foreground transition-colors group-hover:bg-foreground group-hover:text-background"
+      >
+        RS
+      </span>
+      <span className="font-heading text-2xl leading-none font-bold tracking-[-0.025em] uppercase">
+        <span>RMIT</span>{" "}
+        <span className="text-primary transition-colors group-hover:text-foreground">
+          Society
+        </span>
+      </span>
     </Link>
   );
 }

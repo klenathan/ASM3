@@ -1,17 +1,17 @@
-import type { PageRequest, PageResult } from "../../../shared/application/pagination.js";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 import type {
   IdentityAccountRecord,
   PlatformRole,
   UserProfileRecord,
   UserStatus,
-} from "../../identity/domain/identity.types.js";
-import type { CommentRecord, ThreadRecord } from "../../discussions/domain/discussion.js";
-import type { MembershipRecord, MembershipRole, MembershipStatus } from "../../societies/domain/membership.js";
+} from "../../identity/domain/identity.types";
+import type { CommentRecord, ThreadRecord } from "../../discussions/domain/discussion";
+import type { MembershipRecord, MembershipRole, MembershipStatus } from "../../societies/domain/membership";
 import type {
   ModerationActionRecord,
   ReportRecord,
   ReportTargetType,
-} from "../domain/moderation.js";
+} from "../domain/moderation";
 
 export interface CreateReportInput {
   readonly id: string;

@@ -7,7 +7,7 @@ import { UserService } from "./application/user.service";
 import type { PasswordAdapter } from "./application/password.adapter";
 import type { SessionTokenAdapter } from "./application/session.adapter";
 import { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository";
-import { LocalPasswordAdapter } from "./infrastructure/local-password.adapter";
+import { DrizzlePasswordCredentialStore, LocalPasswordAdapter } from "./infrastructure/local-password.adapter";
 import { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter";
 
 export interface IdentityModuleDependencies {
@@ -23,7 +23,8 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
   const transactions = new DrizzleIdentityTransactionManager(dependencies.database);
   const clock = dependencies.clock ?? systemClock;
   // The supplied auth schema has no password-hash field; inject a durable store before deployment.
-  const passwordAdapter = dependencies.passwordAdapter ?? new LocalPasswordAdapter();
+  const passwordAdapter = dependencies.passwordAdapter
+    ?? new LocalPasswordAdapter(new DrizzlePasswordCredentialStore(dependencies.database));
   const sessionAdapter = dependencies.sessionAdapter ?? new OpaqueSessionAdapter();
   const allowedEmailDomains = dependencies.allowedEmailDomains ?? ALLOWED_EMAIL_DOMAINS;
 
@@ -50,7 +51,7 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
 export { AuthService } from "./application/auth.service";
 export { UserService } from "./application/user.service";
 export { AdminUserService } from "./application/admin-user.service";
-export { LocalPasswordAdapter, InMemoryPasswordCredentialStore } from "./infrastructure/local-password.adapter";
+export { LocalPasswordAdapter, InMemoryPasswordCredentialStore, DrizzlePasswordCredentialStore } from "./infrastructure/local-password.adapter";
 export { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter";
 export { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository";
 export { registerIdentityRoutes } from "./presentation/identity.routes";

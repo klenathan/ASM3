@@ -34,6 +34,14 @@ export class DrizzleMembershipRepository implements MembershipRepository {
     return row === undefined ? null : toMembership(row);
   }
 
+  async findActiveMembershipsByUser(userId: string): Promise<readonly MembershipRecord[]> {
+    const rows = await this.executor
+      .select()
+      .from(societyMemberships)
+      .where(and(eq(societyMemberships.userId, userId), eq(societyMemberships.status, "active")));
+    return rows.map(toMembership);
+  }
+
   async countActiveModerators(societyId: string): Promise<number> {
     const rows = await this.executor
       .select({ userId: societyMemberships.userId })

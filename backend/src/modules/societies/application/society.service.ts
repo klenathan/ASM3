@@ -8,17 +8,21 @@ import type { RequestPrincipal } from "../../../shared/presentation/request-prin
 import { isActiveModerator } from "../domain/membership";
 import {
   assertActiveSociety,
+  normalizeAvatarMediaId,
   normalizeRuleDescription,
   normalizeRulePosition,
   normalizeRuleTitle,
   normalizeSlug,
+  normalizeSlugForLookup,
   normalizeSocietyDescription,
   normalizeSocietyName,
+  type SocietyRecord,
 } from "../domain/society";
 import type {
   CreateRuleCommand,
   CreateSocietyCommand,
   RuleDto,
+  SocietyDiscoveryQuery,
   SocietyDto,
   SocietyPageDto,
   UpdateRuleCommand,
@@ -60,6 +64,7 @@ export class SocietyService {
         slug: normalizeSlug(command.slug),
         name: normalizeSocietyName(command.name),
         description: normalizeSocietyDescription(command.description),
+        avatarMediaId: normalizeAvatarMediaId(command.avatarMediaId),
         createdBy: principal.userId,
         createdAt: now,
         updatedAt: now,
@@ -69,31 +74,47 @@ export class SocietyService {
     return toSocietyDto(created);
   }
 
-  async discover(page: PageRequest): Promise<SocietyPageDto> {
-    const limit = normalizePageSize(page.limit);
-    const normalizedPage: PageRequest = page.cursor === undefined
-      ? { limit }
-      : { limit, cursor: page.cursor };
-    return toSocietyPageDto(await this.repository.listSocieties(normalizedPage));
+  async discover(
+    query: SocietyDiscoveryQuery & PageRequest,
+    principal?: RequestPrincipal,
+  ): Promise<SocietyPageDto> {
+    const limit = normalizePageSize(query.limit);
+    const normalizedPage: SocietyDiscoveryQuery & PageRequest = {
+      limit,
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+      ...(query.q === undefined || query.q.trim() === "" ? {} : { q: query.q.trim() }),
+    };
+    const page = await this.repository.listSocieties(normalizedPage);
+
+    if (principal === undefined) {
+      return toSocietyPageDto(page);
+    }
+
+    const memberships = await this.membershipRepository.findActiveMembershipsByUser(principal.userId);
+    const bySocietyId = new Map(memberships.map((item) => [item.societyId, item] as const));
+    return toSocietyPageDto(page, bySocietyId);
   }
 
-  async listSocieties(page: PageRequest): Promise<SocietyPageDto> {
-    return this.discover(page);
+  async listSocieties(
+    query: SocietyDiscoveryQuery & PageRequest,
+    principal?: RequestPrincipal,
+  ): Promise<SocietyPageDto> {
+    return this.discover(query, principal);
   }
 
-  async getSociety(societyId: string): Promise<SocietyDto> {
-    return toSocietyDto(await this.societyOrThrow(societyId));
+  async getSociety(slug: string): Promise<SocietyDto> {
+    return toSocietyDto(await this.societyBySlugOrThrow(slug));
   }
 
-  async listRules(societyId: string): Promise<readonly RuleDto[]> {
-    await this.societyOrThrow(societyId);
-    const rules = await this.repository.listRules(societyId);
+  async listRules(slug: string): Promise<readonly RuleDto[]> {
+    const society = await this.societyBySlugOrThrow(slug);
+    const rules = await this.repository.listRules(society.id);
     return rules.map(toRuleDto);
   }
 
-  async getRule(societyId: string, ruleId: string): Promise<RuleDto> {
-    await this.societyOrThrow(societyId);
-    const rule = await this.repository.findRuleById(societyId, ruleId);
+  async getRule(slug: string, ruleId: string): Promise<RuleDto> {
+    const society = await this.societyBySlugOrThrow(slug);
+    const rule = await this.repository.findRuleById(society.id, ruleId);
     if (rule === null) {
       throw new ApplicationError("NOT_FOUND", "Society rule was not found");
     }
@@ -103,15 +124,15 @@ export class SocietyService {
 
   async createRule(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
     command: CreateRuleCommand,
   ): Promise<RuleDto> {
-    await this.authorizeSocietyChange(principal, societyId);
+    const society = await this.authorizeSocietyChange(principal, slug);
     const now = this.clock.now();
     const rule = await this.transactions.withTransaction((repository) =>
       repository.createRule({
         id: randomUUID(),
-        societyId,
+        societyId: society.id,
         position: normalizeRulePosition(command.position),
         title: normalizeRuleTitle(command.title),
         description: normalizeRuleDescription(command.description),
@@ -125,12 +146,12 @@ export class SocietyService {
 
   async updateRule(
     principal: RequestPrincipal,
-    societyId: string,
+    slug: string,
     ruleId: string,
     command: UpdateRuleCommand,
   ): Promise<RuleDto> {
-    await this.authorizeSocietyChange(principal, societyId);
-    const current = await this.repository.findRuleById(societyId, ruleId);
+    const society = await this.authorizeSocietyChange(principal, slug);
+    const current = await this.repository.findRuleById(society.id, ruleId);
     if (current === null) {
       throw new ApplicationError("NOT_FOUND", "Society rule was not found");
     }
@@ -141,7 +162,7 @@ export class SocietyService {
     }
 
     const updated = await this.transactions.withTransaction((repository) =>
-      repository.updateRule(societyId, ruleId, input),
+      repository.updateRule(society.id, ruleId, input),
     );
     if (updated === null) {
       throw new ApplicationError("NOT_FOUND", "Society rule was not found");
@@ -150,10 +171,10 @@ export class SocietyService {
     return toRuleDto(updated);
   }
 
-  async deleteRule(principal: RequestPrincipal, societyId: string, ruleId: string): Promise<void> {
-    await this.authorizeSocietyChange(principal, societyId);
+  async deleteRule(principal: RequestPrincipal, slug: string, ruleId: string): Promise<void> {
+    const society = await this.authorizeSocietyChange(principal, slug);
     const deleted = await this.transactions.withTransaction((repository) =>
-      repository.deleteRule(societyId, ruleId),
+      repository.deleteRule(society.id, ruleId),
     );
     if (!deleted) {
       throw new ApplicationError("NOT_FOUND", "Society rule was not found");
@@ -162,26 +183,28 @@ export class SocietyService {
 
   private async authorizeSocietyChange(
     principal: RequestPrincipal,
-    societyId: string,
-  ): Promise<void> {
-    const society = await this.societyOrThrow(societyId);
+    slug: string,
+  ): Promise<SocietyRecord> {
+    const society = await this.societyBySlugOrThrow(slug);
     assertActiveSociety(society);
 
     if (principal.platformRole === "system_admin") {
-      return;
+      return society;
     }
 
     const membership = await this.membershipRepository.findMembership(
-      societyId,
+      society.id,
       principal.userId,
     );
     if (!isActiveModerator(membership)) {
       throw new ApplicationError("SOCIETY_FORBIDDEN", "You cannot moderate this society");
     }
+
+    return society;
   }
 
-  private async societyOrThrow(societyId: string) {
-    const society = await this.repository.findSocietyById(societyId);
+  private async societyBySlugOrThrow(slug: string): Promise<SocietyRecord> {
+    const society = await this.repository.findSocietyBySlug(normalizeSlugForLookup(slug));
     if (society === null) {
       throw new ApplicationError("NOT_FOUND", "Society was not found");
     }

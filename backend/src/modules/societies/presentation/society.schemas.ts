@@ -17,6 +17,7 @@ export const societySchema = z
     slug: z.string(),
     name: z.string(),
     description: z.string(),
+    avatarMediaId: z.string().uuid(),
     status: z.enum(["active", "archived"]),
     createdBy: z.string().uuid(),
     createdAt: z.string().datetime(),
@@ -24,9 +25,20 @@ export const societySchema = z
   })
   .openapi("Society");
 
+export const discoveryMembershipSchema = z
+  .object({
+    role: z.enum(["member", "moderator"]),
+    status: z.enum(["active", "left", "banned"]),
+  })
+  .openapi("DiscoveryMembership");
+
+export const societyDiscoveryItemSchema = societySchema
+  .extend({ membership: discoveryMembershipSchema.nullable() })
+  .openapi("SocietyDiscoveryItem");
+
 export const societyPageSchema = z
   .object({
-    items: z.array(societySchema),
+    items: z.array(societyDiscoveryItemSchema),
     nextCursor: z.string().nullable(),
     hasMore: z.boolean(),
   })
@@ -34,9 +46,10 @@ export const societyPageSchema = z
 
 export const createSocietyRequestSchema = z
   .object({
-    slug: z.string().trim().min(1).max(64),
+    slug: z.string().trim().min(1).max(64).regex(/^[a-z0-9][a-z0-9_-]*$/),
     name: z.string().trim().min(1).max(100),
     description: z.string().trim().min(1).max(1000),
+    avatarMediaId: z.string().uuid(),
   })
   .openapi("CreateSocietyRequest");
 
@@ -93,6 +106,7 @@ export const societyDiscoveryQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
     cursor: z.string().min(1).optional(),
+    q: z.string().trim().max(100).optional(),
   })
   .openapi("SocietyDiscoveryQuery");
 

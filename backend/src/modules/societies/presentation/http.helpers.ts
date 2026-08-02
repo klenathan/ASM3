@@ -24,6 +24,13 @@ export function validated<T>(
   return request.valid(target) as T;
 }
 
+export function getInjectedPrincipal(
+  context: Context<AppEnvironment>,
+): RequestPrincipal | undefined {
+  const principal = (context as unknown as PrincipalContext).get("principal");
+  return isRequestPrincipal(principal) ? principal : undefined;
+}
+
 export function requireInjectedPrincipal(context: Context<AppEnvironment>): RequestPrincipal {
   const principalContext = context as unknown as PrincipalContext;
   const principalError = principalContext.get("principalError");

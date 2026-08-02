@@ -6,6 +6,7 @@ export interface CreateSocietyInput {
   readonly slug: string;
   readonly name: string;
   readonly description: string;
+  readonly avatarMediaId: string;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -29,7 +30,7 @@ export interface UpdateRuleInput {
 }
 
 export interface SocietyRepository {
-  listSocieties(page: PageRequest): Promise<PageResult<SocietyRecord>>;
+  listSocieties(page: PageRequest & { readonly q?: string }): Promise<PageResult<SocietyRecord>>;
   findSocietyById(societyId: string): Promise<SocietyRecord | null>;
   findSocietyBySlug(slug: string): Promise<SocietyRecord | null>;
   createSociety(input: CreateSocietyInput): Promise<SocietyRecord>;

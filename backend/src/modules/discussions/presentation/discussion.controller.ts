@@ -28,7 +28,7 @@ export interface DiscussionControllerDependencies {
 }
 
 interface SocietyPathParams {
-  readonly societyId: string;
+  readonly societySlug: string;
 }
 
 interface ThreadPathParams {
@@ -48,10 +48,10 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
   return {
     async listThreads(context: Context<AppEnvironment>): Promise<Response> {
       try {
-        const { societyId } = validated<SocietyPathParams>(context, "param");
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
         const result = await dependencies.feedService.listSocietyThreads(
           getInjectedPrincipal(context),
-          societyId,
+          societySlug,
           pageFrom(validated<PageQuery>(context, "query")),
         );
         return context.json(result, 200);
@@ -63,9 +63,9 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
     async createThread(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
         const command = validated<CreateThreadCommand>(context, "json");
-        const result = await dependencies.threadService.createThread(principal, societyId, command);
+        const result = await dependencies.threadService.createThread(principal, societySlug, command);
         return context.json(result, 201);
       } catch (error) {
         return discussionErrorResponse(context, error);

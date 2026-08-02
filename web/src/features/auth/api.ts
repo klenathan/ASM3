@@ -78,6 +78,19 @@ export function signIn(email: string, password: string): Promise<{ user: User }>
   })
 }
 
+export interface RegisterInput {
+  readonly displayName: string
+  readonly email: string
+  readonly password: string
+}
+
+export function register(input: RegisterInput): Promise<{ user: User }> {
+  return request<{ user: User }>('/api/v1/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 export function signOut(): Promise<void> {
   return request<void>('/api/v1/auth/sign-out', { method: 'POST' })
 }

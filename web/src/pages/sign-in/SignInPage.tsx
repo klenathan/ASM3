@@ -6,7 +6,7 @@ import {
   KeyRound,
   LoaderCircle,
 } from "lucide-react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, Link } from "react-router-dom";
 
 import { LogoMark } from "../../components/site/LogoMark";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
@@ -191,9 +191,21 @@ export function SignInPage() {
             </form>
           </CardContent>
 
-          <CardFooter className="gap-2 rounded-none border-t border-foreground/15 bg-muted/40 px-6 py-4 text-xs leading-5 text-muted-foreground sm:px-8">
-            <KeyRound size={15} aria-hidden="true" />
-            <span>Your session stays in a secure browser cookie.</span>
+          <CardFooter className="flex-col items-stretch gap-3 rounded-none border-t border-foreground/15 bg-muted/40 px-6 py-4 text-xs leading-5 text-muted-foreground sm:px-8">
+            <div className="flex items-center gap-2">
+              <KeyRound size={15} aria-hidden="true" />
+              <span>Your session stays in a secure browser cookie.</span>
+            </div>
+            <p className="flex items-center gap-1.5">
+              <span>New to the forum?</span>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-1 font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline"
+              >
+                Create an account
+                <ArrowUpRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            </p>
           </CardFooter>
         </Card>
       </main>

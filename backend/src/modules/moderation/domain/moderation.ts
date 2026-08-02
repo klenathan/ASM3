@@ -1,4 +1,4 @@
-import { ApplicationError } from "../../../shared/domain/errors.js";
+import { ApplicationError } from "../../../shared/domain/errors";
 
 export type ReportStatus = "pending" | "in_review" | "resolved" | "dismissed";
 export type ReportTargetType = "thread" | "comment";

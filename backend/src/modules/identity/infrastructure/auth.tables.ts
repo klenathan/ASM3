@@ -11,6 +11,7 @@ export const authUsers = pgTable(
   {
     id: uuid("id").primaryKey(),
     email: varchar("email", { length: 320 }).notNull(),
+    passwordHash: varchar("password_hash", { length: 512 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),

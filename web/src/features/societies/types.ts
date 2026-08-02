@@ -1,0 +1,58 @@
+export interface Society {
+  readonly id: string
+  readonly slug: string
+  readonly name: string
+  readonly description: string
+  readonly avatarMediaId: string
+  readonly status: 'active' | 'archived'
+  readonly createdBy: string
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface MembershipSummary {
+  readonly role: 'member' | 'moderator'
+  readonly status: 'active' | 'left' | 'banned'
+}
+
+export interface SocietyDiscoveryItem extends Society {
+  readonly membership: MembershipSummary | null
+}
+
+export interface SocietyPage {
+  readonly items: SocietyDiscoveryItem[]
+  readonly nextCursor: string | null
+  readonly hasMore: boolean
+}
+
+export interface Thread {
+  readonly id: string
+  readonly societyId: string
+  readonly authorId: string
+  readonly title: string
+  readonly body: string | null
+  readonly status: 'published' | 'removed' | 'deleted'
+  readonly score: number
+  readonly commentCount: number
+  readonly mediaIds: readonly string[]
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly deletedAt: string | null
+}
+
+export interface ThreadPage {
+  readonly items: Thread[]
+  readonly nextCursor: string | null
+  readonly hasMore: boolean
+}
+
+export interface SocietyMembership {
+  readonly societyId: string
+  readonly userId: string
+  readonly role: 'member' | 'moderator'
+  readonly status: 'active' | 'left' | 'banned'
+  readonly joinedAt: string
+  readonly updatedAt: string
+  readonly bannedBy: string | null
+  readonly bannedAt: string | null
+}

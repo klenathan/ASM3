@@ -1,18 +1,18 @@
 import type { Context } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
+import type { AppEnvironment } from "../../../app-types";
 import type {
   CreateReportCommand,
   DismissReportCommand,
   ResolveReportCommand,
-} from "../application/moderation.dto.js";
-import type { ModerationService } from "../application/moderation.service.js";
-import type { ReportService } from "../application/report.service.js";
+} from "../application/moderation.dto";
+import type { ModerationService } from "../application/moderation.service";
+import type { ReportService } from "../application/report.service";
 import {
   moderationErrorResponse,
   requireInjectedPrincipal,
   validated,
-} from "./http.helpers.js";
+} from "./http.helpers";
 
 export interface ModerationControllerDependencies {
   readonly reportService: ReportService;
@@ -29,7 +29,7 @@ interface ReportPathParams {
 }
 
 interface SocietyPathParams {
-  readonly societyId: string;
+  readonly societySlug: string;
 }
 
 interface ResolveReportBody {
@@ -77,10 +77,10 @@ export function createModerationController(dependencies: ModerationControllerDep
     async listSocietyReports(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
-        const { societyId } = validated<SocietyPathParams>(context, "param");
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
         const result = await dependencies.moderationService.listSocietyReports(
           principal,
-          societyId,
+          societySlug,
           pageFrom(validated<PageQuery>(context, "query")),
         );
         return context.json(result, 200);

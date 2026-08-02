@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import { AppError, ApplicationError } from "../../../shared/domain/errors.js";
-import { errorResponse } from "../../../shared/presentation/error-response.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { AppEnvironment } from "../../../app-types";
+import { AppError, ApplicationError } from "../../../shared/domain/errors";
+import { errorResponse } from "../../../shared/presentation/error-response";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 
 type PrincipalContext = {
   get(key: string): unknown;

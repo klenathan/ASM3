@@ -1,0 +1,4 @@
+ALTER TABLE "societies" DROP CONSTRAINT "societies_slug_normalized_check";--> statement-breakpoint
+ALTER TABLE "societies" ADD COLUMN "avatar_media_id" uuid NOT NULL;--> statement-breakpoint
+ALTER TABLE "societies" ADD CONSTRAINT "societies_avatar_media_id_media_assets_id_fk" FOREIGN KEY ("avatar_media_id") REFERENCES "public"."media_assets"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "societies" ADD CONSTRAINT "societies_slug_normalized_check" CHECK ("societies"."slug" = lower(btrim("societies"."slug")) and length("societies"."slug") > 0 and "societies"."slug" ~ '^[a-z0-9][a-z0-9_-]*$');

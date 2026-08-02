@@ -2,21 +2,21 @@ import type { Context } from "hono";
 
 import type { AppEnvironment } from "../../../app-types";
 import type { PageRequest } from "../../../shared/application/pagination";
-import type { CreateSocietyCommand } from "../application/society.dto";
+import type { CreateSocietyCommand, SocietyDiscoveryQuery } from "../application/society.dto";
 import type { SocietyService } from "../application/society.service";
-import { requireInjectedPrincipal, societyErrorResponse, validated } from "./http.helpers";
+import {
+  getInjectedPrincipal,
+  requireInjectedPrincipal,
+  societyErrorResponse,
+  validated,
+} from "./http.helpers";
 
 export interface SocietyControllerDependencies {
   readonly societyService: SocietyService;
 }
 
 interface SocietyPathParams {
-  readonly societyId: string;
-}
-
-interface SocietyDiscoveryQuery {
-  readonly limit?: number;
-  readonly cursor?: string;
+  readonly societySlug: string;
 }
 
 export function createSocietyController(dependencies: SocietyControllerDependencies) {
@@ -24,10 +24,13 @@ export function createSocietyController(dependencies: SocietyControllerDependenc
     async discover(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const query = validated<SocietyDiscoveryQuery>(context, "query");
-        const page: PageRequest = query.cursor === undefined
-          ? { limit: query.limit ?? 20 }
-          : { limit: query.limit ?? 20, cursor: query.cursor };
-        const result = await dependencies.societyService.discover(page);
+        const page: SocietyDiscoveryQuery & PageRequest = {
+          limit: query.limit ?? 20,
+          ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+          ...(query.q === undefined ? {} : { q: query.q }),
+        };
+        const principal = getInjectedPrincipal(context);
+        const result = await dependencies.societyService.discover(page, principal);
         return context.json(result, 200);
       } catch (error) {
         return societyErrorResponse(context, error);
@@ -36,8 +39,8 @@ export function createSocietyController(dependencies: SocietyControllerDependenc
 
     async get(context: Context<AppEnvironment>): Promise<Response> {
       try {
-        const { societyId } = validated<SocietyPathParams>(context, "param");
-        const result = await dependencies.societyService.getSociety(societyId);
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
+        const result = await dependencies.societyService.getSociety(societySlug);
         return context.json(result, 200);
       } catch (error) {
         return societyErrorResponse(context, error);

@@ -1,6 +1,6 @@
-import { ProtectedLayout } from "../../app/ProtectedLayout";
+import { Outlet } from "react-router-dom";
+
 import { useAuth } from "../../features/auth/auth-context";
-import { ForumPage } from "../forum/ForumPage";
 import { LandingPage } from "../landing/LandingPage";
 import { ForbiddenPage, LoadingPage, NetworkErrorPage } from "../status";
 
@@ -11,11 +11,6 @@ export function HomeRoute() {
     return <LoadingPage label="Checking your place at the table" />;
   if (status === "forbidden") return <ForbiddenPage detail={error?.message} />;
   if (error?.code === "NETWORK_ERROR") return <NetworkErrorPage />;
-  if (status === "authenticated")
-    return (
-      <ProtectedLayout>
-        <ForumPage />
-      </ProtectedLayout>
-    );
+  if (status === "authenticated") return <Outlet />;
   return <LandingPage />;
 }

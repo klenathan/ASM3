@@ -12,6 +12,9 @@ import { createLogger } from "./lib/logger";
 import { createIdentityModule } from "./modules/identity/index";
 import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
+import { createModerationModule } from "./modules/moderation/index";
+import { createMediaModule, UnconfiguredMediaStorage } from "./modules/media/index";
+import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -24,6 +27,15 @@ async function main(): Promise<void> {
     membershipRepository: societies.membershipRepository,
     societyRepository: societies.societyRepository,
   });
+  const moderation = createModerationModule({
+    database: database.db,
+    societyRepository: societies.societyRepository,
+  });
+  const media = createMediaModule({
+    database: database.db,
+    storage: new UnconfiguredMediaStorage(),
+    attachmentPort: new DrizzleThreadAttachmentAdapter(database.db),
+  });
   const app = createApp({
     config,
     logger,
@@ -31,6 +43,8 @@ async function main(): Promise<void> {
     identity,
     societies,
     discussions,
+    moderation,
+    media,
   });
 
   const server = serve(
