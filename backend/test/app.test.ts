@@ -1,7 +1,10 @@
+import { Writable } from "node:stream";
+
 import pino from "pino";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app";
+import { societyErrorResponse } from "../src/modules/societies/presentation/http.helpers";
 
 const logger = pino({ level: "silent" });
 const config = { webOrigin: "http://localhost:5173" };
@@ -54,6 +57,43 @@ describe("health API", () => {
     expect(response.status).toBe(503);
     expect(text).not.toContain("database password");
     expect(JSON.parse(text)).toMatchObject({ status: "error" });
+  });
+
+  it("logs caught 500 error details without exposing them to clients", async () => {
+    const logEntries: Record<string, unknown>[] = [];
+    const logStream = new Writable({
+      write(chunk, _encoding, callback) {
+        logEntries.push(JSON.parse(chunk.toString()) as Record<string, unknown>);
+        callback();
+      },
+    });
+    const errorLogger = pino({ level: "info" }, logStream);
+    const app = createApp({
+      config,
+      logger: errorLogger,
+      checkReadiness: async () => undefined,
+    });
+    app.get("/test/caught-error", (context) =>
+      societyErrorResponse(context, new Error("database password must stay private")),
+    );
+
+    const response = await app.request("/test/caught-error");
+    const responseText = await response.text();
+    const failureLog = logEntries.find((entry) => entry.msg === "request failed");
+
+    expect(response.status).toBe(500);
+    expect(responseText).not.toContain("database password");
+    expect(failureLog).toMatchObject({
+      level: 50,
+      msg: "request failed",
+      err: {
+        type: "Error",
+        message: "database password must stay private",
+      },
+    });
+    expect(failureLog?.requestId).toBeTypeOf("string");
+    const loggedError = failureLog?.err as { stack?: string } | undefined;
+    expect(loggedError?.stack).toContain("database password must stay private");
   });
 
   it("publishes an OpenAPI 3.1 document", async () => {

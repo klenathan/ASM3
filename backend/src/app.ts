@@ -12,6 +12,8 @@ import type { IdentityRouteDependencies } from "./modules/identity/index";
 import { registerIdentityRoutes, sessionPrincipalMiddleware } from "./modules/identity/index";
 import type { SocietyRouteDependencies } from "./modules/societies/index";
 import { registerSocietyRoutes } from "./modules/societies/index";
+import type { DiscussionRouteDependencies } from "./modules/discussions/index";
+import { registerDiscussionRoutes } from "./modules/discussions/index";
 import type { AppConfig } from "./config/env";
 import {
   OPENAPI_CONFIG,
@@ -28,6 +30,7 @@ interface AppDependencies {
   readonly checkReadiness: () => Promise<void>;
   readonly identity?: IdentityRouteDependencies;
   readonly societies?: SocietyRouteDependencies;
+  readonly discussions?: DiscussionRouteDependencies;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -83,6 +86,19 @@ export function createApp(dependencies: AppDependencies) {
       app.use("/api/v1/societies/*", principalMiddleware);
     }
     registerSocietyRoutes(app, dependencies.societies);
+  }
+
+  if (dependencies.discussions !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/threads", principalMiddleware);
+      app.use("/api/v1/threads/*", principalMiddleware);
+      app.use("/api/v1/comments", principalMiddleware);
+      app.use("/api/v1/comments/*", principalMiddleware);
+    }
+    registerDiscussionRoutes(app, dependencies.discussions);
   }
 
   app.doc(OPENAPI_PATH, OPENAPI_CONFIG);

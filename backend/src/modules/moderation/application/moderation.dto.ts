@@ -1,3 +1,4 @@
+import { ApplicationError } from "../../../shared/domain/errors.js";
 import type { ModerationResolution, ReportRecord, ReportStatus, ReportTargetType } from "../domain/moderation.js";
 
 export interface CreateReportCommand {
@@ -50,5 +51,5 @@ export function reportTarget(record: ReportRecord): {
 } {
   if (record.threadId !== null) return { type: "thread", id: record.threadId };
   if (record.commentId !== null) return { type: "comment", id: record.commentId };
-  throw new Error("Report has no target");
+  throw new ApplicationError("MODERATION_DATA_INVALID", "The report has no target");
 }

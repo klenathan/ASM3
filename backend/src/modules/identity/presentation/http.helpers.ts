@@ -3,7 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type { AppEnvironment } from "../../../app-types";
 import { AppError, ApplicationError } from "../../../shared/domain/errors";
-import { mapError } from "../../../shared/presentation/error-mapping";
+import { errorResponse } from "../../../shared/presentation/error-response";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 
 const identityStatusByCode: Readonly<Record<string, ContentfulStatusCode>> = {
@@ -52,10 +52,7 @@ export function identityErrorResponse(
   context: Context<AppEnvironment>,
   error: unknown,
 ): Response {
-  const requestId = context.get("requestId");
-  const mapped = mapError(error, requestId);
-  const status = identityStatusByCode[mapped.body.error.code] ?? mapped.status;
-  return context.json(mapped.body, status as ContentfulStatusCode);
+  return errorResponse(context, error, identityStatusByCode);
 }
 
 function isRequestPrincipal(value: unknown): value is RequestPrincipal {

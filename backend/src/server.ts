@@ -11,6 +11,7 @@ import { createDatabase } from "./db/client";
 import { createLogger } from "./lib/logger";
 import { createIdentityModule } from "./modules/identity/index";
 import { createSocietyModule } from "./modules/societies/index";
+import { createDiscussionsModule } from "./modules/discussions/index";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -18,12 +19,18 @@ async function main(): Promise<void> {
   const database = createDatabase(config, logger);
   const identity = createIdentityModule({ database: database.db });
   const societies = createSocietyModule({ database: database.db });
+  const discussions = createDiscussionsModule({
+    database: database.db,
+    membershipRepository: societies.membershipRepository,
+    societyRepository: societies.societyRepository,
+  });
   const app = createApp({
     config,
     logger,
     checkReadiness: database.checkConnection,
     identity,
     societies,
+    discussions,
   });
 
   const server = serve(

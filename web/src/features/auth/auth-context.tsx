@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { ApiError, getCurrentUser, signIn as signInRequest, signOut as signOutRequest, type User } from './api'
 
@@ -14,9 +14,33 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+const SESSION_RESTORE_HINT_KEY = 'rmit-session-restore'
+
+function hasSessionRestoreHint(): boolean {
+  try {
+    return window.localStorage.getItem(SESSION_RESTORE_HINT_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function setSessionRestoreHint(isPresent: boolean): void {
+  try {
+    if (isPresent) {
+      window.localStorage.setItem(SESSION_RESTORE_HINT_KEY, 'true')
+    } else {
+      window.localStorage.removeItem(SESSION_RESTORE_HINT_KEY)
+    }
+  } catch {
+    // Session restoration remains available for current page when storage is unavailable.
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>('loading')
+  const [status, setStatus] = useState<AuthStatus>(() => (
+    hasSessionRestoreHint() ? 'loading' : 'unauthenticated'
+  ))
+  const hasRestoredSession = useRef(false)
   const [user, setUser] = useState<User | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
 
@@ -26,12 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const currentUser = await getCurrentUser()
+      setSessionRestoreHint(true)
       setUser(currentUser)
       setStatus('authenticated')
     } catch (caughtError) {
       const nextError = caughtError instanceof ApiError
         ? caughtError
         : new ApiError(0, 'UNKNOWN_ERROR', 'Unable to check your session.')
+      if (nextError.status === 401) setSessionRestoreHint(false)
       setUser(null)
       setError(nextError)
       setStatus(nextError.status === 403 ? 'forbidden' : 'unauthenticated')
@@ -39,11 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (!hasSessionRestoreHint() || hasRestoredSession.current) return
+    hasRestoredSession.current = true
     void refresh()
   }, [refresh])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await signInRequest(email, password)
+    setSessionRestoreHint(true)
     setUser(result.user)
     setError(null)
     setStatus('authenticated')
@@ -54,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signOutRequest()
     } finally {
+      setSessionRestoreHint(false)
       setUser(null)
       setError(null)
       setStatus('unauthenticated')

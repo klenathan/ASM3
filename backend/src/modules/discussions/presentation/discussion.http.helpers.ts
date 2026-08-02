@@ -1,9 +1,7 @@
 import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-
 import type { AppEnvironment } from "../../../app-types";
 import { AppError, ApplicationError } from "../../../shared/domain/errors";
-import { mapError } from "../../../shared/presentation/error-mapping";
+import { errorResponse } from "../../../shared/presentation/error-response";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 
 type PrincipalContext = {
@@ -42,8 +40,7 @@ export function discussionErrorResponse(
   context: Context<AppEnvironment>,
   error: unknown,
 ): Response {
-  const mapped = mapError(error, context.get("requestId"));
-  return context.json(mapped.body, mapped.status as ContentfulStatusCode);
+  return errorResponse(context, error);
 }
 
 function isRequestPrincipal(value: unknown): value is RequestPrincipal {

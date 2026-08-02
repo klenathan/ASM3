@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lt, or } from "drizzle-orm";
 
 import type { Database } from "../../../db/client.js";
 import type { TransactionManager } from "../../../shared/application/transaction.js";
@@ -157,7 +157,7 @@ export class DrizzleModerationRepository implements ModerationRepository {
     const rows = await this.executor
       .update(reports)
       .set({ status: "in_review", assignedTo: moderatorId, updatedAt })
-      .where(and(eq(reports.id, reportId), eq(reports.status, "pending")))
+      .where(and(eq(reports.id, reportId), eq(reports.status, "pending"), isNull(reports.assignedTo)))
       .returning();
     const row = rows[0];
     return row === undefined ? null : toReport(row);
@@ -295,7 +295,7 @@ export class DrizzleModerationRepository implements ModerationRepository {
       .where(eq(userProfiles.userId, userId))
       .returning();
     const row = rows[0];
-    if (row === undefined) throw new ApplicationError("USER_NOT_FOUND", "User was not found");
+    if (row === undefined) throw new ApplicationError("NOT_FOUND", "User was not found");
     return toProfile(row);
   }
 

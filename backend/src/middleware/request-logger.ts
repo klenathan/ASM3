@@ -6,6 +6,7 @@ import type { AppEnvironment } from "../app-types";
 export function requestLogger(logger: Logger): MiddlewareHandler<AppEnvironment> {
   return async (context, next) => {
     const startedAt = performance.now();
+    context.set("logger", logger);
 
     try {
       await next();
