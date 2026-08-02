@@ -1,33 +1,32 @@
 import { randomUUID } from "node:crypto";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
   assertCommentDepth,
   commentDepth,
   normalizeCommentBody,
   type CommentRecord,
-} from "../domain/discussion.js";
+} from "../domain/discussion";
 import {
   assertMutationAuthority,
   canReadRetained,
   requireActiveMember,
-  requireSociety,
   type DiscussionAuthorizationDependencies,
-} from "./discussion.authorization.js";
+} from "./discussion.authorization";
 import type {
   CommentDto,
   CreateCommentCommand,
   UpdateCommentCommand,
-} from "./discussion.dto.js";
-import { toCommentDto } from "./discussion.mappers.js";
+} from "./discussion.dto";
+import { toCommentDto } from "./discussion.mappers";
 import type {
   CreateCommentInput,
   DiscussionRepository,
   UpdateCommentInput,
-} from "./discussion.repository.js";
+} from "./discussion.repository";
 
 export interface CommentServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;
@@ -62,7 +61,7 @@ export class CommentService {
     const parentId = command.parentId ?? null;
     const parent = parentId === null ? null : await this.parentOrThrow(parentId, threadId);
     if (parent !== null) {
-      assertCommentDepth(await this.parentDepth(parent),);
+      assertCommentDepth(await this.parentDepth(parent));
     }
 
     const now = this.clock.now();
@@ -122,7 +121,7 @@ export class CommentService {
     const current = await this.commentOrThrow(commentId);
     const thread = await this.threadOrThrow(current.threadId);
     await assertMutationAuthority(this.authorization, principal, thread.societyId, current.authorId);
-    if (current.status === "deleted") {
+    if (thread.status === "deleted" || current.status === "deleted") {
       throw new ApplicationError("NOT_FOUND", "Comment was not found");
     }
 
@@ -149,6 +148,7 @@ export class CommentService {
     const current = await this.commentOrThrow(commentId);
     const thread = await this.threadOrThrow(current.threadId);
     await assertMutationAuthority(this.authorization, principal, thread.societyId, current.authorId);
+    if (thread.status === "deleted") throw new ApplicationError("NOT_FOUND", "Comment was not found");
     if (current.status === "deleted") return toCommentDto(current);
 
     const now = this.clock.now();
@@ -190,12 +190,11 @@ export class CommentService {
     let current: CommentRecord | null = parent;
     while (current !== null) {
       parents.set(current.id, current);
-      current = current.parentId === null
-        ? null
-        : await this.repository.findComment(current.parentId);
-      if (current === null && parent.parentId !== null && !parents.has(parent.parentId)) {
-        throw new ApplicationError("NOT_FOUND", "The parent comment was not found");
+      if (current.parentId === null) {
+        break;
       }
+      current = await this.repository.findComment(current.parentId);
+      if (current === null) throw new ApplicationError("NOT_FOUND", "The parent comment was not found");
     }
 
     return commentDepth(parent.id, parents);

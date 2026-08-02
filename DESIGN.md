@@ -57,7 +57,7 @@ Use a restrained red-orange ink strategy. Warm neutral surfaces and deep ink car
 
 ## Typography
 
-**Display Font:** A bold, condensed publication face using the current condensed display fallback.
+**Display Font:** Oswald Variable, a condensed publication face self-hosted via Fontsource.
 
 **Body Font:** Geist Variable, a highly legible workhorse sans serif.
 

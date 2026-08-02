@@ -1,9 +1,9 @@
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import { isActiveMember, isActiveModerator } from "../../societies/domain/membership.js";
-import { assertActiveSociety, type SocietyRecord } from "../../societies/domain/society.js";
-import type { MembershipRepository } from "../../societies/application/membership.repository.js";
-import type { SocietyRepository } from "../../societies/application/society.repository.js";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import { ApplicationError } from "../../../shared/domain/errors";
+import { isActiveMember, isActiveModerator } from "../../societies/domain/membership";
+import { assertActiveSociety, type SocietyRecord } from "../../societies/domain/society";
+import type { MembershipRepository } from "../../societies/application/membership.repository";
+import type { SocietyRepository } from "../../societies/application/society.repository";
 
 export interface DiscussionAuthorizationDependencies {
   readonly membershipRepository: MembershipRepository;

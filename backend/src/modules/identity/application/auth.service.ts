@@ -1,25 +1,25 @@
 import { randomUUID } from "node:crypto";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError, DomainError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError, DomainError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
   assertAccountUsable,
-} from "../domain/access.policy.js";
+} from "../domain/access.policy";
 import {
   assertPasswordPolicy,
   assertRegistrationEmail,
   normalizeBio,
   normalizeDisplayName,
   normalizeEmail,
-} from "../domain/registration.policy.js";
-import type { IdentityAccountRecord } from "../domain/identity.types.js";
-import type { AuthResultDto, RegisterCommand, SignInCommand, UserDto } from "./identity.dto.js";
-import { toUserDto } from "./identity.mappers.js";
-import type { IdentityRepository } from "./identity.repository.js";
-import type { PasswordAdapter } from "./password.adapter.js";
-import type { SessionTokenAdapter } from "./session.adapter.js";
+} from "../domain/registration.policy";
+import type { IdentityAccountRecord } from "../domain/identity.types";
+import type { AuthResultDto, RegisterCommand, SignInCommand, UserDto } from "./identity.dto";
+import { toUserDto } from "./identity.mappers";
+import type { IdentityRepository } from "./identity.repository";
+import type { PasswordAdapter } from "./password.adapter";
+import type { SessionTokenAdapter } from "./session.adapter";
 
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30;
 

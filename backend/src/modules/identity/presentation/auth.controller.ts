@@ -1,17 +1,17 @@
 import type { Context } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { AuthService } from "../application/auth.service.js";
-import type { RegisterCommand, SignInCommand } from "../application/identity.dto.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { AuthService } from "../application/auth.service";
+import type { RegisterCommand, SignInCommand } from "../application/identity.dto";
 import {
   extractSessionToken,
   SESSION_COOKIE_NAME,
-} from "./auth.middleware.js";
+} from "./auth.middleware";
 import {
   identityErrorResponse,
   requireInjectedPrincipal,
-} from "./http.helpers.js";
+} from "./http.helpers";
 
 const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 

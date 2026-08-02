@@ -1,12 +1,12 @@
 import type { Context } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
+import type { AppEnvironment } from "../../../app-types";
 import type {
   CreateRuleCommand,
   UpdateRuleCommand,
-} from "../application/society.dto.js";
-import type { SocietyService } from "../application/society.service.js";
-import { requireInjectedPrincipal, societyErrorResponse, validated } from "./http.helpers.js";
+} from "../application/society.dto";
+import type { SocietyService } from "../application/society.service";
+import { requireInjectedPrincipal, societyErrorResponse, validated } from "./http.helpers";
 
 export interface SocietyRulesControllerDependencies {
   readonly societyService: SocietyService;

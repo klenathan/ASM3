@@ -10,6 +10,7 @@ interface AuthContextValue {
   readonly error: ApiError | null
   readonly signIn: (email: string, password: string) => Promise<User>
   readonly signOut: () => Promise<void>
+  readonly refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const value = useMemo<AuthContextValue>(() => ({ status, user, error, signIn, signOut }), [error, signIn, signOut, status, user])
+  const value = useMemo<AuthContextValue>(() => ({ status, user, error, signIn, signOut, refresh }), [error, refresh, signIn, signOut, status, user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

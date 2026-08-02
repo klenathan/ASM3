@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type {
   IssuedSessionToken,
   SessionTokenAdapter,
-} from "../application/session.adapter.js";
+} from "../application/session.adapter";
 
 export class OpaqueSessionAdapter implements SessionTokenAdapter {
   issue(): IssuedSessionToken {

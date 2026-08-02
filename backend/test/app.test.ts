@@ -1,7 +1,7 @@
 import pino from "pino";
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "../src/app.js";
+import { createApp } from "../src/app";
 
 const logger = pino({ level: "silent" });
 const config = { webOrigin: "http://localhost:5173" };

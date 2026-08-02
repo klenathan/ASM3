@@ -12,7 +12,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { authUsers } from "../../identity/infrastructure/auth.tables.js";
+import { authUsers } from "../../identity/infrastructure/auth.tables";
 
 export const societies = pgTable(
   "societies",

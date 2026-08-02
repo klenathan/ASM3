@@ -1,4 +1,4 @@
-import { ApplicationError } from "../../../shared/domain/errors.js";
+import { ApplicationError } from "../../../shared/domain/errors";
 
 export type ThreadStatus = "published" | "removed" | "deleted";
 export type CommentStatus = "published" | "removed" | "deleted";

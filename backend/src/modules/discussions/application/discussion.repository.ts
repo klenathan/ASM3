@@ -1,10 +1,10 @@
-import type { PageRequest, PageResult } from "../../../shared/application/pagination.js";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 import type {
   CommentRecord,
   CommentVoteRecord,
   ThreadRecord,
   ThreadVoteRecord,
-} from "../domain/discussion.js";
+} from "../domain/discussion";
 
 export interface ThreadMediaRecord {
   readonly threadId: string;

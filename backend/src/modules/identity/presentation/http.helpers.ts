@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import { AppError, ApplicationError } from "../../../shared/domain/errors.js";
-import { mapError } from "../../../shared/presentation/error-mapping.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { AppEnvironment } from "../../../app-types";
+import { AppError, ApplicationError } from "../../../shared/domain/errors";
+import { mapError } from "../../../shared/presentation/error-mapping";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 
 const identityStatusByCode: Readonly<Record<string, ContentfulStatusCode>> = {
   AUTH_INVALID_CREDENTIALS: 401,

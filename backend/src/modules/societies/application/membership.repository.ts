@@ -1,4 +1,4 @@
-import type { MembershipRecord } from "../domain/membership.js";
+import type { MembershipRecord } from "../domain/membership";
 
 export interface CreateMembershipInput {
   readonly societyId: string;

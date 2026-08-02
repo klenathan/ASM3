@@ -1,7 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { PasswordAdapter, PasswordCredentialStore } from "../application/password.adapter.js";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { PasswordAdapter, PasswordCredentialStore } from "../application/password.adapter";
 
 const KEY_LENGTH = 64;
 const SCRYPT_COST = 16_384;

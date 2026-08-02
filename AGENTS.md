@@ -26,6 +26,7 @@
 - Use `pnpm` commands from `web/`: `pnpm dev`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `pnpm preview`.
 - Do not introduce a different frontend framework, router, state library, CSS framework, component library, or package manager. Do not add Next.js, Vue, Redux, Material UI, Bootstrap, or npm/yarn without explicit approval.
 - Use Tailwind CSS 4 and existing tokens in `web/src/index.css`. Reuse generated primitives in `web/src/components/ui/`; do not replace shadcn/ui with another UI kit.
+- Preserve the confirmed red-orange visual identity: `oklch(0.53 0.18 32)` in light mode and `oklch(0.72 0.17 32)` in dark mode, paired with warm publication-paper neutrals. `PRODUCT.md`, `DESIGN.md`, and `web/src/index.css` must remain aligned. Do not replace this palette with blue, ultramarine, or cool-white styling unless the user explicitly requests a rebrand.
 - Use React Router for navigation and route guards. Keep providers, routing, and auth protection in `web/src/app/`; keep `web/src/App.tsx` as a thin application shell.
 - Use TanStack Query for server state and request caching. Reuse `web/src/features/auth/` for session state and auth API behavior; do not create duplicate auth or data-fetching layers.
 - Organize `web/src` by feature and page, not by one large global component folder:

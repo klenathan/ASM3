@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import { normalizePageSize, type PageRequest } from "../../../shared/application/pagination.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import { isActiveModerator } from "../domain/membership.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import { normalizePageSize, type PageRequest } from "../../../shared/application/pagination";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import { isActiveModerator } from "../domain/membership";
 import {
   assertActiveSociety,
   normalizeRuleDescription,
@@ -14,7 +14,7 @@ import {
   normalizeSlug,
   normalizeSocietyDescription,
   normalizeSocietyName,
-} from "../domain/society.js";
+} from "../domain/society";
 import type {
   CreateRuleCommand,
   CreateSocietyCommand,
@@ -22,10 +22,10 @@ import type {
   SocietyDto,
   SocietyPageDto,
   UpdateRuleCommand,
-} from "./society.dto.js";
-import { toRuleDto, toSocietyDto, toSocietyPageDto } from "./society.mappers.js";
-import type { MembershipRepository } from "./membership.repository.js";
-import type { SocietyRepository, UpdateRuleInput } from "./society.repository.js";
+} from "./society.dto";
+import { toRuleDto, toSocietyDto, toSocietyPageDto } from "./society.mappers";
+import type { MembershipRepository } from "./membership.repository";
+import type { SocietyRepository, UpdateRuleInput } from "./society.repository";
 
 export interface SocietyServiceDependencies {
   readonly repository: SocietyRepository;

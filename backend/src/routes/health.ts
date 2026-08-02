@@ -1,8 +1,8 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Logger } from "pino";
 
-import type { AppEnvironment } from "../app-types.js";
-import { SERVICE_NAME } from "../constants.js";
+import type { AppEnvironment } from "../app-types";
+import { SERVICE_NAME } from "../constants";
 
 const healthResponseSchema = z
   .object({

@@ -1,15 +1,15 @@
 import { and, asc, desc, eq, gte, gt, lt, or, sql } from "drizzle-orm";
 
-import type { Database } from "../../../db/client.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError, InvalidCursorError } from "../../../shared/domain/errors.js";
+import type { Database } from "../../../db/client";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError, InvalidCursorError } from "../../../shared/domain/errors";
 import {
   cursorFor,
   decodeCursor,
   encodeCursor,
   type PageRequest,
   type PageResult,
-} from "../../../shared/application/pagination.js";
+} from "../../../shared/application/pagination";
 import {
   assertCommentStatus,
   assertThreadStatus,
@@ -17,7 +17,7 @@ import {
   type CommentVoteRecord,
   type ThreadRecord,
   type ThreadVoteRecord,
-} from "../domain/discussion.js";
+} from "../domain/discussion";
 import type {
   CreateCommentInput,
   CreateThreadInput,
@@ -25,14 +25,14 @@ import type {
   ThreadMediaRecord,
   UpdateCommentInput,
   UpdateThreadInput,
-} from "../application/discussion.repository.js";
+} from "../application/discussion.repository";
 import {
   commentVotes,
   comments,
   threadMedia,
   threadVotes,
   threads,
-} from "./discussion.tables.js";
+} from "./discussion.tables";
 
 type DiscussionExecutor = Pick<Database, "select" | "insert" | "update" | "delete">;
 

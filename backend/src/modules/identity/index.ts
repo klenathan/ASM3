@@ -1,14 +1,14 @@
-import type { Database } from "../../db/client.js";
-import { ALLOWED_EMAIL_DOMAINS } from "../../config/email-domains.js";
-import { systemClock, type Clock } from "../../shared/application/clock.js";
-import { AdminUserService } from "./application/admin-user.service.js";
-import { AuthService } from "./application/auth.service.js";
-import { UserService } from "./application/user.service.js";
-import type { PasswordAdapter } from "./application/password.adapter.js";
-import type { SessionTokenAdapter } from "./application/session.adapter.js";
-import { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository.js";
-import { LocalPasswordAdapter } from "./infrastructure/local-password.adapter.js";
-import { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter.js";
+import type { Database } from "../../db/client";
+import { ALLOWED_EMAIL_DOMAINS } from "../../config/email-domains";
+import { systemClock, type Clock } from "../../shared/application/clock";
+import { AdminUserService } from "./application/admin-user.service";
+import { AuthService } from "./application/auth.service";
+import { UserService } from "./application/user.service";
+import type { PasswordAdapter } from "./application/password.adapter";
+import type { SessionTokenAdapter } from "./application/session.adapter";
+import { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository";
+import { LocalPasswordAdapter } from "./infrastructure/local-password.adapter";
+import { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter";
 
 export interface IdentityModuleDependencies {
   readonly database: Database;
@@ -47,18 +47,18 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
   };
 }
 
-export { AuthService } from "./application/auth.service.js";
-export { UserService } from "./application/user.service.js";
-export { AdminUserService } from "./application/admin-user.service.js";
-export { LocalPasswordAdapter, InMemoryPasswordCredentialStore } from "./infrastructure/local-password.adapter.js";
-export { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter.js";
-export { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository.js";
-export { registerIdentityRoutes } from "./presentation/identity.routes.js";
-export type { IdentityRouteDependencies } from "./presentation/identity.routes.js";
-export { sessionPrincipalMiddleware, extractSessionToken } from "./presentation/auth.middleware.js";
-export type { IdentityRepository } from "./application/identity.repository.js";
-export type { PasswordAdapter, PasswordCredentialStore } from "./application/password.adapter.js";
-export type { SessionTokenAdapter } from "./application/session.adapter.js";
+export { AuthService } from "./application/auth.service";
+export { UserService } from "./application/user.service";
+export { AdminUserService } from "./application/admin-user.service";
+export { LocalPasswordAdapter, InMemoryPasswordCredentialStore } from "./infrastructure/local-password.adapter";
+export { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter";
+export { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository";
+export { registerIdentityRoutes } from "./presentation/identity.routes";
+export type { IdentityRouteDependencies } from "./presentation/identity.routes";
+export { sessionPrincipalMiddleware, extractSessionToken } from "./presentation/auth.middleware";
+export type { IdentityRepository } from "./application/identity.repository";
+export type { PasswordAdapter, PasswordCredentialStore } from "./application/password.adapter";
+export type { SessionTokenAdapter } from "./application/session.adapter";
 export type {
   AuthResultDto,
   RegisterCommand,
@@ -67,4 +67,4 @@ export type {
   SuspendUserCommand,
   UpdateProfileCommand,
   UserDto,
-} from "./application/identity.dto.js";
+} from "./application/identity.dto";

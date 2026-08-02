@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import type {
   CreateMembershipInput,
   MembershipRepository,
   UpdateMembershipInput,
-} from "./membership.repository.js";
-import { MembershipService } from "./membership.service.js";
-import type { MembershipRecord } from "../domain/membership.js";
+} from "./membership.repository";
+import { MembershipService } from "./membership.service";
+import type { MembershipRecord } from "../domain/membership";
 import type {
   CreateRuleInput,
   CreateSocietyInput,
   SocietyRepository,
   UpdateRuleInput,
-} from "./society.repository.js";
-import { SocietyService } from "./society.service.js";
-import type { SocietyRecord, SocietyRuleRecord } from "../domain/society.js";
-import type { PageRequest, PageResult } from "../../../shared/application/pagination.js";
+} from "./society.repository";
+import { SocietyService } from "./society.service";
+import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 
 const society: SocietyRecord = {
   id: "society-id",

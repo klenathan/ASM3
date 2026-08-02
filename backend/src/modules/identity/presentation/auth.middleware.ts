@@ -1,9 +1,9 @@
 import type { MiddlewareHandler } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import { AppError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import type { AuthService } from "../application/auth.service.js";
+import type { AppEnvironment } from "../../../app-types";
+import { AppError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import type { AuthService } from "../application/auth.service";
 
 export const SESSION_COOKIE_NAME = "rmit_session";
 

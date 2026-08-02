@@ -1,13 +1,13 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { AdminUserService } from "../application/admin-user.service.js";
-import type { AuthService } from "../application/auth.service.js";
-import type { UserService } from "../application/user.service.js";
-import { createAdminUserController } from "./admin-user.controller.js";
-import { sessionPrincipalMiddleware } from "./auth.middleware.js";
-import { createAuthController } from "./auth.controller.js";
-import { createUserController } from "./user.controller.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { AdminUserService } from "../application/admin-user.service";
+import type { AuthService } from "../application/auth.service";
+import type { UserService } from "../application/user.service";
+import { createAdminUserController } from "./admin-user.controller";
+import { sessionPrincipalMiddleware } from "./auth.middleware";
+import { createAuthController } from "./auth.controller";
+import { createUserController } from "./user.controller";
 import {
   authResultSchema,
   errorSchema,
@@ -17,7 +17,7 @@ import {
   suspendUserRequestSchema,
   updateProfileRequestSchema,
   userSchema,
-} from "./identity.schemas.js";
+} from "./identity.schemas";
 
 const userIdParams = z.object({
   userId: z.string().uuid(),

@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { UpdateProfileCommand } from "../application/identity.dto.js";
-import type { UserService } from "../application/user.service.js";
-import { identityErrorResponse, requireInjectedPrincipal } from "./http.helpers.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { UpdateProfileCommand } from "../application/identity.dto";
+import type { UserService } from "../application/user.service";
+import { identityErrorResponse, requireInjectedPrincipal } from "./http.helpers";
 
 export interface UserControllerDependencies {
   readonly userService: UserService;

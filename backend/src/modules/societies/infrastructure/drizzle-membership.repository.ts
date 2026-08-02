@@ -1,19 +1,19 @@
 import { and, eq } from "drizzle-orm";
 
-import type { Database } from "../../../db/client.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
+import type { Database } from "../../../db/client";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
 import type {
   CreateMembershipInput,
   MembershipRepository,
   UpdateMembershipInput,
-} from "../application/membership.repository.js";
+} from "../application/membership.repository";
 import {
   assertMembershipRole,
   assertMembershipState,
   type MembershipRecord,
-} from "../domain/membership.js";
-import { societyMemberships } from "./society.tables.js";
+} from "../domain/membership";
+import { societyMemberships } from "./society.tables";
 
 type MembershipExecutor = Pick<Database, "select" | "insert" | "update">;
 

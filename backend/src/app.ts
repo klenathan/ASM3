@@ -7,24 +7,27 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import type { Logger } from "pino";
 
-import type { AppEnvironment } from "./app-types.js";
-import type { IdentityRouteDependencies } from "./modules/identity/index.js";
-import { registerIdentityRoutes } from "./modules/identity/index.js";
-import type { AppConfig } from "./config/env.js";
+import type { AppEnvironment } from "./app-types";
+import type { IdentityRouteDependencies } from "./modules/identity/index";
+import { registerIdentityRoutes, sessionPrincipalMiddleware } from "./modules/identity/index";
+import type { SocietyRouteDependencies } from "./modules/societies/index";
+import { registerSocietyRoutes } from "./modules/societies/index";
+import type { AppConfig } from "./config/env";
 import {
   OPENAPI_CONFIG,
   OPENAPI_PATH,
   OPENAPI_UI_PATH,
-} from "./config/openapi.js";
-import { SERVICE_NAME } from "./constants.js";
-import { requestLogger } from "./middleware/request-logger.js";
-import { registerHealthRoutes } from "./routes/health.js";
+} from "./config/openapi";
+import { SERVICE_NAME } from "./constants";
+import { requestLogger } from "./middleware/request-logger";
+import { registerHealthRoutes } from "./routes/health";
 
 interface AppDependencies {
   readonly config: Pick<AppConfig, "webOrigin"> & Partial<Pick<AppConfig, "nodeEnv">>;
   readonly logger: Logger;
   readonly checkReadiness: () => Promise<void>;
   readonly identity?: IdentityRouteDependencies;
+  readonly societies?: SocietyRouteDependencies;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -69,6 +72,17 @@ export function createApp(dependencies: AppDependencies) {
       ...dependencies.identity,
       secureCookies: dependencies.config.nodeEnv === "production",
     });
+  }
+
+  if (dependencies.societies !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/societies", principalMiddleware);
+      app.use("/api/v1/societies/*", principalMiddleware);
+    }
+    registerSocietyRoutes(app, dependencies.societies);
   }
 
   app.doc(OPENAPI_PATH, OPENAPI_CONFIG);

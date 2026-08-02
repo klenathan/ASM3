@@ -1,75 +1,106 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
+import { Button } from "../../components/ui/button";
 import { LogoMark } from "../../components/site/LogoMark";
 import { useAuth } from "../../features/auth/auth-context";
 
+const indexItems = [
+  "Find a society",
+  "Join the thread",
+  "Keep it accountable",
+];
+
 export function LandingPage() {
-  const navigate = useNavigate();
   const { status } = useAuth();
 
   return (
-    <div className="site-frame landing-page">
-      <header className="masthead site-header">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="mx-auto flex w-full max-w-7xl items-center justify-between border-b border-foreground/15 px-6 py-5 lg:px-10">
         <LogoMark />
-        <div className="header-note">
-          RMIT community forum <span aria-hidden="true">/</span> 2026
+        <div className="flex items-center gap-3 text-right text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase sm:gap-6">
+          <span className="hidden sm:inline">RMIT community forum</span>
+          <span aria-hidden="true" className="text-primary">
+            /
+          </span>
+          <span>2026</span>
         </div>
       </header>
 
-      <main className="landing-main">
-        <section className="landing-intro" aria-labelledby="landing-title">
-          <p className="issue-label">Issue 01 · Find your people</p>
-          <h1 id="landing-title">Make room for better conversations.</h1>
-          <p className="landing-deck">
-            RMIT Society is a shared reading table for student communities —
-            discover societies, start threads, and keep campus conversation
-            moving.
+      <main className="mx-auto grid w-full max-w-7xl flex-1 content-center gap-12 px-6 py-16 sm:py-24 lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,0.75fr)] lg:items-center lg:gap-20 lg:px-10">
+        <section aria-labelledby="landing-title">
+          <h1
+            id="landing-title"
+            className="max-w-4xl font-heading text-[clamp(3rem,7.5vw,5.75rem)] leading-[0.95] font-semibold tracking-[-0.01em] text-balance uppercase"
+          >
+            Make room for better conversations.
+          </h1>
+          <p className="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
+            RMIT Society is a community forum organized around societies —
+            shared reading tables where students find their people and keep
+            campus conversation moving.
           </p>
-          <div className="landing-actions">
-            <button
-              className="ink-button"
-              onClick={() => navigate("/sign-in")}
-              type="button"
+          <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
+            <Button
+              asChild
+              size="lg"
+              className="h-12 rounded-none px-5 text-base font-semibold shadow-none"
             >
-              Sign in to RMIT Society{" "}
-              <ArrowUpRight size={18} strokeWidth={1.8} aria-hidden="true" />
-            </button>
-            {status === "loading" && (
-              <span className="quiet-note">Checking session…</span>
-            )}
+              <Link to="/sign-in">
+                Sign in
+                <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </Button>
+            <p className="max-w-xs text-sm leading-6 text-muted-foreground">
+              Open to approved RMIT identities only. An unofficial student
+              community space.
+            </p>
           </div>
+          {status === "loading" && (
+            <p
+              className="mt-4 text-sm text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              Checking session…
+            </p>
+          )}
         </section>
 
-        <aside className="landing-index" aria-label="What RMIT Society is for">
-          <div className="index-topline">
-            <span>RMIT / SOCIETY</span>
-            <span>INDEX</span>
+        <aside
+          aria-label="What RMIT Society is for"
+          className="bg-card ring-1 ring-foreground/15"
+        >
+          <div className="flex items-center justify-between border-b border-foreground/15 px-5 py-4 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+            <span>RMIT / Society</span>
+            <span className="text-primary">Index</span>
           </div>
-          <div className="index-list">
-            <div className="index-row">
-              <span>01</span>
-              <strong>Find a society</strong>
-              <ArrowRight size={16} aria-hidden="true" />
-            </div>
-            <div className="index-row">
-              <span>02</span>
-              <strong>Join the thread</strong>
-              <ArrowRight size={16} aria-hidden="true" />
-            </div>
-            <div className="index-row">
-              <span>03</span>
-              <strong>Keep it accountable</strong>
-              <ArrowRight size={16} aria-hidden="true" />
-            </div>
+          <div className="divide-y divide-foreground/15">
+            {indexItems.map((item, index) => (
+              <div
+                className="group flex items-center gap-4 px-5 py-5 transition-colors hover:bg-primary/5"
+                key={item}
+              >
+                <span className="w-6 text-sm font-semibold text-primary tabular-nums">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <strong className="flex-1 font-heading text-lg font-medium tracking-[0.01em] uppercase">
+                  {item}
+                </strong>
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary"
+                />
+              </div>
+            ))}
           </div>
-          <p className="index-footnote">
+          <p className="border-t border-foreground/15 px-5 py-5 text-sm leading-6 text-muted-foreground">
             For approved RMIT identities across the AU, VN, and EU community.
           </p>
         </aside>
       </main>
 
-      <footer className="site-footer">
+      <footer className="mx-auto flex w-full max-w-7xl flex-col gap-2 border-t border-foreground/15 px-6 py-5 text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase sm:flex-row sm:items-center sm:justify-between lg:px-10">
         <span>Unofficial student community space</span>
         <span>Use your approved RMIT email to enter</span>
       </footer>

@@ -1,27 +1,27 @@
 import { and, asc, eq, gt, or } from "drizzle-orm";
 
-import type { Database } from "../../../db/client.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { InvalidCursorError, ApplicationError } from "../../../shared/domain/errors.js";
+import type { Database } from "../../../db/client";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { InvalidCursorError, ApplicationError } from "../../../shared/domain/errors";
 import {
   cursorFor,
   decodeCursor,
   encodeCursor,
   type PageRequest,
   type PageResult,
-} from "../../../shared/application/pagination.js";
+} from "../../../shared/application/pagination";
 import type {
   SocietyRepository,
   CreateRuleInput,
   CreateSocietyInput,
   UpdateRuleInput,
-} from "../application/society.repository.js";
+} from "../application/society.repository";
 import {
   assertSocietyStatus,
   type SocietyRecord,
   type SocietyRuleRecord,
-} from "../domain/society.js";
-import { societies, societyRules } from "./society.tables.js";
+} from "../domain/society";
+import { societies, societyRules } from "./society.tables";
 
 type SocietyExecutor = Pick<Database, "select" | "insert" | "update" | "delete">;
 

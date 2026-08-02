@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { AddModeratorCommand } from "../application/society.dto.js";
-import type { MembershipService } from "../application/membership.service.js";
-import { requireInjectedPrincipal, societyErrorResponse, validated } from "./http.helpers.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { AddModeratorCommand } from "../application/society.dto";
+import type { MembershipService } from "../application/membership.service";
+import { requireInjectedPrincipal, societyErrorResponse, validated } from "./http.helpers";
 
 export interface MembershipControllerDependencies {
   readonly membershipService: MembershipService;

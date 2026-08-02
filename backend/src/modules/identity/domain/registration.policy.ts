@@ -1,4 +1,4 @@
-import { DomainError } from "../../../shared/domain/errors.js";
+import { DomainError } from "../../../shared/domain/errors";
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

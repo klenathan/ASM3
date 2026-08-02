@@ -2,7 +2,7 @@
   "name": "@rmit-society/backend",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "packageManager": "pnpm@10.13.1",
   "engines": {
     "node": ">=22.0.0 <23",

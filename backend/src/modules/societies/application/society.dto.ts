@@ -1,4 +1,4 @@
-import type { PageResult } from "../../../shared/application/pagination.js";
+import type { PageResult } from "../../../shared/application/pagination";
 
 export interface SocietyDto {
   readonly id: string;

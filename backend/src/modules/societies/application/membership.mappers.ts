@@ -1,5 +1,5 @@
-import type { MembershipRecord } from "../domain/membership.js";
-import type { MembershipDto } from "./society.dto.js";
+import type { MembershipRecord } from "../domain/membership";
+import type { MembershipDto } from "./society.dto";
 
 export function toMembershipDto(record: MembershipRecord): MembershipDto {
   return {

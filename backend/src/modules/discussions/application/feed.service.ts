@@ -1,16 +1,16 @@
-import type { PageRequest } from "../../../shared/application/pagination.js";
-import { normalizePageSize } from "../../../shared/application/pagination.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { PageRequest } from "../../../shared/application/pagination";
+import { normalizePageSize } from "../../../shared/application/pagination";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
   canReadRetained,
   hasSocietyModeratorAuthority,
   requireSociety,
   type DiscussionAuthorizationDependencies,
-} from "./discussion.authorization.js";
-import type { CommentPageDto, ThreadPageDto } from "./discussion.dto.js";
-import { toCommentPageDto, toThreadPageDto } from "./discussion.mappers.js";
-import type { DiscussionRepository } from "./discussion.repository.js";
+} from "./discussion.authorization";
+import type { CommentPageDto, ThreadPageDto } from "./discussion.dto";
+import { toCommentPageDto, toThreadPageDto } from "./discussion.mappers";
+import type { DiscussionRepository } from "./discussion.repository";
 
 export interface FeedServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;

@@ -1,4 +1,4 @@
-import type { PlatformRole, UserStatus } from "../domain/identity.types.js";
+import type { PlatformRole, UserStatus } from "../domain/identity.types";
 
 export interface UserDto {
   readonly userId: string;

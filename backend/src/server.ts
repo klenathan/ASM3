@@ -4,23 +4,26 @@ import pino from "pino";
 
 loadDotenv({ quiet: true });
 
-import { createApp } from "./app.js";
-import { loadConfig } from "./config/env.js";
-import { SERVICE_NAME } from "./constants.js";
-import { createDatabase } from "./db/client.js";
-import { createLogger } from "./lib/logger.js";
-import { createIdentityModule } from "./modules/identity/index.js";
+import { createApp } from "./app";
+import { loadConfig } from "./config/env";
+import { SERVICE_NAME } from "./constants";
+import { createDatabase } from "./db/client";
+import { createLogger } from "./lib/logger";
+import { createIdentityModule } from "./modules/identity/index";
+import { createSocietyModule } from "./modules/societies/index";
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const database = createDatabase(config, logger);
   const identity = createIdentityModule({ database: database.db });
+  const societies = createSocietyModule({ database: database.db });
   const app = createApp({
     config,
     logger,
     checkReadiness: database.checkConnection,
     identity,
+    societies,
   });
 
   const server = serve(
@@ -75,6 +78,9 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  pino({ base: { service: SERVICE_NAME } }).fatal({ err: error }, "API failed to start");
+  pino({ base: { service: SERVICE_NAME } }).fatal(
+    { err: error },
+    "API failed to start",
+  );
   process.exitCode = 1;
 });

@@ -1,20 +1,20 @@
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
   assertAccountUsable,
   assertSystemAdmin,
   assertTargetExists,
-} from "../domain/access.policy.js";
+} from "../domain/access.policy";
 import type {
   SetUserRoleCommand,
   SuspendUserCommand,
   UserDto,
-} from "./identity.dto.js";
-import { toUserDto } from "./identity.mappers.js";
-import type { IdentityRepository } from "./identity.repository.js";
-import type { IdentityAccountRecord } from "../domain/identity.types.js";
+} from "./identity.dto";
+import { toUserDto } from "./identity.mappers";
+import type { IdentityRepository } from "./identity.repository";
+import type { IdentityAccountRecord } from "../domain/identity.types";
 
 export interface AdminUserServiceDependencies {
   readonly repository: IdentityRepository;

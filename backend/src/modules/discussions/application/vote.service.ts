@@ -1,15 +1,15 @@
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import { assertVoteValue, type CommentRecord, type ThreadRecord } from "../domain/discussion.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import { assertVoteValue, type CommentRecord, type ThreadRecord } from "../domain/discussion";
 import {
   requireActiveMember,
   requireSociety,
   type DiscussionAuthorizationDependencies,
-} from "./discussion.authorization.js";
-import type { VoteDto } from "./discussion.dto.js";
-import type { DiscussionRepository } from "./discussion.repository.js";
+} from "./discussion.authorization";
+import type { VoteDto } from "./discussion.dto";
+import type { DiscussionRepository } from "./discussion.repository";
 
 export interface VoteServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;

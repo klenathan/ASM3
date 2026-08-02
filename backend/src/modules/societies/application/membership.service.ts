@@ -1,20 +1,20 @@
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
   assertModeratorCanBeRemoved,
   isActiveMember,
   isActiveModerator,
-} from "../domain/membership.js";
-import { assertActiveSociety, type SocietyRecord } from "../domain/society.js";
-import type { MembershipDto, AddModeratorCommand } from "./society.dto.js";
-import { toMembershipDto } from "./membership.mappers.js";
+} from "../domain/membership";
+import { assertActiveSociety, type SocietyRecord } from "../domain/society";
+import type { MembershipDto, AddModeratorCommand } from "./society.dto";
+import { toMembershipDto } from "./membership.mappers";
 import type {
   CreateMembershipInput,
   MembershipRepository,
-} from "./membership.repository.js";
-import type { SocietyRepository } from "./society.repository.js";
+} from "./membership.repository";
+import type { SocietyRepository } from "./society.repository";
 
 export interface MembershipServiceDependencies {
   readonly repository: MembershipRepository;

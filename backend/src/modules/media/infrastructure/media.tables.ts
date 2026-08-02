@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, pgTable, bigint, text, timestamp, uuid, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { authUsers } from "../../identity/infrastructure/auth.tables.js";
+import { authUsers } from "../../identity/infrastructure/auth.tables";
 
 export const mediaAssets = pgTable(
   "media_assets",

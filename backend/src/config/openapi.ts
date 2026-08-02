@@ -1,4 +1,4 @@
-import { API_VERSION } from "../constants.js";
+import { API_VERSION } from "../constants";
 
 export const OPENAPI_PATH = "/api/v1/openapi.json";
 export const OPENAPI_UI_PATH = "/docs";

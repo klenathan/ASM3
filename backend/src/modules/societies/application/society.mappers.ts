@@ -1,6 +1,6 @@
-import type { PageResult } from "../../../shared/application/pagination.js";
-import type { SocietyRecord, SocietyRuleRecord } from "../domain/society.js";
-import type { RuleDto, SocietyDto, SocietyPageDto } from "./society.dto.js";
+import type { PageResult } from "../../../shared/application/pagination";
+import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
+import type { RuleDto, SocietyDto, SocietyPageDto } from "./society.dto";
 
 export function toSocietyDto(record: SocietyRecord): SocietyDto {
   return {

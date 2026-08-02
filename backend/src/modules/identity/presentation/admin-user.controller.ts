@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { AdminUserService } from "../application/admin-user.service.js";
-import type { SetUserRoleCommand, SuspendUserCommand } from "../application/identity.dto.js";
-import { identityErrorResponse, requireInjectedPrincipal } from "./http.helpers.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { AdminUserService } from "../application/admin-user.service";
+import type { SetUserRoleCommand, SuspendUserCommand } from "../application/identity.dto";
+import { identityErrorResponse, requireInjectedPrincipal } from "./http.helpers";
 
 export interface AdminUserControllerDependencies {
   readonly adminUserService: AdminUserService;

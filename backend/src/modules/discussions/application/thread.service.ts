@@ -1,31 +1,31 @@
 import { randomUUID } from "node:crypto";
 
-import type { Clock } from "../../../shared/application/clock.js";
-import { normalizePageSize } from "../../../shared/application/pagination.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
+import type { Clock } from "../../../shared/application/clock";
+import { normalizePageSize } from "../../../shared/application/pagination";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
   assertMutationAuthority,
   canReadRetained,
   requireActiveMember,
   type DiscussionAuthorizationDependencies,
-} from "./discussion.authorization.js";
+} from "./discussion.authorization";
 import type {
   CreateThreadCommand,
   ThreadDto,
   UpdateThreadCommand,
-} from "./discussion.dto.js";
-import { toThreadDto } from "./discussion.mappers.js";
+} from "./discussion.dto";
+import { toThreadDto } from "./discussion.mappers";
 import type {
   CreateThreadInput,
   DiscussionRepository,
   UpdateThreadInput,
-} from "./discussion.repository.js";
+} from "./discussion.repository";
 import {
   normalizeThreadBody,
   normalizeThreadTitle,
-} from "../domain/discussion.js";
+} from "../domain/discussion";
 
 export interface ThreadServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;

@@ -1,7 +1,7 @@
-import type { PageResult } from "../../../shared/application/pagination.js";
-import type { CommentRecord, ThreadRecord } from "../domain/discussion.js";
-import type { CommentDto, CommentPageDto, ThreadDto, ThreadPageDto } from "./discussion.dto.js";
-import type { ThreadMediaRecord } from "./discussion.repository.js";
+import type { PageResult } from "../../../shared/application/pagination";
+import type { CommentRecord, ThreadRecord } from "../domain/discussion";
+import type { CommentDto, CommentPageDto, ThreadDto, ThreadPageDto } from "./discussion.dto";
+import type { ThreadMediaRecord } from "./discussion.repository";
 
 export function toThreadDto(
   record: ThreadRecord,

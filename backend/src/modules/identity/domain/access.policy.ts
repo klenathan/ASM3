@@ -1,5 +1,5 @@
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { IdentityAccountRecord } from "./identity.types.js";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { IdentityAccountRecord } from "./identity.types";
 
 export function assertAccountUsable(account: IdentityAccountRecord, now: Date): void {
   if (account.profile.status === "deactivated") {

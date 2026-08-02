@@ -5,7 +5,7 @@ import type {
   PlatformRole,
   UserProfileRecord,
   UserStatus,
-} from "../domain/identity.types.js";
+} from "../domain/identity.types";
 
 export interface CreateAuthUserInput {
   readonly id: string;

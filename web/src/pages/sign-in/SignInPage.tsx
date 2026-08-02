@@ -6,8 +6,9 @@ import {
   KeyRound,
   LoaderCircle,
 } from "lucide-react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
+import { LogoMark } from "../../components/site/LogoMark";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import {
@@ -23,17 +24,6 @@ import { Label } from "../../components/ui/label";
 import { ApiError } from "../../features/auth/api";
 import { useAuth } from "../../features/auth/auth-context";
 import { ForbiddenPage } from "../status";
-
-function Brand() {
-  return (
-    <Link
-      className="font-heading text-xl font-bold tracking-[-0.04em] text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
-      to="/"
-    >
-      <span className="text-primary">RMIT</span> Society
-    </Link>
-  );
-}
 
 export function SignInPage() {
   const navigate = useNavigate();
@@ -79,12 +69,12 @@ export function SignInPage() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between border-b border-foreground/15 px-6 py-5 lg:px-10">
-        <Brand />
+        <LogoMark />
         <Button
           variant="ghost"
           type="button"
           onClick={() => navigate("/")}
-          className="h-9 rounded-none px-2 text-sm text-muted-foreground hover:text-foreground"
+          className="h-11 rounded-none px-2 text-sm text-muted-foreground hover:text-foreground"
         >
           Back to landing
         </Button>
@@ -92,16 +82,9 @@ export function SignInPage() {
 
       <main className="mx-auto grid w-full max-w-7xl gap-12 px-6 py-16 sm:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(24rem,28rem)] lg:items-center lg:gap-24 lg:px-10 lg:py-28">
         <section aria-labelledby="sign-in-title">
-          <div className="flex items-center gap-3 text-xs font-semibold tracking-[0.12em] text-primary uppercase">
-            <span>Access desk</span>
-            <span aria-hidden="true" className="text-foreground/35">
-              /
-            </span>
-            <span className="text-muted-foreground">Issue 01</span>
-          </div>
           <h1
             id="sign-in-title"
-            className="mt-5 max-w-2xl font-heading text-[clamp(3rem,7vw,5.5rem)] leading-[0.92] font-bold tracking-[-0.04em] text-balance"
+            className="max-w-2xl font-heading text-[clamp(2.75rem,6.5vw,5rem)] leading-[0.95] font-semibold tracking-[-0.01em] text-balance uppercase"
           >
             Welcome back to the table.
           </h1>

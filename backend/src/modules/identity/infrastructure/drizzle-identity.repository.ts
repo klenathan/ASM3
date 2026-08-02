@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 
-import type { Database } from "../../../db/client.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
+import type { Database } from "../../../db/client";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
 import type {
   AuthSessionRecord,
   AuthUserRecord,
@@ -10,7 +10,7 @@ import type {
   PlatformRole,
   UserProfileRecord,
   UserStatus,
-} from "../domain/identity.types.js";
+} from "../domain/identity.types";
 import type {
   CreateAuthUserInput,
   CreateSessionInput,
@@ -18,9 +18,9 @@ import type {
   IdentityRepository,
   UpdateUserAccessInput,
   UpdateUserProfileInput,
-} from "../application/identity.repository.js";
-import { authSessions, authUsers } from "./auth.tables.js";
-import { userProfiles } from "./user-profile.tables.js";
+} from "../application/identity.repository";
+import { authSessions, authUsers } from "./auth.tables";
+import { userProfiles } from "./user-profile.tables";
 
 type IdentityExecutor = Pick<Database, "select" | "insert" | "update" | "delete">;
 

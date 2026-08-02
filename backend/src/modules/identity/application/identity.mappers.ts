@@ -1,5 +1,5 @@
-import type { UserDto } from "./identity.dto.js";
-import type { IdentityAccountRecord } from "../domain/identity.types.js";
+import type { UserDto } from "./identity.dto";
+import type { IdentityAccountRecord } from "../domain/identity.types";
 
 export function toUserDto(account: IdentityAccountRecord): UserDto {
   return {

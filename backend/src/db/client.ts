@@ -2,8 +2,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import type { Logger } from "pino";
 
-import type { AppConfig } from "../config/env.js";
-import { SERVICE_NAME } from "../constants.js";
+import type { AppConfig } from "../config/env";
+import { SERVICE_NAME } from "../constants";
 
 export function createDatabase(config: AppConfig, logger: Logger) {
   const pool = new Pool({

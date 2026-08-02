@@ -1,12 +1,12 @@
-import type { Clock } from "../../../shared/application/clock.js";
-import type { TransactionManager } from "../../../shared/application/transaction.js";
-import { ApplicationError } from "../../../shared/domain/errors.js";
-import type { RequestPrincipal } from "../../../shared/presentation/request-principal.js";
-import { assertAccountUsable } from "../domain/access.policy.js";
-import { normalizeBio, normalizeDisplayName } from "../domain/registration.policy.js";
-import type { UpdateProfileCommand, UserDto } from "./identity.dto.js";
-import { toUserDto } from "./identity.mappers.js";
-import type { IdentityRepository } from "./identity.repository.js";
+import type { Clock } from "../../../shared/application/clock";
+import type { TransactionManager } from "../../../shared/application/transaction";
+import { ApplicationError } from "../../../shared/domain/errors";
+import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import { assertAccountUsable } from "../domain/access.policy";
+import { normalizeBio, normalizeDisplayName } from "../domain/registration.policy";
+import type { UpdateProfileCommand, UserDto } from "./identity.dto";
+import { toUserDto } from "./identity.mappers";
+import type { IdentityRepository } from "./identity.repository";
 
 export interface UserServiceDependencies {
   readonly repository: IdentityRepository;

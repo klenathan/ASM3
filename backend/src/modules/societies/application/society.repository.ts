@@ -1,5 +1,5 @@
-import type { PageRequest, PageResult } from "../../../shared/application/pagination.js";
-import type { SocietyRecord, SocietyRuleRecord } from "../domain/society.js";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
+import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
 
 export interface CreateSocietyInput {
   readonly id: string;

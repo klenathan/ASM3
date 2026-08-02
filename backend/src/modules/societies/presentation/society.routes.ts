@@ -1,11 +1,11 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 
-import type { AppEnvironment } from "../../../app-types.js";
-import type { MembershipService } from "../application/membership.service.js";
-import type { SocietyService } from "../application/society.service.js";
-import { createMembershipController } from "./membership.controller.js";
-import { createSocietyRulesController } from "./society-rules.controller.js";
-import { createSocietyController } from "./society.controller.js";
+import type { AppEnvironment } from "../../../app-types";
+import type { MembershipService } from "../application/membership.service";
+import type { SocietyService } from "../application/society.service";
+import { createMembershipController } from "./membership.controller";
+import { createSocietyRulesController } from "./society-rules.controller";
+import { createSocietyController } from "./society.controller";
 import {
   addModeratorRequestSchema,
   createRuleRequestSchema,
@@ -19,7 +19,7 @@ import {
   societyRulesSchema,
   societySchema,
   updateRuleRequestSchema,
-} from "./society.schemas.js";
+} from "./society.schemas";
 
 const societyIdParams = z.object({
   societyId: z.string().uuid(),

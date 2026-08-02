@@ -11,9 +11,9 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { authUsers } from "../../identity/infrastructure/auth.tables.js";
-import { comments, threads } from "../../discussions/infrastructure/discussion.tables.js";
-import { societies } from "../../societies/infrastructure/society.tables.js";
+import { authUsers } from "../../identity/infrastructure/auth.tables";
+import { comments, threads } from "../../discussions/infrastructure/discussion.tables";
+import { societies } from "../../societies/infrastructure/society.tables";
 
 export const reports = pgTable(
   "reports",

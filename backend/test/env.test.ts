@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig } from "../src/config/env.js";
+import { loadConfig } from "../src/config/env";
 
 const databaseUrl = "postgresql://user:password@localhost:5432/rmit_society";
 

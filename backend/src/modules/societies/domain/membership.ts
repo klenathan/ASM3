@@ -1,4 +1,4 @@
-import { ApplicationError } from "../../../shared/domain/errors.js";
+import { ApplicationError } from "../../../shared/domain/errors";
 
 export type MembershipRole = "member" | "moderator";
 export type MembershipStatus = "active" | "left" | "banned";

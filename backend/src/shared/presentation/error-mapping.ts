@@ -1,4 +1,4 @@
-import { AppError, DomainError } from "../domain/errors.js";
+import { AppError, DomainError } from "../domain/errors";
 
 export interface ErrorResponse {
   readonly status: number;
