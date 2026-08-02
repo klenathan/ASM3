@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+lib/
+.esbuild/
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# AWS SAM / CDK
+.cdk/
+cdk.out/
+samconfig.toml/
+
+# Serverless
+.serverless/
+webpack.config.js.map
+.travis.yml
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!.env.test
+*.pem
+*.key
+*.p12
+credentials
+
+# Runtime
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Tests / coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Local cloud emulation (ministack)
+.ministack/
+.cloudpulse/
+local.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Misc
+tmp/
+temp/
+*.tmp
