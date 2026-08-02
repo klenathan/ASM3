@@ -1,20 +1,30 @@
 output "site_url" {
-  description = "Public CloudFront URL for the React application."
-  value       = "https://${aws_cloudfront_distribution.this.domain_name}"
+  description = "Public HTTPS URL for the React application through API Gateway."
+  value       = local.public_origin
 }
 
 output "api_url" {
-  description = "Public API base URL routed through CloudFront."
-  value       = "https://${aws_cloudfront_distribution.this.domain_name}/api/v1"
+  description = "Public HTTPS API Gateway origin. The client appends /api/v1 paths."
+  value       = local.public_origin
 }
 
-output "web_bucket_name" {
-  description = "S3 bucket to which the built web client is uploaded."
-  value       = aws_s3_bucket.web.id
+output "api_custom_domain_target" {
+  description = "API Gateway DNS target for an optional custom-domain CNAME or Route 53 alias record."
+  value       = var.api_custom_domain_name == null ? null : aws_apigatewayv2_domain_name.public[0].domain_name_configuration[0].target_domain_name
+}
+
+output "api_custom_domain_hosted_zone_id" {
+  description = "API Gateway hosted zone ID for an optional Route 53 alias record."
+  value       = var.api_custom_domain_name == null ? null : aws_apigatewayv2_domain_name.public[0].domain_name_configuration[0].hosted_zone_id
+}
+
+output "web_ecr_repository_url" {
+  description = "ECR repository URL for the web server image."
+  value       = aws_ecr_repository.web.repository_url
 }
 
 output "media_bucket_name" {
-  description = "Private S3 bucket used for uploaded media."
+  description = "Public S3 bucket used for uploaded media."
   value       = aws_s3_bucket.media.id
 }
 

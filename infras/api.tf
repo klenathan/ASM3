@@ -7,15 +7,35 @@ resource "aws_apigatewayv2_integration" "backend" {
   api_id                 = aws_apigatewayv2_api.backend.id
   integration_type       = "HTTP_PROXY"
   integration_method     = "ANY"
-  integration_uri        = "http://${aws_eip.ecs.public_dns}:3000/{proxy}"
+  integration_uri        = "http://${aws_eip.ecs.public_dns}:3000/api/{proxy}"
   payload_format_version = "1.0"
   timeout_milliseconds   = 29000
 }
 
 resource "aws_apigatewayv2_route" "backend" {
   api_id    = aws_apigatewayv2_api.backend.id
-  route_key = "ANY /{proxy+}"
+  route_key = "ANY /api/{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.backend.id}"
+}
+
+resource "aws_apigatewayv2_integration" "web" {
+  api_id                 = aws_apigatewayv2_api.backend.id
+  integration_type       = "HTTP_PROXY"
+  integration_method     = "ANY"
+  integration_uri        = "http://${aws_eip.ecs.public_dns}:8080"
+  payload_format_version = "1.0"
+  timeout_milliseconds   = 29000
+  request_parameters = {
+    "overwrite:path" = "$request.path"
+  }
+}
+
+# The default HTTP API endpoint is HTTPS. The more-specific /api route above
+# continues to select the backend integration.
+resource "aws_apigatewayv2_route" "web" {
+  api_id    = aws_apigatewayv2_api.backend.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.web.id}"
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -46,4 +66,24 @@ resource "aws_apigatewayv2_stage" "backend" {
     throttling_burst_limit   = 20
     throttling_rate_limit    = 10
   }
+}
+
+resource "aws_apigatewayv2_domain_name" "public" {
+  count = var.api_custom_domain_name == null ? 0 : 1
+
+  domain_name = var.api_custom_domain_name
+
+  domain_name_configuration {
+    certificate_arn = var.api_custom_domain_certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+resource "aws_apigatewayv2_api_mapping" "public" {
+  count = var.api_custom_domain_name == null ? 0 : 1
+
+  api_id      = aws_apigatewayv2_api.backend.id
+  domain_name = aws_apigatewayv2_domain_name.public[0].domain_name
+  stage       = aws_apigatewayv2_stage.backend.name
 }

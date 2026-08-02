@@ -8,10 +8,12 @@ BOOTSTRAP_DIR := $(INFRA_DIR)/bootstrap
 BACKEND_KEY ?= demo/infrastructure.tfstate
 STATE_BUCKET ?=
 ARGS ?=
+BACKEND_IMAGE_TAG ?= latest
+TARGET_PLATFORM ?= linux/amd64
 
 .DEFAULT_GOAL := help
 
-.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu
+.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend
 
 define with_env
 	@set -a; \
@@ -27,11 +29,13 @@ endef
 help:
 	@printf '%s\n' \
 		'Common targets:' \
-		'  make whoami                         Verify AWS credentials from .env.' \
-		'  make bootstrap-init|plan|apply      Manage the local-state bootstrap stack.' \
+		'  make whoami                          Verify AWS credentials from .env.' \
+		'  make bootstrap-init|plan|apply       Manage the local-state bootstrap stack.' \
 		'  make bootstrap-output                Show bootstrap outputs.' \
-		'  make init STATE_BUCKET=<bucket>     Initialize the root remote-state backend.' \
+		'  make init STATE_BUCKET=<bucket>      Initialize the root remote-state backend.' \
 		'  make plan|apply|destroy|output       Manage the root infrastructure stack.' \
+		'  make deploy-frontend                 Build and push the React web-server image to ECR.' \
+		'  make push-backend                    Build/push x86 backend image to ECR.' \
 		'  make validate|fmt                    Validate or format both stacks.' \
 		'  make tofu ARGS="<command>"           Run an authenticated root OpenTofu command.' \
 		'  make bootstrap-tofu ARGS="<command>" Run an authenticated bootstrap OpenTofu command.'
@@ -68,6 +72,12 @@ destroy:
 
 output:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) output)
+
+push-backend:
+	@IMAGE_TAG="$(BACKEND_IMAGE_TAG)" TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/push-backend-ecr.sh
+
+deploy-frontend:
+	@./scripts/deploy-frontend.sh
 
 validate:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) validate)

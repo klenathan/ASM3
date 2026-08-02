@@ -31,14 +31,39 @@ variable "owner" {
   type        = string
 }
 
-variable "web_origin" {
-  description = "Exact HTTPS browser origin accepted by backend CORS. Use the CloudFront URL output after the first apply."
+variable "learner_lab_role_name" {
+  description = "Pre-created IAM role supplied by AWS Academy Learner Lab."
   type        = string
-  default     = "https://example.invalid"
+  default     = "LabRole"
+}
+
+variable "learner_lab_instance_profile_name" {
+  description = "Pre-created EC2 instance profile supplied by AWS Academy Learner Lab."
+  type        = string
+  default     = "LabInstanceProfile"
+}
+
+variable "api_custom_domain_name" {
+  description = "Optional DNS name for the HTTPS API Gateway endpoint, such as community.example.com."
+  type        = string
+  default     = null
+  nullable    = true
 
   validation {
-    condition     = can(regex("^https://", var.web_origin))
-    error_message = "web_origin must be an HTTPS origin."
+    condition     = var.api_custom_domain_name == null || can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$", var.api_custom_domain_name))
+    error_message = "api_custom_domain_name must be a valid DNS name when provided."
+  }
+}
+
+variable "api_custom_domain_certificate_arn" {
+  description = "ACM certificate ARN for api_custom_domain_name. The certificate must be in aws_region."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = (var.api_custom_domain_name == null) == (var.api_custom_domain_certificate_arn == null)
+    error_message = "Set api_custom_domain_name and api_custom_domain_certificate_arn together."
   }
 }
 
@@ -88,8 +113,14 @@ variable "backend_image_tag" {
   default     = "latest"
 }
 
+variable "web_image_tag" {
+  description = "Frontend ECR image tag deployed by ECS."
+  type        = string
+  default     = "latest"
+}
+
 variable "app_desired_count" {
-  description = "Number of backend tasks. Keep at 0 until an image has been pushed to ECR."
+  description = "Number of application tasks. Keep at 0 until both images have been pushed to ECR."
   type        = number
   default     = 0
 

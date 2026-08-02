@@ -260,7 +260,7 @@ Same shape as `thread_votes`, replacing `thread_id` with `comment_id`. Separate 
 | -------------- | ------------ | ----------------------------------------------- |
 | `id`           | uuid         | PK                                              |
 | `owner_id`     | uuid         | FK auth user; restrict delete                   |
-| `object_key`   | varchar(512) | unique; never store presigned or CloudFront URL |
+| `object_key`   | varchar(512) | unique; never store presigned or delivery URL |
 | `purpose`      | text         | initially `thread_attachment` or `avatar`       |
 | `content_type` | varchar(100) | allow-listed by service                         |
 | `byte_size`    | bigint       | positive and bounded by purpose                 |

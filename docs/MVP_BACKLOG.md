@@ -91,8 +91,7 @@ Owner: infrastructure + documentation
 - Implement an automated, user-visible AWS analytics workflow. Analytics is currently deferred but is required by the assessment.
 - Create the required solution-architecture document: architecture diagrams, AWS service interactions, data/API design, security/cost decisions, live deployment evidence, teardown steps, and references.
 - Use immutable ECR image tags and document the deployed version.
-- Invalidate CloudFront after frontend release uploads.
-- Add a deployment smoke script covering CloudFront, API health, database readiness, session authentication, S3 upload, and media retrieval.
+- Add a deployment smoke script covering the API Gateway HTTPS site, API health, database readiness, session authentication, S3 upload, and media retrieval.
 - Resolve RDS TLS trust in the ECS image before a real deployment.
 - Treat the public HTTP API origin as a demo risk until private origin connectivity/TLS is implemented.
 

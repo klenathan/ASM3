@@ -60,10 +60,10 @@ The application is an individual cloud-computing assessment project. It must run
 
 - **Compute:** Amazon EC2
 - **Containers:** Amazon ECS using EC2 launch type when orchestration is needed
-- **Storage:** Amazon S3 for media and static objects
+- **Storage:** Amazon S3 for media objects
 - **Database:** Amazon RDS
 - **Analytics:** Deferred for the current milestone; must be revisited because the assessment requires an Analytics-category AWS service
-- **Networking and content delivery:** Amazon CloudFront for cached delivery of the web client and S3 media
+- **Networking and content delivery:** API Gateway provides the HTTPS entry point for the Nginx-served web client and backend API; CloudFront is unavailable in Learner Lab
 
 Every graded AWS service must be fully implemented and invoked automatically by the client, application code, or another service—not only through CLI or AWS Console.
 

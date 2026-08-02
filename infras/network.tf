@@ -48,13 +48,21 @@ resource "aws_route_table_association" "public" {
 
 resource "aws_security_group" "ecs" {
   name_prefix = "${local.name}-ecs-"
-  description = "Backend ingress through API Gateway and unrestricted egress"
+  description = "API Gateway proxy ingress and unrestricted egress"
   vpc_id      = aws_vpc.this.id
 
   ingress {
-    description = "API Gateway public HTTP proxy"
+    description = "API Gateway public HTTP proxy to backend"
     from_port   = 3000
     to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "API Gateway public HTTP proxy to web container"
+    from_port   = 8080
+    to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

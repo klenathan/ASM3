@@ -93,7 +93,7 @@ Approved RMIT domains live in `src/config/email-domains.ts`, not environment var
 Target request path:
 
 ```text
-Browser → CloudFront /api/* → API Gateway → ECS on EC2 → RDS PostgreSQL
+Browser → API Gateway (HTTPS) → Nginx or backend ECS container on EC2 → RDS PostgreSQL
 ```
 
-CloudFront/API Gateway routing and ECS infrastructure are separate deployment work. API responses remain non-cacheable unless a future route explicitly defines safe caching.
+API Gateway routing and ECS infrastructure are separate deployment work. API responses remain non-cacheable unless a future route explicitly defines safe caching.
