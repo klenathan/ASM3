@@ -15,6 +15,7 @@ import type {
   CreateSocietyInput,
   SocietyRepository,
   UpdateRuleInput,
+  MembershipSocietyRecord,
 } from "./society.repository";
 import { SocietyService } from "./society.service";
 import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
@@ -89,6 +90,29 @@ describe("SocietyService", () => {
     expect(anonymous.items[0]?.membership).toBeNull();
   });
 
+  it("lists the current user's subscribed societies with membership", async () => {
+    const repository = new FakeSocietyRepository(society, [
+      { society, membership: membership(student.userId, "member") },
+    ]);
+    const service = new SocietyService({
+      repository,
+      membershipRepository: new FakeMembershipRepository(),
+      transactions: immediateTransaction(repository),
+      clock,
+    });
+
+    const result = await service.listMySocieties(student);
+    expect(result).toEqual([
+      {
+        id: society.id,
+        slug: society.slug,
+        name: society.name,
+        avatarMediaId: society.avatarMediaId,
+        membership: { role: "member", status: "active" },
+      },
+    ]);
+  });
+
   it("uses an active society moderator rather than platform role for rules", async () => {
     const repository = new FakeSocietyRepository(society);
     const memberships = new FakeMembershipRepository([
@@ -157,10 +181,16 @@ describe("MembershipService", () => {
 class FakeSocietyRepository implements SocietyRepository {
   private readonly societies = new Map<string, SocietyRecord>();
   private readonly rules = new Map<string, SocietyRuleRecord>();
+  private readonly memberSocieties: readonly MembershipSocietyRecord[];
   createdBy: string | null = null;
 
-  constructor(initial?: SocietyRecord) {
+  constructor(initial?: SocietyRecord, memberSocieties: readonly MembershipSocietyRecord[] = []) {
     if (initial !== undefined) this.societies.set(initial.id, initial);
+    this.memberSocieties = memberSocieties;
+  }
+
+  async listActiveMemberSocieties(_userId: string): Promise<readonly MembershipSocietyRecord[]> {
+    return this.memberSocieties;
   }
 
   async listSocieties(_page: PageRequest): Promise<PageResult<SocietyRecord>> {

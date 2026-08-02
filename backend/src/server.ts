@@ -26,6 +26,26 @@ async function main(): Promise<void> {
     database: database.db,
     membershipRepository: societies.membershipRepository,
     societyRepository: societies.societyRepository,
+    profile: {
+      findPublicIdentity: async (userId) => {
+        const account = await identity.repository.findAccountByUserId(userId);
+        return account === null
+          ? null
+          : {
+              displayName: account.profile.displayName,
+              avatarMediaId: account.profile.avatarMediaId,
+            };
+      },
+      canReadActivityBy: async (viewer, authorId) => {
+        const target = await identity.repository.findAccountByUserId(authorId);
+        if (target === null) return false;
+        if (target.profile.isPublic) return true;
+        if (viewer === undefined) return false;
+        if (viewer.userId === authorId) return true;
+        if (viewer.platformRole === "system_admin") return true;
+        return false;
+      },
+    },
   });
   const moderation = createModerationModule({
     database: database.db,

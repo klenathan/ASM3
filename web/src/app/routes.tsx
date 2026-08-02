@@ -7,6 +7,8 @@ import { SignInPage } from "../pages/sign-in/SignInPage";
 import { ForumPage } from "../pages/forum/ForumPage";
 import { BrowseSocietiesPage } from "../pages/societies/BrowseSocietiesPage";
 import { SocietyDetailPage } from "../pages/societies/SocietyDetailPage";
+import { ProfilePage } from "../pages/profile/ProfilePage";
+import { UserProfilePage } from "../pages/u/UserProfilePage";
 import { ForbiddenPage, UnauthorizedPage } from "../pages/status";
 
 export function AppRoutes() {
@@ -17,6 +19,8 @@ export function AppRoutes() {
           <Route index element={<ForumPage />} />
           <Route path="societies" element={<BrowseSocietiesPage />} />
           <Route path="s/:slug" element={<SocietyDetailPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="u/:sid" element={<UserProfilePage />} />
         </Route>
       </Route>
       <Route path="/sign-in" element={<SignInPage />} />

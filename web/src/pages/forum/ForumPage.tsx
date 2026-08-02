@@ -2,29 +2,14 @@ import { ArrowRight, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/ui/button";
+import { SocietyIndex } from "../../features/societies/society-index";
 
 export function ForumPage() {
   const navigate = useNavigate();
   return (
     <main className="mx-auto grid w-full max-w-7xl flex-1 gap-10 px-6 py-10 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-14 lg:px-10 lg:py-14">
-      <aside aria-label="Society index" className="lg:pt-1">
-        <h2 className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase">
-          Your index
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Your society shelf is waiting for its first entry.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate("/societies")}
-          className="mt-5 h-11 w-full justify-start rounded-none border-foreground/20 px-3 shadow-none"
-        >
-          <span aria-hidden="true" className="text-primary">
-            +
-          </span>{" "}
-          Discover societies
-        </Button>
+      <aside aria-label="Society index">
+        <SocietyIndex />
       </aside>
 
       <section aria-labelledby="forum-title">

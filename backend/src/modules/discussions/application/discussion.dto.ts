@@ -10,6 +10,8 @@ export interface ThreadDto {
   readonly score: number;
   readonly commentCount: number;
   readonly mediaIds: readonly string[];
+  readonly authorDisplayName: string | null;
+  readonly authorAvatarMediaId: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly deletedAt: string | null;
@@ -31,6 +33,41 @@ export interface CommentDto {
 }
 
 export type CommentPageDto = PageResult<CommentDto>;
+
+export interface UserThreadActivityDto {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string | null;
+  readonly score: number;
+  readonly commentCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly societyId: string;
+  readonly societySlug: string;
+  readonly societyName: string;
+  readonly authorId: string;
+  readonly authorDisplayName: string;
+  readonly authorAvatarMediaId: string | null;
+}
+
+export type UserThreadActivityPageDto = PageResult<UserThreadActivityDto>;
+
+export interface UserCommentActivityDto {
+  readonly id: string;
+  readonly threadId: string;
+  readonly threadTitle: string;
+  readonly societyId: string;
+  readonly societySlug: string;
+  readonly societyName: string;
+  readonly body: string | null;
+  readonly score: number;
+  readonly createdAt: string;
+  readonly authorId: string;
+  readonly authorDisplayName: string;
+  readonly authorAvatarMediaId: string | null;
+}
+
+export type UserCommentActivityPageDto = PageResult<UserCommentActivityDto>;
 
 export interface CreateThreadCommand {
   readonly title: string;

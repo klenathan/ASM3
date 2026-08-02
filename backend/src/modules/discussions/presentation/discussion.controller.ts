@@ -44,6 +44,10 @@ interface PageQuery {
   readonly cursor?: string;
 }
 
+interface PublicUserIdParams {
+  readonly userId: string;
+}
+
 export function createDiscussionController(dependencies: DiscussionControllerDependencies) {
   return {
     async listThreads(context: Context<AppEnvironment>): Promise<Response> {
@@ -129,6 +133,34 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
         const command = validated<CreateCommentCommand>(context, "json");
         const result = await dependencies.commentService.createComment(principal, threadId, command);
         return context.json(result, 201);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async listUserThreads(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { userId } = validated<PublicUserIdParams>(context, "param");
+        const result = await dependencies.feedService.listUserThreads(
+          getInjectedPrincipal(context),
+          userId,
+          pageFrom(validated<PageQuery>(context, "query")),
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async listUserComments(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { userId } = validated<PublicUserIdParams>(context, "param");
+        const result = await dependencies.feedService.listUserComments(
+          getInjectedPrincipal(context),
+          userId,
+          pageFrom(validated<PageQuery>(context, "query")),
+        );
+        return context.json(result, 200);
       } catch (error) {
         return discussionErrorResponse(context, error);
       }

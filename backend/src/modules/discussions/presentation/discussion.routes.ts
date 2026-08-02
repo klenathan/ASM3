@@ -17,6 +17,8 @@ import {
   threadSchema,
   updateCommentRequestSchema,
   updateThreadRequestSchema,
+  userCommentActivityPageSchema,
+  userThreadActivityPageSchema,
   voteRequestSchema,
   voteSchema,
 } from "./discussion.schemas";
@@ -24,6 +26,7 @@ import {
 const societySlugParams = z.object({ societySlug: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9_-]*$/) });
 const threadIdParams = z.object({ threadId: z.string().uuid() });
 const commentIdParams = z.object({ commentId: z.string().uuid() });
+const publicUserIdParams = z.object({ userId: z.string().uuid() });
 
 const listThreadsRoute = createRoute({
   method: "get",
@@ -150,6 +153,34 @@ const voteThreadRoute = createRoute({
   },
 });
 
+const listUserThreadsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/users/{userId}/threads",
+  tags: ["Discussions"],
+  summary: "List a user's threads",
+  request: { params: publicUserIdParams, query: discussionPageQuerySchema },
+  responses: {
+    200: { description: "Thread activity", content: { "application/json": { schema: userThreadActivityPageSchema } } },
+    400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "Profile activity is private", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "User was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const listUserCommentsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/users/{userId}/comments",
+  tags: ["Discussions"],
+  summary: "List a user's comments",
+  request: { params: publicUserIdParams, query: discussionPageQuerySchema },
+  responses: {
+    200: { description: "Comment activity", content: { "application/json": { schema: userCommentActivityPageSchema } } },
+    400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "Profile activity is private", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "User was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
 const getCommentRoute = createRoute({
   method: "get",
   path: "/api/v1/comments/{commentId}",
@@ -232,6 +263,8 @@ export function registerDiscussionRoutes(
   app.openapi(listCommentsRoute, (context) => controller.listComments(context) as never);
   app.openapi(createCommentRoute, (context) => controller.createComment(context) as never);
   app.openapi(voteThreadRoute, (context) => controller.voteThread(context) as never);
+  app.openapi(listUserThreadsRoute, (context) => controller.listUserThreads(context) as never);
+  app.openapi(listUserCommentsRoute, (context) => controller.listUserComments(context) as never);
   app.openapi(getCommentRoute, (context) => controller.getComment(context) as never);
   app.openapi(updateCommentRoute, (context) => controller.updateComment(context) as never);
   app.openapi(deleteCommentRoute, (context) => controller.deleteComment(context) as never);

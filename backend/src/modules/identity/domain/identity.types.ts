@@ -15,6 +15,7 @@ export interface UserProfileRecord {
   readonly avatarMediaId: string | null;
   readonly platformRole: PlatformRole;
   readonly status: UserStatus;
+  readonly isPublic: boolean;
   readonly suspendedUntil: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;

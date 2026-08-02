@@ -73,6 +73,35 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     };
   }
 
+  async listThreadsByAuthor(
+    authorId: string,
+    page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>> {
+    const after = page.cursor === undefined ? undefined : threadAfter(page.cursor);
+    const authorFilter = eq(threads.authorId, authorId);
+    const statusFilter = eq(threads.status, "published");
+    const where = after === undefined
+      ? and(authorFilter, statusFilter)
+      : and(authorFilter, statusFilter, after);
+    const rows = await this.executor
+      .select()
+      .from(threads)
+      .where(where)
+      .orderBy(desc(threads.createdAt), desc(threads.id))
+      .limit(page.limit + 1);
+    const items = rows.slice(0, page.limit).map(toThread);
+    const last = items.at(-1);
+    const hasMore = rows.length > page.limit;
+
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last !== undefined
+        ? encodeCursor(cursorFor(last.createdAt, last.id))
+        : null,
+    };
+  }
+
   async findThread(threadId: string): Promise<ThreadRecord | null> {
     return this.findThreadInternal(threadId, false);
   }
@@ -165,6 +194,35 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
       .from(comments)
       .where(where)
       .orderBy(asc(comments.createdAt), asc(comments.id))
+      .limit(page.limit + 1);
+    const items = rows.slice(0, page.limit).map(toComment);
+    const last = items.at(-1);
+    const hasMore = rows.length > page.limit;
+
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last !== undefined
+        ? encodeCursor(cursorFor(last.createdAt, last.id))
+        : null,
+    };
+  }
+
+  async listCommentsByAuthor(
+    authorId: string,
+    page: PageRequest,
+  ): Promise<PageResult<CommentRecord>> {
+    const after = page.cursor === undefined ? undefined : commentAfter(page.cursor);
+    const authorFilter = eq(comments.authorId, authorId);
+    const statusFilter = eq(comments.status, "published");
+    const where = after === undefined
+      ? and(authorFilter, statusFilter)
+      : and(authorFilter, statusFilter, after);
+    const rows = await this.executor
+      .select()
+      .from(comments)
+      .where(where)
+      .orderBy(desc(comments.createdAt), desc(comments.id))
       .limit(page.limit + 1);
     const items = rows.slice(0, page.limit).map(toComment);
     const last = items.at(-1);

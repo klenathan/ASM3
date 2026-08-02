@@ -5,7 +5,7 @@ import type { PageRequest, PageResult } from "../../../shared/application/pagina
 import type { TransactionManager } from "../../../shared/application/transaction";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import type { MembershipRepository } from "../../societies/application/membership.repository";
-import type { SocietyRepository } from "../../societies/application/society.repository";
+import type { SocietyRepository, MembershipSocietyRecord } from "../../societies/application/society.repository";
 import type { MembershipRecord } from "../../societies/domain/membership";
 import type { SocietyRecord } from "../../societies/domain/society";
 import { CommentService } from "./comment.service";
@@ -185,6 +185,16 @@ class FakeDiscussionRepository implements DiscussionRepository {
     return { items, nextCursor: null, hasMore: false };
   }
 
+  async listThreadsByAuthor(
+    authorId: string,
+    _page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>> {
+    const items = [...this.threads.values()].filter(
+      (thread) => thread.authorId === authorId && thread.status === "published",
+    );
+    return { items, nextCursor: null, hasMore: false };
+  }
+
   async findThread(threadId: string): Promise<ThreadRecord | null> {
     return this.threads.get(threadId) ?? null;
   }
@@ -239,6 +249,16 @@ class FakeDiscussionRepository implements DiscussionRepository {
   ): Promise<PageResult<CommentRecord>> {
     const items = [...this.comments.values()].filter(
       (comment) => comment.threadId === threadId && (includeRetained || comment.status === "published"),
+    );
+    return { items, nextCursor: null, hasMore: false };
+  }
+
+  async listCommentsByAuthor(
+    authorId: string,
+    _page: PageRequest,
+  ): Promise<PageResult<CommentRecord>> {
+    const items = [...this.comments.values()].filter(
+      (comment) => comment.authorId === authorId && comment.status === "published",
     );
     return { items, nextCursor: null, hasMore: false };
   }
@@ -392,6 +412,7 @@ class FakeSocietyRepository implements SocietyRepository {
   async listSocieties(_page: PageRequest): Promise<PageResult<SocietyRecord>> {
     return { items: [society], nextCursor: null, hasMore: false };
   }
+  async listActiveMemberSocieties(_userId: string): Promise<readonly MembershipSocietyRecord[]> { return []; }
   async findSocietyBySlug(_slug: string): Promise<SocietyRecord | null> { return society; }
   async createSociety(input: never): Promise<SocietyRecord> { return input; }
   async listRules(): Promise<readonly never[]> { return []; }

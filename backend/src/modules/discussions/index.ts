@@ -1,7 +1,10 @@
 import type { Database } from "../../db/client";
 import { systemClock, type Clock } from "../../shared/application/clock";
 import { CommentService } from "./application/comment.service";
-import { FeedService } from "./application/feed.service";
+import {
+  FeedService,
+  type DiscussionProfilePort,
+} from "./application/feed.service";
 import { ThreadService } from "./application/thread.service";
 import { VoteService } from "./application/vote.service";
 import { DrizzleDiscussionRepository, DrizzleDiscussionTransactionManager } from "./infrastructure/drizzle-discussion.repository";
@@ -11,6 +14,7 @@ export interface DiscussionsModuleDependencies {
   readonly database: Database;
   readonly membershipRepository: MembershipRepository;
   readonly societyRepository: SocietyRepository;
+  readonly profile: DiscussionProfilePort;
   readonly clock?: Clock;
 }
 
@@ -25,7 +29,7 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
   const threadService = new ThreadService({ repository, transactions, clock, ...authorization });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });
   const voteService = new VoteService({ repository, transactions, clock, ...authorization });
-  const feedService = new FeedService({ repository, ...authorization });
+  const feedService = new FeedService({ repository, profile: dependencies.profile, ...authorization });
 
   return {
     repository,
@@ -40,7 +44,10 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
 export { CommentService } from "./application/comment.service";
 export type { CommentServiceDependencies } from "./application/comment.service";
 export { FeedService } from "./application/feed.service";
-export type { FeedServiceDependencies } from "./application/feed.service";
+export type {
+  DiscussionProfilePort,
+  FeedServiceDependencies,
+} from "./application/feed.service";
 export { ThreadService } from "./application/thread.service";
 export type { ThreadServiceDependencies } from "./application/thread.service";
 export { VoteService } from "./application/vote.service";
@@ -61,6 +68,10 @@ export type {
   ThreadPageDto,
   UpdateCommentCommand,
   UpdateThreadCommand,
+  UserCommentActivityDto,
+  UserCommentActivityPageDto,
+  UserThreadActivityDto,
+  UserThreadActivityPageDto,
   VoteCommand,
   VoteDto,
 } from "./application/discussion.dto";

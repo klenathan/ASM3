@@ -8,6 +8,7 @@ export interface UserDto {
   readonly avatarMediaId: string | null;
   readonly platformRole: PlatformRole;
   readonly status: UserStatus;
+  readonly isPublic: boolean;
   readonly suspendedUntil: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -35,6 +36,24 @@ export interface UpdateProfileCommand {
   readonly displayName?: string;
   readonly bio?: string | null;
   readonly avatarMediaId?: string | null;
+  readonly isPublic?: boolean;
+}
+
+/**
+ * A profile that may be viewed by visitors other than its owner.
+ * When the profile is not public (and the viewer is not the owner) the
+ * activity-bearing fields are hidden and the consumer renders a private state.
+ */
+export interface PublicUserDto {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly bio: string | null;
+  readonly avatarMediaId: string | null;
+  readonly platformRole: PlatformRole;
+  readonly status: UserStatus;
+  readonly isPublic: boolean;
+  readonly isOwner: boolean;
+  readonly createdAt: string;
 }
 
 export interface SuspendUserCommand {

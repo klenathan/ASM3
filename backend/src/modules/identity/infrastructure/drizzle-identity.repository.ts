@@ -77,12 +77,14 @@ export class DrizzleIdentityRepository implements IdentityRepository {
       readonly displayName?: string;
       readonly bio?: string | null;
       readonly avatarMediaId?: string | null;
+      readonly isPublic?: boolean;
       readonly updatedAt: Date;
     } = {
       updatedAt: input.updatedAt,
       ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
       ...(input.bio === undefined ? {} : { bio: input.bio }),
       ...(input.avatarMediaId === undefined ? {} : { avatarMediaId: input.avatarMediaId }),
+      ...(input.isPublic === undefined ? {} : { isPublic: input.isPublic }),
     };
     const rows = await this.executor
       .update(userProfiles)
@@ -175,6 +177,7 @@ function toProfile(row: typeof userProfiles.$inferSelect): UserProfileRecord {
     avatarMediaId: row.avatarMediaId,
     platformRole: row.platformRole,
     status: row.status,
+    isPublic: row.isPublic,
     suspendedUntil: row.suspendedUntil,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

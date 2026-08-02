@@ -22,6 +22,7 @@ export interface UpdateUserProfileInput {
   readonly displayName?: string;
   readonly bio?: string | null;
   readonly avatarMediaId?: string | null;
+  readonly isPublic?: boolean;
   readonly updatedAt: Date;
 }
 

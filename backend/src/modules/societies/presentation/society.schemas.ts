@@ -36,6 +36,18 @@ export const societyDiscoveryItemSchema = societySchema
   .extend({ membership: discoveryMembershipSchema.nullable() })
   .openapi("SocietyDiscoveryItem");
 
+export const mySocietySchema = z
+  .object({
+    id: z.string().uuid(),
+    slug: z.string(),
+    name: z.string(),
+    avatarMediaId: z.string().uuid(),
+    membership: discoveryMembershipSchema,
+  })
+  .openapi("MySociety");
+
+export const mySocietiesResponseSchema = z.array(mySocietySchema).openapi("MySocieties");
+
 export const societyPageSchema = z
   .object({
     items: z.array(societyDiscoveryItemSchema),

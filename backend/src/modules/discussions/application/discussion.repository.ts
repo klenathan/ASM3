@@ -49,6 +49,10 @@ export interface DiscussionRepository {
     page: PageRequest,
     includeRetained: boolean,
   ): Promise<PageResult<ThreadRecord>>;
+  listThreadsByAuthor(
+    authorId: string,
+    page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>>;
   findThread(threadId: string): Promise<ThreadRecord | null>;
   findThreadForUpdate(threadId: string): Promise<ThreadRecord | null>;
   createThread(input: CreateThreadInput): Promise<ThreadRecord>;
@@ -61,6 +65,10 @@ export interface DiscussionRepository {
     threadId: string,
     page: PageRequest,
     includeRetained: boolean,
+  ): Promise<PageResult<CommentRecord>>;
+  listCommentsByAuthor(
+    authorId: string,
+    page: PageRequest,
   ): Promise<PageResult<CommentRecord>>;
   findComment(commentId: string): Promise<CommentRecord | null>;
   findCommentForUpdate(commentId: string): Promise<CommentRecord | null>;

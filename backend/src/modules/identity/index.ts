@@ -62,6 +62,7 @@ export type { PasswordAdapter, PasswordCredentialStore } from "./application/pas
 export type { SessionTokenAdapter } from "./application/session.adapter";
 export type {
   AuthResultDto,
+  PublicUserDto,
   RegisterCommand,
   SetUserRoleCommand,
   SignInCommand,

@@ -26,8 +26,9 @@ import type {
   SocietyDto,
   SocietyPageDto,
   UpdateRuleCommand,
+  MySocietyDto,
 } from "./society.dto";
-import { toRuleDto, toSocietyDto, toSocietyPageDto } from "./society.mappers";
+import { toMySocietyDto, toRuleDto, toSocietyDto, toSocietyPageDto } from "./society.mappers";
 import type { MembershipRepository } from "./membership.repository";
 import type { SocietyRepository, UpdateRuleInput } from "./society.repository";
 
@@ -100,6 +101,11 @@ export class SocietyService {
     principal?: RequestPrincipal,
   ): Promise<SocietyPageDto> {
     return this.discover(query, principal);
+  }
+
+  async listMySocieties(principal: RequestPrincipal): Promise<readonly MySocietyDto[]> {
+    const records = await this.repository.listActiveMemberSocieties(principal.userId);
+    return records.map(toMySocietyDto);
   }
 
   async getSociety(slug: string): Promise<SocietyDto> {

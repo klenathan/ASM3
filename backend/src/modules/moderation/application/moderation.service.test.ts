@@ -19,7 +19,7 @@ import type {
 import type { ModerationActionRecord, ReportRecord } from "../domain/moderation";
 import { ModerationService } from "./moderation.service";
 import { ReportService } from "./report.service";
-import type { CreateRuleInput, CreateSocietyInput, SocietyRepository, UpdateRuleInput } from "../../societies/application/society.repository";
+import type { CreateRuleInput, CreateSocietyInput, SocietyRepository, UpdateRuleInput, MembershipSocietyRecord } from "../../societies/application/society.repository";
 
 const now = new Date("2026-01-02T00:00:00.000Z");
 const clock: Clock = { now: () => now };
@@ -325,6 +325,7 @@ class FakeSocietyRepository implements SocietyRepository {
     return societyId === society.id ? society : null;
   }
   async listSocieties(_page: PageRequest): Promise<PageResult<SocietyRecord>> { return page([society]); }
+  async listActiveMemberSocieties(_userId: string): Promise<readonly MembershipSocietyRecord[]> { return []; }
   async findSocietyBySlug(_slug: string): Promise<SocietyRecord | null> { return society; }
   async createSociety(input: CreateSocietyInput): Promise<SocietyRecord> { return { ...input, status: "active" }; }
   async listRules(_societyId: string): Promise<readonly SocietyRuleRecord[]> { return []; }
@@ -357,6 +358,7 @@ function account(userId: string): IdentityAccountRecord {
       avatarMediaId: null,
       platformRole: "student",
       status: "active",
+      isPublic: true,
       suspendedUntil: null,
       createdAt: now,
       updatedAt: now,

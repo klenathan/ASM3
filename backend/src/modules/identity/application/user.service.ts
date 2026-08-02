@@ -2,10 +2,10 @@ import type { Clock } from "../../../shared/application/clock";
 import type { TransactionManager } from "../../../shared/application/transaction";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
-import { assertAccountUsable } from "../domain/access.policy";
+import { assertAccountUsable, assertTargetExists } from "../domain/access.policy";
 import { normalizeBio, normalizeDisplayName } from "../domain/registration.policy";
-import type { UpdateProfileCommand, UserDto } from "./identity.dto";
-import { toUserDto } from "./identity.mappers";
+import type { PublicUserDto, UpdateProfileCommand, UserDto } from "./identity.dto";
+import { toPublicUserDto, toUserDto } from "./identity.mappers";
 import type { IdentityRepository } from "./identity.repository";
 
 export interface UserServiceDependencies {
@@ -42,6 +42,7 @@ export class UserService {
         : { displayName: normalizeDisplayName(command.displayName) }),
       ...(command.bio === undefined ? {} : { bio: normalizeBio(command.bio) }),
       ...(command.avatarMediaId === undefined ? {} : { avatarMediaId: command.avatarMediaId }),
+      ...(command.isPublic === undefined ? {} : { isPublic: command.isPublic }),
     };
 
     if (Object.keys(input).length === 1) {
@@ -59,6 +60,15 @@ export class UserService {
         return updatedAccount;
       }),
     );
+  }
+
+  async getPublicProfile(
+    viewer: RequestPrincipal | undefined,
+    userId: string,
+  ): Promise<PublicUserDto> {
+    const account = await this.repository.findAccountByUserId(userId);
+    assertTargetExists(account);
+    return toPublicUserDto(account, viewer?.userId === userId);
   }
 
   private async accountForPrincipal(principal: RequestPrincipal) {

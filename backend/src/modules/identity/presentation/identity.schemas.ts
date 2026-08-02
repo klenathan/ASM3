@@ -9,6 +9,7 @@ export const userSchema = z
     avatarMediaId: z.string().uuid().nullable(),
     platformRole: z.enum(["student", "system_admin"]),
     status: z.enum(["active", "suspended", "deactivated"]),
+    isPublic: z.boolean(),
     suspendedUntil: z.string().datetime().nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
@@ -44,8 +45,23 @@ export const updateProfileRequestSchema = z
     displayName: z.string().trim().min(1).max(80).optional(),
     bio: z.string().max(500).nullable().optional(),
     avatarMediaId: z.string().uuid().nullable().optional(),
+    isPublic: z.boolean().optional(),
   })
   .openapi("UpdateProfileRequest");
+
+export const publicUserSchema = z
+  .object({
+    userId: z.string().uuid(),
+    displayName: z.string(),
+    bio: z.string().nullable(),
+    avatarMediaId: z.string().uuid().nullable(),
+    platformRole: z.enum(["student", "system_admin"]),
+    status: z.enum(["active", "suspended", "deactivated"]),
+    isPublic: z.boolean(),
+    isOwner: z.boolean(),
+    createdAt: z.string().datetime(),
+  })
+  .openapi("PublicUser");
 
 export const suspendUserRequestSchema = z
   .object({

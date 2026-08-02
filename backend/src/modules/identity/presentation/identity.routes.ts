@@ -11,6 +11,7 @@ import { createUserController } from "./user.controller";
 import {
   authResultSchema,
   errorSchema,
+  publicUserSchema,
   registerRequestSchema,
   setUserRoleRequestSchema,
   signInRequestSchema,
@@ -97,6 +98,19 @@ const getProfileRoute = createRoute({
     200: { description: "Current profile", content: { "application/json": { schema: userSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "Account cannot be used", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const getPublicUserRoute = createRoute({
+  method: "get",
+  path: "/api/v1/users/{userId}",
+  tags: ["Identity"],
+  summary: "Get a public user profile",
+  request: { params: userIdParams },
+  responses: {
+    200: { description: "Public profile", content: { "application/json": { schema: publicUserSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "User was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });
 
@@ -188,6 +202,7 @@ export function registerIdentityRoutes(
 
   app.use("/api/v1/auth/me", principalMiddleware);
   app.use("/api/v1/users/me", principalMiddleware);
+  app.use("/api/v1/users/*", principalMiddleware);
   app.use("/api/v1/admin/users/*", principalMiddleware);
 
   app.openapi(registerRoute, (context) => authController.register(context) as never);
@@ -195,6 +210,7 @@ export function registerIdentityRoutes(
   app.openapi(signOutRoute, (context) => authController.signOut(context) as never);
   app.openapi(authMeRoute, (context) => authController.currentUser(context) as never);
   app.openapi(getProfileRoute, (context) => userController.getProfile(context) as never);
+  app.openapi(getPublicUserRoute, (context) => userController.getPublicUser(context) as never);
   app.openapi(updateProfileRoute, (context) => userController.updateProfile(context) as never);
 
   if (dependencies.adminUserService !== undefined) {

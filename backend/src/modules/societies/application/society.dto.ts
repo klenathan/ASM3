@@ -21,6 +21,14 @@ export interface SocietyDiscoverDto extends SocietyDto {
   readonly membership: SocietyMembershipSummary | null;
 }
 
+export interface MySocietyDto {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly avatarMediaId: string;
+  readonly membership: SocietyMembershipSummary;
+}
+
 export interface SocietyDiscoveryQuery {
   readonly limit?: number;
   readonly cursor?: string;

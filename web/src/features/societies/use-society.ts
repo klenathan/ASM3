@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -7,13 +8,16 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  createSocietyThread,
   fetchMembership,
+  fetchMySocieties,
   fetchSociety,
   fetchSocietyPage,
   fetchSocietyThreads,
   joinSociety,
   leaveSociety,
 } from "./api";
+import type { CreateThreadInput, ThreadPage } from "./types";
 
 export function useSocietyDiscovery(query: string) {
   const normalized = query.trim().toLowerCase()
@@ -39,6 +43,13 @@ export function useSociety(slug: string) {
   })
 }
 
+export function useMySocieties() {
+  return useQuery({
+    queryKey: ["societies", "mine"],
+    queryFn: fetchMySocieties,
+  })
+}
+
 export function useSocietyMembership(slug: string) {
   return useQuery({
     queryKey: ["societies", slug, "membership"],
@@ -58,11 +69,43 @@ export function useSocietyThreads(slug: string) {
   })
 }
 
+export function useCreateSocietyThread(slug: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: CreateThreadInput) => createSocietyThread(slug, input),
+    onSuccess: (thread) => {
+      queryClient.setQueryData<InfiniteData<ThreadPage>>(
+        ["societies", slug, "threads"],
+        (current) => {
+          const firstPage = current?.pages[0]
+          if (current === undefined || firstPage === undefined) return current
+
+          return {
+            ...current,
+            pages: [
+              {
+                ...firstPage,
+                items: [
+                  thread,
+                  ...firstPage.items.filter((item) => item.id !== thread.id),
+                ],
+              },
+              ...current.pages.slice(1),
+            ],
+          }
+        },
+      )
+    },
+  })
+}
+
 export function useJoinSociety(slug: string) {
   const queryClient = useQueryClient()
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["societies", slug] })
     void queryClient.invalidateQueries({ queryKey: ["societies", "discover"] })
+    void queryClient.invalidateQueries({ queryKey: ["societies", "mine"] })
   }
   return useMutation({
     mutationFn: () => joinSociety(slug),
@@ -75,6 +118,7 @@ export function useLeaveSociety(slug: string) {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["societies", slug] })
     void queryClient.invalidateQueries({ queryKey: ["societies", "discover"] })
+    void queryClient.invalidateQueries({ queryKey: ["societies", "mine"] })
   }
   return useMutation({
     mutationFn: () => leaveSociety(slug),

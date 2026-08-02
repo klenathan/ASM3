@@ -24,6 +24,8 @@ export const threadSchema = z
     score: z.number().int(),
     commentCount: z.number().int().nonnegative(),
     mediaIds: z.array(z.string().uuid()),
+    authorDisplayName: z.string().nullable(),
+    authorAvatarMediaId: z.string().uuid().nullable(),
     createdAt: isoDate,
     updatedAt: isoDate,
     deletedAt: isoDate.nullable(),
@@ -103,6 +105,57 @@ export const voteSchema = z
     score: z.number().int(),
   })
   .openapi("Vote");
+
+export const userThreadActivitySchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string(),
+    body: z.string().nullable(),
+    score: z.number().int(),
+    commentCount: z.number().int().nonnegative(),
+    createdAt: isoDate,
+    updatedAt: isoDate,
+    societyId: z.string().uuid(),
+    societySlug: z.string(),
+    societyName: z.string(),
+    authorId: z.string().uuid(),
+    authorDisplayName: z.string(),
+    authorAvatarMediaId: z.string().uuid().nullable(),
+  })
+  .openapi("UserThreadActivity");
+
+export const userThreadActivityPageSchema = z
+  .object({
+    items: z.array(userThreadActivitySchema),
+    nextCursor: z.string().nullable(),
+    hasMore: z.boolean(),
+  })
+  .openapi("UserThreadActivityPage");
+
+export const userCommentActivitySchema = z
+  .object({
+    id: z.string().uuid(),
+    threadId: z.string().uuid(),
+    threadTitle: z.string(),
+    societyId: z.string().uuid(),
+    societySlug: z.string(),
+    societyName: z.string(),
+    body: z.string().nullable(),
+    score: z.number().int(),
+    createdAt: isoDate,
+    authorId: z.string().uuid(),
+    authorDisplayName: z.string(),
+    authorAvatarMediaId: z.string().uuid().nullable(),
+  })
+  .openapi("UserCommentActivity");
+
+export const userCommentActivityPageSchema = z
+  .object({
+    items: z.array(userCommentActivitySchema),
+    nextCursor: z.string().nullable(),
+    hasMore: z.boolean(),
+  })
+  .openapi("UserCommentActivityPage");
 
 export const discussionPageQuerySchema = z
   .object({

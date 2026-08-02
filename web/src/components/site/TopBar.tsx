@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut, Search, Settings, UserRound } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Search, Settings, UserRound, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
@@ -15,14 +15,20 @@ import {
 import { Input } from "../ui/input";
 import { LogoMark } from "./LogoMark";
 
-const menuItems = [
+const menuItems: {
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
+  disabled?: boolean;
+}[] = [
   { label: "Profile", icon: UserRound },
-  { label: "Settings", icon: Settings },
+  { label: "Settings", icon: Settings, disabled: true },
 ];
 
 export function TopBar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const openProfile = () => navigate("/profile");
   const initials = (user?.displayName ?? "?")
     .split(" ")
     .map((part) => part[0])
@@ -101,8 +107,15 @@ export function TopBar() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {menuItems.map(({ label, icon: Icon }) => (
-                <DropdownMenuItem key={label}>
+              {menuItems.map(({ label, icon: Icon, onClick, disabled }) => (
+                <DropdownMenuItem
+                  key={label}
+                  disabled={disabled}
+                  onSelect={() => {
+                    const action = onClick ?? (label === "Profile" ? openProfile : undefined);
+                    if (action !== undefined) action();
+                  }}
+                >
                   <Icon aria-hidden="true" /> {label}
                 </DropdownMenuItem>
               ))}

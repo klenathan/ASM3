@@ -1,11 +1,13 @@
 import type { PageResult } from "../../../shared/application/pagination";
 import type { MembershipRecord } from "../domain/membership";
 import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
+import type { MembershipSocietyRecord } from "./society.repository";
 import type {
   RuleDto,
   SocietyDto,
   SocietyPageDto,
   SocietyMembershipSummary,
+  MySocietyDto,
 } from "./society.dto";
 
 export function toSocietyDto(record: SocietyRecord): SocietyDto {
@@ -43,6 +45,16 @@ function toMembershipSummary(membership: MembershipRecord): SocietyMembershipSum
   return {
     role: membership.role,
     status: membership.status,
+  };
+}
+
+export function toMySocietyDto(record: MembershipSocietyRecord): MySocietyDto {
+  return {
+    id: record.society.id,
+    slug: record.society.slug,
+    name: record.society.name,
+    avatarMediaId: record.society.avatarMediaId,
+    membership: toMembershipSummary(record.membership),
   };
 }
 

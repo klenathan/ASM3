@@ -1,4 +1,5 @@
 import type { PageRequest, PageResult } from "../../../shared/application/pagination";
+import type { MembershipRecord } from "../domain/membership";
 import type { SocietyRecord, SocietyRuleRecord } from "../domain/society";
 
 export interface CreateSocietyInput {
@@ -29,8 +30,14 @@ export interface UpdateRuleInput {
   readonly updatedAt: Date;
 }
 
+export interface MembershipSocietyRecord {
+  readonly society: SocietyRecord;
+  readonly membership: MembershipRecord;
+}
+
 export interface SocietyRepository {
   listSocieties(page: PageRequest & { readonly q?: string }): Promise<PageResult<SocietyRecord>>;
+  listActiveMemberSocieties(userId: string): Promise<readonly MembershipSocietyRecord[]>;
   findSocietyById(societyId: string): Promise<SocietyRecord | null>;
   findSocietyBySlug(slug: string): Promise<SocietyRecord | null>;
   createSociety(input: CreateSocietyInput): Promise<SocietyRecord>;

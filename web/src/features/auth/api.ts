@@ -6,6 +6,7 @@ export interface User {
   readonly avatarMediaId: string | null
   readonly platformRole: 'student' | 'system_admin'
   readonly status: 'active' | 'suspended' | 'deactivated'
+  readonly isPublic: boolean
   readonly suspendedUntil: string | null
   readonly createdAt: string
   readonly updatedAt: string

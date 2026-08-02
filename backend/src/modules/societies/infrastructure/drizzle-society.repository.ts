@@ -10,18 +10,24 @@ import {
   type PageRequest,
   type PageResult,
 } from "../../../shared/application/pagination";
+import {
+  type MembershipRecord,
+  assertMembershipRole,
+  assertMembershipState,
+} from "../domain/membership";
 import type {
   SocietyRepository,
   CreateRuleInput,
   CreateSocietyInput,
   UpdateRuleInput,
+  MembershipSocietyRecord,
 } from "../application/society.repository";
 import {
   assertSocietyStatus,
   type SocietyRecord,
   type SocietyRuleRecord,
 } from "../domain/society";
-import { societies, societyRules } from "./society.tables";
+import { societies, societyMemberships, societyRules } from "./society.tables";
 
 type SocietyExecutor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
@@ -73,6 +79,28 @@ export class DrizzleSocietyRepository implements SocietyRepository {
       .limit(1);
     const row = rows[0];
     return row === undefined ? null : toSociety(row);
+  }
+
+  async listActiveMemberSocieties(userId: string): Promise<readonly MembershipSocietyRecord[]> {
+    const rows = await this.executor
+      .select({
+        society: societies,
+        membership: societyMemberships,
+      })
+      .from(societies)
+      .innerJoin(
+        societyMemberships,
+        and(
+          eq(societyMemberships.societyId, societies.id),
+          eq(societyMemberships.userId, userId),
+          eq(societyMemberships.status, "active"),
+        ),
+      )
+      .orderBy(asc(societies.name), asc(societies.id));
+    return rows.map((row) => ({
+      society: toSociety(row.society),
+      membership: toMembership(row.membership),
+    }));
   }
 
   async createSociety(input: CreateSocietyInput): Promise<SocietyRecord> {
@@ -225,6 +253,19 @@ function toRule(row: typeof societyRules.$inferSelect): SocietyRuleRecord {
     description: row.description,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+function toMembership(row: typeof societyMemberships.$inferSelect): MembershipRecord {
+  return {
+    societyId: row.societyId,
+    userId: row.userId,
+    role: assertMembershipRole(row.role),
+    status: assertMembershipState(row.status),
+    joinedAt: row.joinedAt,
+    updatedAt: row.updatedAt,
+    bannedBy: row.bannedBy,
+    bannedAt: row.bannedAt,
   };
 }
 

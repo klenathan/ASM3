@@ -57,5 +57,15 @@ export function createSocietyController(dependencies: SocietyControllerDependenc
         return societyErrorResponse(context, error);
       }
     },
+
+    async mySocieties(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const result = await dependencies.societyService.listMySocieties(principal);
+        return context.json(result, 200);
+      } catch (error) {
+        return societyErrorResponse(context, error);
+      }
+    },
   };
 }

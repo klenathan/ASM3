@@ -484,6 +484,7 @@ function toProfile(row: typeof userProfiles.$inferSelect): UserProfileRecord {
     avatarMediaId: row.avatarMediaId,
     platformRole: row.platformRole,
     status: row.status,
+    isPublic: row.isPublic,
     suspendedUntil: row.suspendedUntil,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

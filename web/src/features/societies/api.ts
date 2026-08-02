@@ -1,8 +1,11 @@
 import { request } from "../../lib/http";
 import type {
+  CreateThreadInput,
+  MySociety,
   Society,
   SocietyMembership,
   SocietyPage,
+  Thread,
   ThreadPage,
 } from "./types";
 
@@ -25,12 +28,26 @@ export function fetchSociety(slug: string): Promise<Society> {
   return request<Society>(`/api/v1/societies/${encodeURIComponent(slug)}`)
 }
 
+export function fetchMySocieties(): Promise<MySociety[]> {
+  return request<MySociety[]>("/api/v1/me/societies")
+}
+
 export function fetchSocietyThreads(
   slug: string,
   cursor?: string,
 ): Promise<ThreadPage> {
   const query = cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`
   return request<ThreadPage>(`/api/v1/societies/${encodeURIComponent(slug)}/threads${query}`)
+}
+
+export function createSocietyThread(
+  slug: string,
+  input: CreateThreadInput,
+): Promise<Thread> {
+  return request<Thread>(`/api/v1/societies/${encodeURIComponent(slug)}/threads`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
 }
 
 export function fetchMembership(slug: string): Promise<SocietyMembership | null> {

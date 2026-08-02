@@ -100,6 +100,8 @@ export function createApp(dependencies: AppDependencies) {
       });
       app.use("/api/v1/societies", principalMiddleware);
       app.use("/api/v1/societies/*", principalMiddleware);
+      app.use("/api/v1/me", principalMiddleware);
+      app.use("/api/v1/me/*", principalMiddleware);
     }
     registerSocietyRoutes(app, dependencies.societies);
   }

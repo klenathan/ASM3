@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { mediaAssets } from "../../media/infrastructure/media.tables";
 import { authUsers } from "./auth.tables";
@@ -17,6 +17,7 @@ export const userProfiles = pgTable(
     }),
     platformRole: text("platform_role").notNull().default("student"),
     status: text("status").notNull().default("active"),
+    isPublic: boolean("is_public").notNull().default(true),
     suspendedUntil: timestamp("suspended_until", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()

@@ -19,6 +19,14 @@ export interface SocietyDiscoveryItem extends Society {
   readonly membership: MembershipSummary | null
 }
 
+export interface MySociety {
+  readonly id: string
+  readonly slug: string
+  readonly name: string
+  readonly avatarMediaId: string
+  readonly membership: MembershipSummary
+}
+
 export interface SocietyPage {
   readonly items: SocietyDiscoveryItem[]
   readonly nextCursor: string | null
@@ -35,6 +43,8 @@ export interface Thread {
   readonly score: number
   readonly commentCount: number
   readonly mediaIds: readonly string[]
+  readonly authorDisplayName: string | null
+  readonly authorAvatarMediaId: string | null
   readonly createdAt: string
   readonly updatedAt: string
   readonly deletedAt: string | null
@@ -44,6 +54,11 @@ export interface ThreadPage {
   readonly items: Thread[]
   readonly nextCursor: string | null
   readonly hasMore: boolean
+}
+
+export interface CreateThreadInput {
+  readonly title: string
+  readonly body: string
 }
 
 export interface SocietyMembership {

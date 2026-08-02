@@ -13,6 +13,7 @@ import {
   errorSchema,
   membershipResponseSchema,
   membershipSchema,
+  mySocietiesResponseSchema,
   ruleSchema,
   societyDiscoveryQuerySchema,
   societyPageSchema,
@@ -73,6 +74,17 @@ const getSocietyRoute = createRoute({
   responses: {
     200: { description: "Society", content: { "application/json": { schema: societySchema } } },
     404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const mySocietiesRoute = createRoute({
+  method: "get",
+  path: "/api/v1/me/societies",
+  tags: ["Societies"],
+  summary: "List the current user's subscribed societies",
+  responses: {
+    200: { description: "The current user's subscribed societies", content: { "application/json": { schema: mySocietiesResponseSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
   },
 });
 
@@ -247,6 +259,7 @@ export function registerSocietyRoutes(
   app.openapi(discoverRoute, (context) => societyController.discover(context) as never);
   app.openapi(createSocietyRoute, (context) => societyController.create(context) as never);
   app.openapi(getSocietyRoute, (context) => societyController.get(context) as never);
+  app.openapi(mySocietiesRoute, (context) => societyController.mySocieties(context) as never);
   app.openapi(getMembershipRoute, (context) => membershipController.get(context) as never);
   app.openapi(joinRoute, (context) => membershipController.join(context) as never);
   app.openapi(leaveRoute, (context) => membershipController.leave(context) as never);
