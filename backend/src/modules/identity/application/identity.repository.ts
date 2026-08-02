@@ -42,6 +42,7 @@ export interface CreateSessionInput {
 export interface IdentityRepository {
   findUserByEmail(email: string): Promise<AuthUserRecord | null>;
   findAccountByUserId(userId: string): Promise<IdentityAccountRecord | null>;
+  findAccountsByUserIds(userIds: readonly string[]): Promise<readonly IdentityAccountRecord[]>;
   createUser(input: CreateAuthUserInput): Promise<AuthUserRecord>;
   createProfile(input: CreateUserProfileInput): Promise<UserProfileRecord>;
   updateProfile(userId: string, input: UpdateUserProfileInput): Promise<UserProfileRecord>;

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import type { TransactionManager } from "../../../shared/application/transaction";
@@ -50,6 +50,16 @@ export class DrizzleIdentityRepository implements IdentityRepository {
       .limit(1);
     const row = rows[0];
     return row === undefined ? null : { user: toAuthUser(row.user), profile: toProfile(row.profile) };
+  }
+
+  async findAccountsByUserIds(userIds: readonly string[]): Promise<readonly IdentityAccountRecord[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.executor
+      .select({ user: authUsers, profile: userProfiles })
+      .from(authUsers)
+      .innerJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+      .where(inArray(authUsers.id, [...userIds]));
+    return rows.map((row) => ({ user: toAuthUser(row.user), profile: toProfile(row.profile) }));
   }
 
   async createUser(input: CreateAuthUserInput): Promise<AuthUserRecord> {

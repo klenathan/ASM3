@@ -21,6 +21,7 @@ export function toThreadDto(
   record: ThreadRecord,
   media: readonly ThreadMediaRecord[] = [],
   author?: ProfileIdentity | null,
+  myVote: -1 | 0 | 1 = 0,
 ): ThreadDto {
   return {
     id: record.id,
@@ -34,6 +35,7 @@ export function toThreadDto(
     mediaIds: media.map((item) => item.mediaId),
     authorDisplayName: author?.displayName ?? null,
     authorAvatarMediaId: author?.avatarMediaId ?? null,
+    myVote,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     deletedAt: record.deletedAt?.toISOString() ?? null,
@@ -44,10 +46,16 @@ export function toThreadPageDto(
   page: PageResult<ThreadRecord>,
   mediaByThread: ReadonlyMap<string, readonly ThreadMediaRecord[]>,
   authorById: ReadonlyMap<string, ProfileIdentity> = new Map(),
+  voteByThread: ReadonlyMap<string, -1 | 0 | 1> = new Map(),
 ): ThreadPageDto {
   return {
     items: page.items.map((record) =>
-      toThreadDto(record, mediaByThread.get(record.id) ?? [], authorById.get(record.authorId)),
+      toThreadDto(
+        record,
+        mediaByThread.get(record.id) ?? [],
+        authorById.get(record.authorId),
+        voteByThread.get(record.id) ?? 0,
+      ),
     ),
     nextCursor: page.nextCursor,
     hasMore: page.hasMore,
@@ -96,6 +104,7 @@ export function toUserThreadActivityDto(
   record: ThreadRecord,
   society: SocietyRecord,
   identity: ProfileIdentity,
+  myVote: -1 | 0 | 1 = 0,
 ): UserThreadActivityDto {
   return {
     id: record.id,
@@ -111,6 +120,7 @@ export function toUserThreadActivityDto(
     authorId: record.authorId,
     authorDisplayName: identity.displayName,
     authorAvatarMediaId: identity.avatarMediaId,
+    myVote,
   };
 }
 

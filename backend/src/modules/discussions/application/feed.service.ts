@@ -2,6 +2,9 @@ import type { PageRequest } from "../../../shared/application/pagination";
 import { normalizePageSize } from "../../../shared/application/pagination";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
+import type { SocietyRecord } from "../../societies/domain/society";
+import type { ThreadRecord } from "../domain/discussion";
+import type { ThreadMediaRecord } from "./discussion.repository";
 import {
   canReadRetained,
   hasSocietyModeratorAuthority,
@@ -34,6 +37,7 @@ import type { DiscussionRepository } from "./discussion.repository";
  */
 export interface DiscussionProfilePort {
   findPublicIdentity(userId: string): Promise<ProfileIdentity | null>;
+  findPublicIdentities(userIds: readonly string[]): Promise<ReadonlyMap<string, ProfileIdentity>>;
   canReadActivityBy(
     viewer: RequestPrincipal | undefined,
     authorId: string,
@@ -68,16 +72,17 @@ export class FeedService {
       : await hasSocietyModeratorAuthority(this.authorization, principal, societyId);
     const normalizedPage = normalizePage(page);
     const result = await this.repository.listThreads(societyId, normalizedPage, includeRetained);
-    const media = await Promise.all(
-      result.items.map(async (thread) => [thread.id, await this.repository.listThreadMedia(thread.id)] as const),
-    );
-    const authorById = new Map<string, ProfileIdentity>();
-    for (const thread of result.items) {
-      if (authorById.has(thread.authorId)) continue;
-      const identity = await this.profile.findPublicIdentity(thread.authorId);
-      if (identity !== null) authorById.set(thread.authorId, identity);
+    const mediaByThread = await this.mediaByThread(result.items);
+    const authorById = await this.identitiesFor(result.items);
+    const voteByThread = new Map<string, -1 | 0 | 1>();
+    if (principal !== undefined) {
+      const votes = await this.repository.findThreadVotes(
+        result.items.map((thread) => thread.id),
+        principal.userId,
+      );
+      for (const vote of votes) voteByThread.set(vote.threadId, vote.value);
     }
-    return toThreadPageDto(result, new Map(media), authorById);
+    return toThreadPageDto(result, mediaByThread, authorById, voteByThread);
   }
 
   async listThreadComments(
@@ -111,15 +116,24 @@ export class FeedService {
       normalizePage(page),
     );
 
-    const items: Array<Awaited<ReturnType<typeof toHomeFeedThreadDto>>> = [];
-    for (const thread of result.items) {
-      const society = await this.authorization.societyRepository.findSocietyById(thread.societyId);
-      if (society === null) continue;
-      const media = await this.repository.listThreadMedia(thread.id);
-      const identity = await this.profile.findPublicIdentity(thread.authorId);
-      const vote = await this.repository.findThreadVote(thread.id, principal.userId);
-      items.push(toHomeFeedThreadDto(thread, society, media, identity, vote?.value ?? 0));
-    }
+    const threadIds = result.items.map((thread) => thread.id);
+    const mediaByThread = await this.mediaByThread(result.items);
+    const authorById = await this.identitiesFor(result.items);
+    const societyById = await this.societiesFor(result.items);
+    const votes = await this.repository.findThreadVotes(threadIds, principal.userId);
+    const voteById = new Map(votes.map((vote) => [vote.threadId, vote.value]));
+
+    const items: HomeFeedPageDto["items"] = result.items.flatMap((thread) => {
+      const society = societyById.get(thread.societyId);
+      if (society === undefined) return [];
+      return [toHomeFeedThreadDto(
+        thread,
+        society,
+        mediaByThread.get(thread.id) ?? [],
+        authorById.get(thread.authorId) ?? null,
+        voteById.get(thread.id) ?? 0,
+      )];
+    });
 
     return {
       items,
@@ -135,12 +149,21 @@ export class FeedService {
   ): Promise<UserThreadActivityPageDto> {
     const identity = await this.authorActivity(viewer, authorId);
     const result = await this.repository.listThreadsByAuthor(authorId, normalizePage(page));
-    const items: UserThreadActivityDto[] = [];
-    for (const thread of result.items) {
-      const society = await this.authorization.societyRepository.findSocietyById(thread.societyId);
-      if (society === null) continue;
-      items.push(toUserThreadActivityDto(thread, society, identity));
+    const societyById = await this.societiesFor(result.items);
+    const voteByThread = new Map<string, -1 | 0 | 1>();
+    if (viewer !== undefined) {
+      const votes = await this.repository.findThreadVotes(
+        result.items.map((thread) => thread.id),
+        viewer.userId,
+      );
+      for (const vote of votes) voteByThread.set(vote.threadId, vote.value);
     }
+    const items: UserThreadActivityDto[] = result.items.flatMap((thread) => {
+      const society = societyById.get(thread.societyId);
+      return society === undefined
+        ? []
+        : [toUserThreadActivityDto(thread, society, identity, voteByThread.get(thread.id) ?? 0)];
+    });
     return {
       items,
       nextCursor: result.nextCursor,
@@ -155,19 +178,50 @@ export class FeedService {
   ): Promise<UserCommentActivityPageDto> {
     const identity = await this.authorActivity(viewer, authorId);
     const result = await this.repository.listCommentsByAuthor(authorId, normalizePage(page));
-    const items: UserCommentActivityDto[] = [];
-    for (const comment of result.items) {
-      const thread = await this.repository.findThread(comment.threadId);
-      if (thread === null) continue;
-      const society = await this.authorization.societyRepository.findSocietyById(thread.societyId);
-      if (society === null) continue;
-      items.push(toUserCommentActivityDto(comment, thread, society, identity));
-    }
+    const threadIds = [...new Set(result.items.map((comment) => comment.threadId))];
+    const threadById = new Map(
+      (await this.repository.findThreadsByIds(threadIds)).map((thread) => [thread.id, thread]),
+    );
+    const societyById = await this.societiesFor([...threadById.values()]);
+    const items: UserCommentActivityDto[] = result.items.flatMap((comment) => {
+      const thread = threadById.get(comment.threadId);
+      if (thread === undefined) return [];
+      const society = societyById.get(thread.societyId);
+      return society === undefined ? [] : [toUserCommentActivityDto(comment, thread, society, identity)];
+    });
     return {
       items,
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
     };
+  }
+
+  private async mediaByThread(
+    threads: readonly ThreadRecord[],
+  ): Promise<ReadonlyMap<string, readonly ThreadMediaRecord[]>> {
+    const id = await this.repository.listThreadMediaBatch(threads.map((thread) => thread.id));
+    const grouped = new Map<string, ThreadMediaRecord[]>();
+    for (const media of id) {
+      const list = grouped.get(media.threadId);
+      if (list === undefined) grouped.set(media.threadId, [media]);
+      else list.push(media);
+    }
+    return grouped;
+  }
+
+  private async identitiesFor(
+    threads: readonly ThreadRecord[],
+  ): Promise<ReadonlyMap<string, ProfileIdentity>> {
+    const authorIds = [...new Set(threads.map((thread) => thread.authorId))];
+    return this.profile.findPublicIdentities(authorIds);
+  }
+
+  private async societiesFor(
+    threads: readonly ThreadRecord[],
+  ): Promise<ReadonlyMap<string, SocietyRecord>> {
+    const ids = [...new Set(threads.map((thread) => thread.societyId))];
+    const societies = await this.authorization.societyRepository.findSocietiesByIds(ids);
+    return new Map(societies.map((society) => [society.id, society]));
   }
 
   private async authorActivity(

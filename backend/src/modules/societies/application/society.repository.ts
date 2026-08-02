@@ -40,6 +40,7 @@ export interface SocietyRepository {
   listActiveMemberSocieties(userId: string): Promise<readonly MembershipSocietyRecord[]>;
   findSocietyById(societyId: string): Promise<SocietyRecord | null>;
   findSocietyBySlug(slug: string): Promise<SocietyRecord | null>;
+  findSocietiesByIds(ids: readonly string[]): Promise<readonly SocietyRecord[]>;
   createSociety(input: CreateSocietyInput): Promise<SocietyRecord>;
   listRules(societyId: string): Promise<readonly SocietyRuleRecord[]>;
   findRuleById(societyId: string, ruleId: string): Promise<SocietyRuleRecord | null>;

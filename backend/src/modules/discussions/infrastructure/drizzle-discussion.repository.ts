@@ -131,6 +131,41 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     };
   }
 
+  async findThreadsByIds(ids: readonly string[]): Promise<readonly ThreadRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.executor
+      .select()
+      .from(threads)
+      .where(inArray(threads.id, [...ids]));
+    return rows.map(toThread);
+  }
+
+  async listThreadMediaBatch(threadIds: readonly string[]): Promise<readonly ThreadMediaRecord[]> {
+    if (threadIds.length === 0) return [];
+    const rows = await this.executor
+      .select()
+      .from(threadMedia)
+      .where(inArray(threadMedia.threadId, [...threadIds]))
+      .orderBy(asc(threadMedia.position), asc(threadMedia.mediaId));
+    return rows.map((row) => ({
+      threadId: row.threadId,
+      mediaId: row.mediaId,
+      position: row.position,
+    }));
+  }
+
+  async findThreadVotes(
+    threadIds: readonly string[],
+    userId: string,
+  ): Promise<readonly ThreadVoteRecord[]> {
+    if (threadIds.length === 0) return [];
+    const rows = await this.executor
+      .select()
+      .from(threadVotes)
+      .where(and(inArray(threadVotes.threadId, [...threadIds]), eq(threadVotes.userId, userId)));
+    return rows.map(toThreadVote);
+  }
+
   async findThread(threadId: string): Promise<ThreadRecord | null> {
     return this.findThreadInternal(threadId, false);
   }

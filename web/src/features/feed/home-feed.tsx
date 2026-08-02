@@ -1,117 +1,34 @@
-import { ArrowBigUp, MessageCircle, RefreshCw, Share2 } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/ui/button";
 import {
   Card,
   CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
 } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Spinner } from "../../components/ui/spinner";
-import { cn } from "../../lib/utils";
-import { useHomeFeed, useThreadLike } from "./use-home-feed";
+import { DiscussionCard } from "../discussions/thread-card";
+import type { DiscussionItem } from "../discussions/types";
+import { useThreadVote } from "../discussions/use-thread-vote";
+import { useHomeFeed } from "./use-home-feed";
 import type { HomeFeedThread } from "./types";
 
-function timeAgo(value: string): string {
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(value).getTime()) / 1000),
-  );
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function FeedCard({ thread }: { readonly thread: HomeFeedThread }) {
-  const like = useThreadLike();
-  const liked = thread.myVote === 1;
-
-  const toggleLike = () => {
-    void like.mutate({ threadId: thread.id, value: liked ? 0 : 1 });
-  };
-
-  return (
-    <Card>
-      <CardHeader className="gap-1.5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <Link
-            to={`/s/${thread.societySlug}`}
-            className="font-semibold text-foreground hover:text-primary"
-          >
-            r/{thread.societyName}
-          </Link>
-          {thread.authorDisplayName !== null && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>
-                Posted by{" "}
-                <Link
-                  to={`/u/${thread.authorId}`}
-                  className="font-medium hover:text-primary"
-                >
-                  u/{thread.authorDisplayName}
-                </Link>
-              </span>
-            </>
-          )}
-          <span aria-hidden="true">·</span>
-          <span>{timeAgo(thread.createdAt)}</span>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-2">
-        <CardTitle className="text-lg font-semibold leading-snug">
-          {thread.title}
-        </CardTitle>
-        {thread.body !== null && (
-          <p className="line-clamp-3 leading-7 text-muted-foreground">
-            {thread.body}
-          </p>
-        )}
-      </CardContent>
-
-      <CardFooter className="gap-5 text-xs font-medium text-muted-foreground">
-        <button
-          type="button"
-          onClick={toggleLike}
-          aria-pressed={liked}
-          aria-label={liked ? "Unlike this thread" : "Like this thread"}
-          className={cn(
-            "inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-            liked ? "text-primary" : "hover:text-primary",
-          )}
-        >
-          <ArrowBigUp
-            aria-hidden="true"
-            className="size-4"
-            strokeWidth={2}
-            fill={liked ? "currentColor" : "none"}
-          />
-          {thread.score}
-        </button>
-        <span className="inline-flex items-center gap-1">
-          <MessageCircle aria-hidden="true" className="size-4" strokeWidth={2} />
-          {thread.commentCount} comment{thread.commentCount === 1 ? "" : "s"}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Share2 aria-hidden="true" className="size-4" strokeWidth={2} />
-        </span>
-      </CardFooter>
-    </Card>
-  );
+function toDiscussionItem(thread: HomeFeedThread): DiscussionItem {
+  return {
+    id: thread.id,
+    title: thread.title,
+    body: thread.body,
+    score: thread.score,
+    commentCount: thread.commentCount,
+    createdAt: thread.createdAt,
+    authorId: thread.authorId,
+    authorDisplayName: thread.authorDisplayName,
+    societySlug: thread.societySlug,
+    societyName: thread.societyName,
+    myVote: thread.myVote,
+  }
 }
 
 function FeedSkeleton() {
@@ -128,12 +45,13 @@ function FeedSkeleton() {
         </Card>
       ))}
     </div>
-  );
+  )
 }
 
 export function HomeFeed() {
   const navigate = useNavigate();
   const query = useHomeFeed();
+  const vote = useThreadVote();
   const threads = query.data?.pages.flatMap((page) => page.items) ?? [];
   const { hasNextPage, fetchNextPage } = query;
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -202,7 +120,16 @@ export function HomeFeed() {
   return (
     <div className="space-y-4">
       {threads.map((thread) => (
-        <FeedCard key={thread.id} thread={thread} />
+        <DiscussionCard
+          key={thread.id}
+          item={toDiscussionItem(thread)}
+          onToggleLike={() =>
+            void vote.mutate({
+              threadId: thread.id,
+              value: thread.myVote === 1 ? 0 : 1,
+            })
+          }
+        />
       ))}
       {query.isFetchingNextPage && (
         <div className="flex justify-center py-8 text-muted-foreground">

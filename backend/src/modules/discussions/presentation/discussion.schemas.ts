@@ -26,6 +26,7 @@ export const threadSchema = z
     mediaIds: z.array(z.string().uuid()),
     authorDisplayName: z.string().nullable(),
     authorAvatarMediaId: z.string().uuid().nullable(),
+    myVote: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
     createdAt: isoDate,
     updatedAt: isoDate,
     deletedAt: isoDate.nullable(),
@@ -151,6 +152,7 @@ export const userThreadActivitySchema = z
     authorId: z.string().uuid(),
     authorDisplayName: z.string(),
     authorAvatarMediaId: z.string().uuid().nullable(),
+    myVote: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
   })
   .openapi("UserThreadActivity");
 

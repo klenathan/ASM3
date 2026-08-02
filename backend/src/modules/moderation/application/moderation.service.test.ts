@@ -327,6 +327,9 @@ class FakeSocietyRepository implements SocietyRepository {
   async listSocieties(_page: PageRequest): Promise<PageResult<SocietyRecord>> { return page([society]); }
   async listActiveMemberSocieties(_userId: string): Promise<readonly MembershipSocietyRecord[]> { return []; }
   async findSocietyBySlug(_slug: string): Promise<SocietyRecord | null> { return society; }
+  async findSocietiesByIds(ids: readonly string[]): Promise<readonly SocietyRecord[]> {
+    return ids.includes(society.id) ? [society] : [];
+  }
   async createSociety(input: CreateSocietyInput): Promise<SocietyRecord> { return { ...input, status: "active" }; }
   async listRules(_societyId: string): Promise<readonly SocietyRuleRecord[]> { return []; }
   async findRuleById(_societyId: string, _ruleId: string): Promise<SocietyRuleRecord | null> { return null; }

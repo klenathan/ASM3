@@ -36,6 +36,18 @@ async function main(): Promise<void> {
               avatarMediaId: account.profile.avatarMediaId,
             };
       },
+      findPublicIdentities: async (userIds) => {
+        const accounts = await identity.repository.findAccountsByUserIds(userIds);
+        return new Map(
+          accounts.map((account) => [
+            account.user.id,
+            {
+              displayName: account.profile.displayName,
+              avatarMediaId: account.profile.avatarMediaId,
+            },
+          ]),
+        );
+      },
       canReadActivityBy: async (viewer, authorId) => {
         const target = await identity.repository.findAccountByUserId(authorId);
         if (target === null) return false;

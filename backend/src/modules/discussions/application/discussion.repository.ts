@@ -57,6 +57,12 @@ export interface DiscussionRepository {
     authorId: string,
     page: PageRequest,
   ): Promise<PageResult<ThreadRecord>>;
+  findThreadsByIds(ids: readonly string[]): Promise<readonly ThreadRecord[]>;
+  listThreadMediaBatch(threadIds: readonly string[]): Promise<readonly ThreadMediaRecord[]>;
+  findThreadVotes(
+    threadIds: readonly string[],
+    userId: string,
+  ): Promise<readonly ThreadVoteRecord[]>;
   findThread(threadId: string): Promise<ThreadRecord | null>;
   findThreadForUpdate(threadId: string): Promise<ThreadRecord | null>;
   createThread(input: CreateThreadInput): Promise<ThreadRecord>;

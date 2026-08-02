@@ -24,6 +24,7 @@ export interface UserThreadActivity {
   readonly authorId: string
   readonly authorDisplayName: string
   readonly authorAvatarMediaId: string | null
+  readonly myVote: -1 | 0 | 1
 }
 
 export interface UserThreadActivityPage {

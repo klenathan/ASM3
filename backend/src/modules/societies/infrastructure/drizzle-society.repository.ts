@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, ilike, or } from "drizzle-orm";
+import { and, asc, eq, gt, ilike, inArray, or } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import type { TransactionManager } from "../../../shared/application/transaction";
@@ -79,6 +79,15 @@ export class DrizzleSocietyRepository implements SocietyRepository {
       .limit(1);
     const row = rows[0];
     return row === undefined ? null : toSociety(row);
+  }
+
+  async findSocietiesByIds(ids: readonly string[]): Promise<readonly SocietyRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.executor
+      .select()
+      .from(societies)
+      .where(inArray(societies.id, [...ids]));
+    return rows.map(toSociety);
   }
 
   async listActiveMemberSocieties(userId: string): Promise<readonly MembershipSocietyRecord[]> {

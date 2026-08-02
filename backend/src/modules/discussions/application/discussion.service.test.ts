@@ -210,6 +210,22 @@ class FakeDiscussionRepository implements DiscussionRepository {
     return this.threads.get(threadId) ?? null;
   }
 
+  async findThreadsByIds(ids: readonly string[]): Promise<readonly ThreadRecord[]> {
+    const idSet = new Set(ids);
+    return [...this.threads.values()].filter((thread) => idSet.has(thread.id));
+  }
+
+  async listThreadMediaBatch(_threadIds: readonly string[]): Promise<readonly ThreadMediaRecord[]> {
+    return [...this.threadMedia.values()].flat();
+  }
+
+  async findThreadVotes(
+    _threadIds: readonly string[],
+    _userId: string,
+  ): Promise<readonly ThreadVoteRecord[]> {
+    return [...this.threadVotes.values()];
+  }
+
   async findThreadForUpdate(threadId: string): Promise<ThreadRecord | null> {
     return this.findThread(threadId);
   }
@@ -425,6 +441,9 @@ class FakeSocietyRepository implements SocietyRepository {
   }
   async listActiveMemberSocieties(_userId: string): Promise<readonly MembershipSocietyRecord[]> { return []; }
   async findSocietyBySlug(_slug: string): Promise<SocietyRecord | null> { return society; }
+  async findSocietiesByIds(ids: readonly string[]): Promise<readonly SocietyRecord[]> {
+    return ids.includes(society.id) ? [society] : [];
+  }
   async createSociety(input: never): Promise<SocietyRecord> { return input; }
   async listRules(): Promise<readonly never[]> { return []; }
   async findRuleById(): Promise<null> { return null; }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, MessageSquare, ThumbsUp } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -11,6 +11,9 @@ import {
 } from "../../components/ui/avatar";
 import { useAuth } from "../../features/auth/auth-context";
 import { useMediaUrl } from "../../features/media/use-media-url";
+import { DiscussionCard } from "../../features/discussions/thread-card";
+import type { DiscussionItem } from "../../features/discussions/types";
+import { useThreadVote } from "../../features/discussions/use-thread-vote";
 import {
   SocietyThreadComposer,
   type ThreadPostingAccess,
@@ -24,25 +27,6 @@ import {
   useSocietyThreads,
 } from "../../features/societies/use-society";
 
-function timeAgo(value: string): string {
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(value).getTime()) / 1000),
-  );
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export function SocietyDetailPage() {
   const { slug = "" } = useParams();
   const { user } = useAuth();
@@ -52,6 +36,7 @@ export function SocietyDetailPage() {
   const join = useJoinSociety(slug);
   const leave = useLeaveSociety(slug);
   const createThread = useCreateSocietyThread(slug);
+  const vote = useThreadVote();
   const avatarUrl = useMediaUrl(societyQuery.data?.avatarMediaId);
 
   const society = societyQuery.data;
@@ -117,13 +102,6 @@ export function SocietyDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-12 sm:py-16 lg:px-10">
-      <Link
-        to="/societies"
-        className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" /> All societies
-      </Link>
-
       <section
         aria-labelledby="society-title"
         className="mt-8 border-t-2 border-foreground pt-8"
@@ -219,7 +197,10 @@ export function SocietyDetailPage() {
         />
       </section>
 
-      <section aria-labelledby="threads-title" className="mt-10">
+      <section
+        aria-labelledby="threads-title"
+        className="flex flex-col mt-10 gap-2"
+      >
         <div className="flex items-end justify-between border-b-2 border-foreground pb-4">
           <h2
             id="threads-title"
@@ -255,43 +236,31 @@ export function SocietyDetailPage() {
           </div>
         ) : (
           <div>
-            {threads.map((thread) => (
-              <article
-                key={thread.id}
-                className="group border-b border-foreground/15 py-5"
-              >
-                <h3 className="text-lg leading-7 font-medium text-foreground">
-                  {thread.title}
-                </h3>
-                {thread.body !== null && (
-                  <p className="mt-2 line-clamp-2 max-w-2xl leading-7 text-muted-foreground">
-                    {thread.body}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <ThumbsUp aria-hidden="true" className="size-3.5" />
-                    {thread.score}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <MessageSquare aria-hidden="true" className="size-3.5" />
-                    {thread.commentCount}
-                  </span>
-                  <span>{timeAgo(thread.createdAt)}</span>
-                  {thread.authorDisplayName !== null && (
-                    <span>
-                      by{" "}
-                      <Link
-                        to={`/u/${thread.authorId}`}
-                        className="font-medium hover:text-primary"
-                      >
-                        {thread.authorDisplayName}
-                      </Link>
-                    </span>
-                  )}
-                </div>
-              </article>
-            ))}
+            {threads.map((thread) => {
+              const item: DiscussionItem = {
+                id: thread.id,
+                title: thread.title,
+                body: thread.body,
+                score: thread.score,
+                commentCount: thread.commentCount,
+                createdAt: thread.createdAt,
+                authorId: thread.authorId,
+                authorDisplayName: thread.authorDisplayName,
+                societySlug: society.slug,
+                societyName: society.name,
+                myVote: thread.myVote,
+              };
+              return (
+                <DiscussionCard
+                  key={thread.id}
+                  item={item}
+                  showSociety={false}
+                  onToggleLike={() =>
+                    void vote.mutate({ threadId: thread.id, value: 1 })
+                  }
+                />
+              );
+            })}
             {threadsQuery.isFetchingNextPage && (
               <div className="flex justify-center py-8 text-muted-foreground">
                 <Spinner />

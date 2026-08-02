@@ -205,6 +205,11 @@ class FakeSocietyRepository implements SocietyRepository {
     return [...this.societies.values()].find((item) => item.slug === slug) ?? null;
   }
 
+  async findSocietiesByIds(ids: readonly string[]): Promise<readonly SocietyRecord[]> {
+    const idSet = new Set(ids);
+    return [...this.societies.values()].filter((item) => idSet.has(item.id));
+  }
+
   async createSociety(input: CreateSocietyInput): Promise<SocietyRecord> {
     const created = { ...input, status: "active" as const };
     this.societies.set(created.id, created);

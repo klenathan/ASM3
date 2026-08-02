@@ -15,6 +15,7 @@ const thread: Thread = {
   mediaIds: [],
   authorDisplayName: "Alex Student",
   authorAvatarMediaId: null,
+  myVote: 0,
   createdAt: "2026-08-02T00:00:00.000Z",
   updatedAt: "2026-08-02T00:00:00.000Z",
   deletedAt: null,
