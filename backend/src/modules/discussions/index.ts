@@ -3,8 +3,8 @@ import { systemClock, type Clock } from "../../shared/application/clock";
 import { CommentService } from "./application/comment.service";
 import {
   FeedService,
-  type DiscussionProfilePort,
 } from "./application/feed.service";
+import type { DiscussionProfilePort } from "./application/discussion.profile";
 import { ThreadService } from "./application/thread.service";
 import { VoteService } from "./application/vote.service";
 import { DrizzleDiscussionRepository, DrizzleDiscussionTransactionManager } from "./infrastructure/drizzle-discussion.repository";
@@ -26,7 +26,13 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
     membershipRepository: dependencies.membershipRepository,
     societyRepository: dependencies.societyRepository,
   };
-  const threadService = new ThreadService({ repository, transactions, clock, ...authorization });
+  const threadService = new ThreadService({
+    repository,
+    transactions,
+    clock,
+    profile: dependencies.profile,
+    ...authorization,
+  });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });
   const voteService = new VoteService({ repository, transactions, clock, ...authorization });
   const feedService = new FeedService({ repository, profile: dependencies.profile, ...authorization });
@@ -46,6 +52,8 @@ export type { CommentServiceDependencies } from "./application/comment.service";
 export { FeedService } from "./application/feed.service";
 export type {
   DiscussionProfilePort,
+} from "./application/discussion.profile";
+export type {
   FeedServiceDependencies,
 } from "./application/feed.service";
 export { ThreadService } from "./application/thread.service";

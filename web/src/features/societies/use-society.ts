@@ -50,11 +50,11 @@ export function useMySocieties() {
   })
 }
 
-export function useSocietyMembership(slug: string) {
+export function useSocietyMembership(slug: string, enabled = true) {
   return useQuery({
     queryKey: ["societies", slug, "membership"],
     queryFn: () => fetchMembership(slug),
-    enabled: slug.length > 0,
+    enabled: enabled && slug.length > 0,
   })
 }
 

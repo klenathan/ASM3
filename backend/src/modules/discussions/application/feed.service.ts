@@ -5,6 +5,7 @@ import type { RequestPrincipal } from "../../../shared/presentation/request-prin
 import type { SocietyRecord } from "../../societies/domain/society";
 import type { ThreadRecord } from "../domain/discussion";
 import type { ThreadMediaRecord } from "./discussion.repository";
+import type { DiscussionProfilePort } from "./discussion.profile";
 import {
   canReadRetained,
   hasSocietyModeratorAuthority,
@@ -29,20 +30,6 @@ import {
   type ProfileIdentity,
 } from "./discussion.mappers";
 import type { DiscussionRepository } from "./discussion.repository";
-
-/**
- * Port into the identity module. The discussions module never reads identity
- * storage directly; it receives profile identity and privacy decisions through
- * this explicitly injected boundary to keep modules decoupled.
- */
-export interface DiscussionProfilePort {
-  findPublicIdentity(userId: string): Promise<ProfileIdentity | null>;
-  findPublicIdentities(userIds: readonly string[]): Promise<ReadonlyMap<string, ProfileIdentity>>;
-  canReadActivityBy(
-    viewer: RequestPrincipal | undefined,
-    authorId: string,
-  ): Promise<boolean>;
-}
 
 export interface FeedServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;
@@ -99,9 +86,19 @@ export class FeedService {
     const includeRetained = principal === undefined
       ? false
       : await hasSocietyModeratorAuthority(this.authorization, principal, thread.societyId);
-    return toCommentPageDto(
-      await this.repository.listComments(threadId, normalizePage(page), includeRetained),
+    const result = await this.repository.listComments(threadId, normalizePage(page), includeRetained);
+    const authorById = await this.profile.findPublicIdentities(
+      [...new Set(result.items.map((comment) => comment.authorId))],
     );
+    const voteByComment = new Map<string, -1 | 0 | 1>();
+    if (principal !== undefined) {
+      const votes = await this.repository.findCommentVotes(
+        result.items.map((comment) => comment.id),
+        principal.userId,
+      );
+      for (const vote of votes) voteByComment.set(vote.commentId, vote.value);
+    }
+    return toCommentPageDto(result, authorById, voteByComment);
   }
 
   async listHomeFeed(

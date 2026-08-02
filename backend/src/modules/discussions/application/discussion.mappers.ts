@@ -77,7 +77,11 @@ export function toHomeFeedThreadDto(
   };
 }
 
-export function toCommentDto(record: CommentRecord): CommentDto {
+export function toCommentDto(
+  record: CommentRecord,
+  author?: ProfileIdentity | null,
+  myVote: -1 | 0 | 1 = 0,
+): CommentDto {
   return {
     id: record.id,
     threadId: record.threadId,
@@ -86,15 +90,26 @@ export function toCommentDto(record: CommentRecord): CommentDto {
     body: record.body,
     status: record.status,
     score: record.score,
+    authorDisplayName: author?.displayName ?? null,
+    authorAvatarMediaId: author?.avatarMediaId ?? null,
+    myVote,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     deletedAt: record.deletedAt?.toISOString() ?? null,
   };
 }
 
-export function toCommentPageDto(page: PageResult<CommentRecord>): CommentPageDto {
+export function toCommentPageDto(
+  page: PageResult<CommentRecord>,
+  authorById: ReadonlyMap<string, ProfileIdentity> = new Map(),
+  voteByComment: ReadonlyMap<string, -1 | 0 | 1> = new Map(),
+): CommentPageDto {
   return {
-    items: page.items.map(toCommentDto),
+    items: page.items.map((record) => toCommentDto(
+      record,
+      authorById.get(record.authorId),
+      voteByComment.get(record.id) ?? 0,
+    )),
     nextCursor: page.nextCursor,
     hasMore: page.hasMore,
   };

@@ -36,6 +36,9 @@ export interface CommentDto {
   readonly body: string | null;
   readonly status: "published" | "removed" | "deleted";
   readonly score: number;
+  readonly authorDisplayName: string | null;
+  readonly authorAvatarMediaId: string | null;
+  readonly myVote: -1 | 0 | 1;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly deletedAt: string | null;

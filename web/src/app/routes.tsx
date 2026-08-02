@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { ProtectedLayout } from "./ProtectedLayout";
 import { HomeRoute } from "../pages/home/HomeRoute";
@@ -10,6 +10,7 @@ import { SocietyDetailPage } from "../pages/societies/SocietyDetailPage";
 import { ProfilePage } from "../pages/profile/ProfilePage";
 import { UserProfilePage } from "../pages/u/UserProfilePage";
 import { ForbiddenPage, UnauthorizedPage } from "../pages/status";
+import { ThreadPage } from "../pages/thread/ThreadPage";
 
 export function AppRoutes() {
   return (
@@ -25,9 +26,16 @@ export function AppRoutes() {
       </Route>
       <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/s/:slug/t/:id" element={<ThreadPage />} />
+      <Route path="/society/:slug/thread/:id" element={<ThreadRedirect />} />
       <Route path="/401" element={<UnauthorizedPage />} />
       <Route path="/403" element={<ForbiddenPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+function ThreadRedirect() {
+  const { slug, id } = useParams()
+  return <Navigate to={`/s/${slug ?? ""}/t/${id ?? ""}`} replace />
 }

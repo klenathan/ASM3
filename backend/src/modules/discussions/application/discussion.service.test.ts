@@ -25,6 +25,7 @@ import type {
 } from "../domain/discussion";
 import { ThreadService } from "./thread.service";
 import { VoteService } from "./vote.service";
+import type { DiscussionProfilePort } from "./discussion.profile";
 
 const society: SocietyRecord = {
   id: "society-id",
@@ -142,10 +143,17 @@ function createThreadService(repository: FakeDiscussionRepository): ThreadServic
     repository,
     transactions: immediateTransaction(repository),
     clock,
+    profile: fakeProfile,
     membershipRepository: new FakeMembershipRepository(),
     societyRepository: new FakeSocietyRepository(),
   });
 }
+
+const fakeProfile: DiscussionProfilePort = {
+  findPublicIdentity: async () => null,
+  findPublicIdentities: async () => new Map(),
+  canReadActivityBy: async () => true,
+};
 
 function createCommentService(repository: FakeDiscussionRepository): CommentService {
   return new CommentService({
@@ -372,6 +380,16 @@ class FakeDiscussionRepository implements DiscussionRepository {
 
   async findCommentVote(commentId: string, userId: string): Promise<CommentVoteRecord | null> {
     return this.commentVotes.get(`${commentId}:${userId}`) ?? null;
+  }
+
+  async findCommentVotes(
+    commentIds: readonly string[],
+    userId: string,
+  ): Promise<readonly CommentVoteRecord[]> {
+    return commentIds.flatMap((commentId) => {
+      const vote = this.commentVotes.get(`${commentId}:${userId}`);
+      return vote === undefined ? [] : [vote];
+    });
   }
 
   async createCommentVote(input: {

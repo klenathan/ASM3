@@ -18,6 +18,7 @@ import type {
   UpdateThreadCommand,
 } from "./discussion.dto";
 import { toThreadDto } from "./discussion.mappers";
+import type { DiscussionProfilePort } from "./discussion.profile";
 import type {
   CreateThreadInput,
   DiscussionRepository,
@@ -32,6 +33,7 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly repository: DiscussionRepository;
   readonly transactions: TransactionManager<DiscussionRepository>;
   readonly clock: Clock;
+  readonly profile: DiscussionProfilePort;
 }
 
 export class ThreadService {
@@ -39,12 +41,14 @@ export class ThreadService {
   private readonly transactions: TransactionManager<DiscussionRepository>;
   private readonly clock: Clock;
   private readonly authorization: DiscussionAuthorizationDependencies;
+  private readonly profile: DiscussionProfilePort;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
     this.transactions = dependencies.transactions;
     this.clock = dependencies.clock;
     this.authorization = dependencies;
+    this.profile = dependencies.profile;
   }
 
   async createThread(
@@ -73,7 +77,15 @@ export class ThreadService {
       return created;
     });
 
-    return toThreadDto(thread, await this.repository.listThreadMedia(thread.id));
+    const vote = principal === undefined
+      ? null
+      : await this.repository.findThreadVote(thread.id, principal.userId);
+    return toThreadDto(
+      thread,
+      await this.repository.listThreadMedia(thread.id),
+      await this.profile.findPublicIdentity(thread.authorId),
+      vote?.value ?? 0,
+    );
   }
 
   async getThread(

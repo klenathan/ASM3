@@ -57,6 +57,28 @@ export interface ThreadPage {
   readonly hasMore: boolean
 }
 
+export interface Comment {
+  readonly id: string
+  readonly threadId: string
+  readonly authorId: string
+  readonly parentId: string | null
+  readonly body: string | null
+  readonly status: 'published' | 'removed' | 'deleted'
+  readonly score: number
+  readonly authorDisplayName: string | null
+  readonly authorAvatarMediaId: string | null
+  readonly myVote: -1 | 0 | 1
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly deletedAt: string | null
+}
+
+export interface CommentPage {
+  readonly items: readonly Comment[]
+  readonly nextCursor: string | null
+  readonly hasMore: boolean
+}
+
 export interface CreateThreadInput {
   readonly title: string
   readonly body: string

@@ -421,6 +421,18 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     return row === undefined ? null : toCommentVote(row);
   }
 
+  async findCommentVotes(
+    commentIds: readonly string[],
+    userId: string,
+  ): Promise<readonly CommentVoteRecord[]> {
+    if (commentIds.length === 0) return [];
+    const rows = await this.executor
+      .select()
+      .from(commentVotes)
+      .where(and(inArray(commentVotes.commentId, [...commentIds]), eq(commentVotes.userId, userId)));
+    return rows.map(toCommentVote);
+  }
+
   async createCommentVote(input: {
     readonly commentId: string;
     readonly userId: string;

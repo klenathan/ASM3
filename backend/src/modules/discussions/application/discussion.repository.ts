@@ -105,6 +105,10 @@ export interface DiscussionRepository {
   incrementThreadScore(threadId: string, delta: number): Promise<ThreadRecord | null>;
 
   findCommentVote(commentId: string, userId: string): Promise<CommentVoteRecord | null>;
+  findCommentVotes(
+    commentIds: readonly string[],
+    userId: string,
+  ): Promise<readonly CommentVoteRecord[]>;
   createCommentVote(input: {
     readonly commentId: string;
     readonly userId: string;

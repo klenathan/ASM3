@@ -1,5 +1,5 @@
 import { ArrowBigUp, MessageCircle, Share2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   Card,
@@ -21,22 +21,42 @@ export function DiscussionCard({
   readonly onToggleLike?: () => void
   readonly showSociety?: boolean
 }) {
+  const navigate = useNavigate();
   const liked = item.myVote === 1;
+  const threadUrl = item.societySlug === null ? null : `/s/${item.societySlug}/t/${item.id}`;
+  const openThread = () => {
+    if (threadUrl !== null) navigate(threadUrl);
+  };
   const author =
     item.authorDisplayName === null ? null : (
-      <Link to={`/u/${item.authorId}`} className="font-medium hover:text-primary">
+      <Link
+        to={`/u/${item.authorId}`}
+        onClick={(event) => event.stopPropagation()}
+        className="font-medium hover:text-primary"
+      >
         u/{item.authorDisplayName}
       </Link>
     );
 
   return (
-    <Card>
+    <Card
+      role={threadUrl === null ? undefined : "link"}
+      tabIndex={threadUrl === null ? undefined : 0}
+      onClick={openThread}
+      onKeyDown={(event) => {
+        if (threadUrl === null || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        openThread();
+      }}
+      className={threadUrl === null ? undefined : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"}
+    >
       <CardHeader className="gap-1.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {showSociety && item.societySlug !== null && (
             <>
               <Link
                 to={`/s/${item.societySlug}`}
+                onClick={(event) => event.stopPropagation()}
                 className="font-semibold text-foreground hover:text-primary"
               >
                 r/{item.societyName}
@@ -70,7 +90,10 @@ export function DiscussionCard({
         ) : (
           <button
             type="button"
-            onClick={onToggleLike}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleLike();
+            }}
             aria-pressed={liked}
             aria-label={liked ? "Unlike this thread" : "Like this thread"}
             className={cn(
@@ -87,10 +110,18 @@ export function DiscussionCard({
             {item.score}
           </button>
         )}
-        <span className="inline-flex items-center gap-1">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            openThread();
+          }}
+          disabled={threadUrl === null}
+          className="inline-flex items-center gap-1 hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground"
+        >
           <MessageCircle aria-hidden="true" className="size-4" strokeWidth={2} />
           {item.commentCount} comment{item.commentCount === 1 ? "" : "s"}
-        </span>
+        </button>
         <span className="inline-flex items-center gap-1">
           <Share2 aria-hidden="true" className="size-4" strokeWidth={2} />
         </span>
