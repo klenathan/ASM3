@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Greenfield. Frontend and backend frameworks remain open. AWS deployment choices confirmed below; prefer a simple stack that one student can implement, explain, deploy, and demonstrate reliably.
+The `web` frontend uses React 19, Vite 8, TypeScript 7, Tailwind CSS 4, shadcn/ui, React Router 7, TanStack Query, and pnpm. The backend framework remains open. AWS deployment choices are confirmed below; prefer a simple backend that one student can implement, explain, deploy, and demonstrate reliably.
 
 ## Users
 
@@ -74,7 +74,7 @@ Minimize ongoing deployment cost. Begin with small, Single-AZ resources and avoi
 ### Open decisions
 
 - Exact approved RMIT AU, VN, and EU email-domain allow-list
-- Frontend and backend frameworks
+- Backend framework
 - Authentication implementation and email-verification mechanism
 - RDS engine
 - Final Analytics service and user-visible analytics workflow

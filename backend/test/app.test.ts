@@ -1,0 +1,77 @@
+import pino from "pino";
+import { describe, expect, it } from "vitest";
+
+import { createApp } from "../src/app.js";
+
+const logger = pino({ level: "silent" });
+const config = { webOrigin: "http://localhost:5173" };
+
+describe("health API", () => {
+  it("reports liveness without checking dependencies", async () => {
+    const app = createApp({
+      config,
+      logger,
+      checkReadiness: async () => {
+        throw new Error("must not be called");
+      },
+    });
+
+    const response = await app.request("/api/v1/health/live");
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      status: "ok",
+      service: "rmit-society-api",
+    });
+  });
+
+  it("reports readiness when dependencies are available", async () => {
+    const app = createApp({
+      config,
+      logger,
+      checkReadiness: async () => undefined,
+    });
+
+    const response = await app.request("/api/v1/health/ready");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ status: "ok" });
+  });
+
+  it("returns 503 without leaking dependency errors", async () => {
+    const app = createApp({
+      config,
+      logger,
+      checkReadiness: async () => {
+        throw new Error("database password must stay private");
+      },
+    });
+
+    const response = await app.request("/api/v1/health/ready");
+    const text = await response.text();
+
+    expect(response.status).toBe(503);
+    expect(text).not.toContain("database password");
+    expect(JSON.parse(text)).toMatchObject({ status: "error" });
+  });
+
+  it("publishes an OpenAPI 3.1 document", async () => {
+    const app = createApp({
+      config,
+      logger,
+      checkReadiness: async () => undefined,
+    });
+
+    const response = await app.request("/api/v1/openapi.json");
+    const document = (await response.json()) as {
+      openapi: string;
+      paths: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(document.openapi).toBe("3.1.0");
+    expect(document.paths).toHaveProperty("/api/v1/health/live");
+    expect(document.paths).toHaveProperty("/api/v1/health/ready");
+  });
+});
