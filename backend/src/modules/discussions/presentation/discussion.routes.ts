@@ -13,6 +13,7 @@ import {
   createThreadRequestSchema,
   discussionPageQuerySchema,
   errorSchema,
+  homeFeedPageSchema,
   threadPageSchema,
   threadSchema,
   updateCommentRequestSchema,
@@ -38,6 +39,20 @@ const listThreadsRoute = createRoute({
     200: { description: "Thread feed", content: { "application/json": { schema: threadPageSchema } } },
     400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const homeFeedRoute = createRoute({
+  method: "get",
+  path: "/api/v1/feed",
+  tags: ["Discussions"],
+  summary: "List the authenticated user's home feed",
+  description: "Threads from societies the user has joined, ordered by newest first.",
+  request: { query: discussionPageQuerySchema },
+  responses: {
+    200: { description: "Home feed", content: { "application/json": { schema: homeFeedPageSchema } } },
+    400: { description: "Invalid cursor or query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
   },
 });
 
@@ -256,6 +271,7 @@ export function registerDiscussionRoutes(
 ): void {
   const controller = createDiscussionController(dependencies);
   app.openapi(listThreadsRoute, (context) => controller.listThreads(context) as never);
+  app.openapi(homeFeedRoute, (context) => controller.homeFeed(context) as never);
   app.openapi(createThreadRoute, (context) => controller.createThread(context) as never);
   app.openapi(getThreadRoute, (context) => controller.getThread(context) as never);
   app.openapi(updateThreadRoute, (context) => controller.updateThread(context) as never);

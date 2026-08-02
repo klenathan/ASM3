@@ -19,6 +19,14 @@ export interface ThreadDto {
 
 export type ThreadPageDto = PageResult<ThreadDto>;
 
+export interface HomeFeedThreadDto extends ThreadDto {
+  readonly societySlug: string;
+  readonly societyName: string;
+  readonly myVote: -1 | 0 | 1;
+}
+
+export type HomeFeedPageDto = PageResult<HomeFeedThreadDto>;
+
 export interface CommentDto {
   readonly id: string;
   readonly threadId: string;

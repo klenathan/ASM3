@@ -1,11 +1,7 @@
-import { ArrowRight, BookOpen } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
-import { Button } from "../../components/ui/button";
 import { SocietyIndex } from "../../features/societies/society-index";
+import { HomeFeed } from "../../features/feed/home-feed";
 
 export function ForumPage() {
-  const navigate = useNavigate();
   return (
     <main className="mx-auto grid w-full max-w-7xl flex-1 gap-10 px-6 py-10 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-14 lg:px-10 lg:py-14">
       <aside aria-label="Society index">
@@ -25,29 +21,8 @@ export function ForumPage() {
           </span>
         </div>
 
-        <div className="mt-12 flex flex-col items-start gap-5 border-t border-foreground/15 pt-10">
-          <div
-            aria-hidden="true"
-            className="flex size-12 items-center justify-center bg-foreground text-background"
-          >
-            <BookOpen size={24} strokeWidth={1.5} />
-          </div>
-          <h2 className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase">
-            Make the first mark.
-          </h2>
-          <p className="max-w-md leading-7 text-muted-foreground">
-            Threads from societies you join will collect here. Start by
-            finding a community that feels like yours.
-          </p>
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => navigate("/societies")}
-            className="h-12 rounded-none px-5 text-base font-semibold shadow-none"
-          >
-            Browse societies
-            <ArrowRight aria-hidden="true" />
-          </Button>
+        <div className="mt-8">
+          <HomeFeed />
         </div>
       </section>
     </main>

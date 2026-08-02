@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, gt, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, gt, inArray, lt, or, sql } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import type { TransactionManager } from "../../../shared/application/transaction";
@@ -51,6 +51,35 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     const after = page.cursor === undefined ? undefined : threadAfter(page.cursor);
     const societyFilter = eq(threads.societyId, societyId);
     const statusFilter = includeRetained ? undefined : eq(threads.status, "published");
+    const where = after === undefined
+      ? and(societyFilter, statusFilter)
+      : and(societyFilter, statusFilter, after);
+    const rows = await this.executor
+      .select()
+      .from(threads)
+      .where(where)
+      .orderBy(desc(threads.createdAt), desc(threads.id))
+      .limit(page.limit + 1);
+    const items = rows.slice(0, page.limit).map(toThread);
+    const last = items.at(-1);
+    const hasMore = rows.length > page.limit;
+
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last !== undefined
+        ? encodeCursor(cursorFor(last.createdAt, last.id))
+        : null,
+    };
+  }
+
+  async listThreadsInSocieties(
+    societyIds: readonly string[],
+    page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>> {
+    const after = page.cursor === undefined ? undefined : threadAfter(page.cursor);
+    const societyFilter = inArray(threads.societyId, societyIds);
+    const statusFilter = eq(threads.status, "published");
     const where = after === undefined
       ? and(societyFilter, statusFilter)
       : and(societyFilter, statusFilter, after);

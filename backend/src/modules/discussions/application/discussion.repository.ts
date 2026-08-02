@@ -49,6 +49,10 @@ export interface DiscussionRepository {
     page: PageRequest,
     includeRetained: boolean,
   ): Promise<PageResult<ThreadRecord>>;
+  listThreadsInSocieties(
+    societyIds: readonly string[],
+    page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>>;
   listThreadsByAuthor(
     authorId: string,
     page: PageRequest,

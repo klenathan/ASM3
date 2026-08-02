@@ -185,6 +185,17 @@ class FakeDiscussionRepository implements DiscussionRepository {
     return { items, nextCursor: null, hasMore: false };
   }
 
+  async listThreadsInSocieties(
+    societyIds: readonly string[],
+    _page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>> {
+    const ids = new Set(societyIds);
+    const items = [...this.threads.values()].filter(
+      (thread) => ids.has(thread.societyId) && thread.status === "published",
+    );
+    return { items, nextCursor: null, hasMore: false };
+  }
+
   async listThreadsByAuthor(
     authorId: string,
     _page: PageRequest,

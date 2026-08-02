@@ -96,6 +96,10 @@ export function useCreateSocietyThread(slug: string) {
           }
         },
       )
+      void queryClient.invalidateQueries({
+        queryKey: ["societies", slug, "threads"],
+        exact: true,
+      })
     },
   })
 }

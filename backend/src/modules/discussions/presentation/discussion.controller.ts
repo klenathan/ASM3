@@ -64,6 +64,18 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       }
     },
 
+    async homeFeed(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const result = await dependencies.feedService.listHomeFeed(
+          requireInjectedPrincipal(context),
+          pageFrom(validated<PageQuery>(context, "query")),
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
     async createThread(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);

@@ -40,6 +40,36 @@ export const threadPageSchema = z
   })
   .openapi("ThreadPage");
 
+export const homeFeedThreadSchema = z
+  .object({
+    id: z.string().uuid(),
+    societyId: z.string().uuid(),
+    societySlug: z.string(),
+    societyName: z.string(),
+    authorId: z.string().uuid(),
+    title: z.string(),
+    body: z.string().nullable(),
+    status: z.enum(["published", "removed", "deleted"]),
+    score: z.number().int(),
+    commentCount: z.number().int().nonnegative(),
+    mediaIds: z.array(z.string().uuid()),
+    authorDisplayName: z.string().nullable(),
+    authorAvatarMediaId: z.string().uuid().nullable(),
+    myVote: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
+    createdAt: isoDate,
+    updatedAt: isoDate,
+    deletedAt: isoDate.nullable(),
+  })
+  .openapi("HomeFeedThread");
+
+export const homeFeedPageSchema = z
+  .object({
+    items: z.array(homeFeedThreadSchema),
+    nextCursor: z.string().nullable(),
+    hasMore: z.boolean(),
+  })
+  .openapi("HomeFeedPage");
+
 export const commentSchema = z
   .object({
     id: z.string().uuid(),

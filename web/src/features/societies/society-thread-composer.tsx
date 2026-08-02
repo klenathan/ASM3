@@ -36,6 +36,7 @@ export function SocietyThreadComposer({
   const titleErrorId = `${titleId}-error`;
   const bodyErrorId = `${bodyId}-error`;
   const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -97,7 +98,10 @@ export function SocietyThreadComposer({
       titleRef.current?.focus();
       return;
     }
-    if (nextErrors.body !== undefined) return;
+    if (nextErrors.body !== undefined) {
+      bodyRef.current?.focus();
+      return;
+    }
 
     try {
       await onCreate({ title: title.trim(), body: body.trim() });
@@ -211,6 +215,7 @@ export function SocietyThreadComposer({
             Your post
           </label>
           <Textarea
+            ref={bodyRef}
             id={bodyId}
             value={body}
             maxLength={100_000}

@@ -10,6 +10,7 @@ import {
 } from "./discussion.authorization";
 import type {
   CommentPageDto,
+  HomeFeedPageDto,
   ThreadPageDto,
   UserCommentActivityDto,
   UserCommentActivityPageDto,
@@ -18,6 +19,7 @@ import type {
 } from "./discussion.dto";
 import {
   toCommentPageDto,
+  toHomeFeedThreadDto,
   toThreadPageDto,
   toUserCommentActivityDto,
   toUserThreadActivityDto,
@@ -95,6 +97,35 @@ export class FeedService {
     return toCommentPageDto(
       await this.repository.listComments(threadId, normalizePage(page), includeRetained),
     );
+  }
+
+  async listHomeFeed(
+    principal: RequestPrincipal,
+    page: PageRequest,
+  ): Promise<HomeFeedPageDto> {
+    const memberships = await this.authorization.membershipRepository
+      .findActiveMembershipsByUser(principal.userId);
+    const societyIds = memberships.map((membership) => membership.societyId);
+    const result = await this.repository.listThreadsInSocieties(
+      societyIds,
+      normalizePage(page),
+    );
+
+    const items: Array<Awaited<ReturnType<typeof toHomeFeedThreadDto>>> = [];
+    for (const thread of result.items) {
+      const society = await this.authorization.societyRepository.findSocietyById(thread.societyId);
+      if (society === null) continue;
+      const media = await this.repository.listThreadMedia(thread.id);
+      const identity = await this.profile.findPublicIdentity(thread.authorId);
+      const vote = await this.repository.findThreadVote(thread.id, principal.userId);
+      items.push(toHomeFeedThreadDto(thread, society, media, identity, vote?.value ?? 0));
+    }
+
+    return {
+      items,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    };
   }
 
   async listUserThreads(

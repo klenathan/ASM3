@@ -4,6 +4,7 @@ import type { CommentRecord, ThreadRecord } from "../domain/discussion";
 import type {
   CommentDto,
   CommentPageDto,
+  HomeFeedThreadDto,
   ThreadDto,
   ThreadPageDto,
   UserCommentActivityDto,
@@ -50,6 +51,21 @@ export function toThreadPageDto(
     ),
     nextCursor: page.nextCursor,
     hasMore: page.hasMore,
+  };
+}
+
+export function toHomeFeedThreadDto(
+  record: ThreadRecord,
+  society: SocietyRecord,
+  media: readonly ThreadMediaRecord[] = [],
+  author?: ProfileIdentity | null,
+  myVote: -1 | 0 | 1 = 0,
+): HomeFeedThreadDto {
+  return {
+    ...toThreadDto(record, media, author),
+    societySlug: society.slug,
+    societyName: society.name,
+    myVote,
   };
 }
 
