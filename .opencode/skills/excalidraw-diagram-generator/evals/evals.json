@@ -1,0 +1,29 @@
+{
+  "skill_name": "excalidraw-diagram-generator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create an Excalidraw architecture diagram with three connected service cards. Each card must contain a heading plus a four-line responsibility description, and the cards must remain easy to move as units. Save the result as architecture.excalidraw and validate it.",
+      "expected_output": "A valid architecture.excalidraw file whose text-heavy card copy is grouped with each backing shape, while arrows bind reciprocally to the shapes.",
+      "files": [],
+      "expectations": [
+        "Every text-heavy interior text element has no containerId and shares a non-empty groupIds value with its backing shape.",
+        "No backing shape lists its text-heavy grouped copy in boundElements.",
+        "Every connector arrow is reciprocally bound to its source and destination shapes.",
+        "The bundled binding audit passes for architecture.excalidraw."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a mixed Excalidraw flowchart named moderation-flow.excalidraw. Use short one-line labels for Start and Complete, but include a detailed moderation step with at least 140 characters of body text inside its rectangle. Connect all three nodes and validate the file.",
+      "expected_output": "A valid mixed-label diagram: short labels use container bindings, detailed body text uses shape-and-text grouping, and connectors remain bound to shapes.",
+      "files": [],
+      "expectations": [
+        "The Start and Complete labels use reciprocal container bindings with their shapes.",
+        "The detailed moderation text has no containerId, is not in boundElements, and shares a groupIds value with its backing shape.",
+        "All text bounds fit within their backing shapes.",
+        "The bundled binding audit passes for moderation-flow.excalidraw."
+      ]
+    }
+  ]
+}

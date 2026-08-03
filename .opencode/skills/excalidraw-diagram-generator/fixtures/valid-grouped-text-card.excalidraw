@@ -1,0 +1,33 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "binding-audit-fixture",
+  "elements": [
+    {
+      "id": "details-card",
+      "type": "rectangle",
+      "x": 100,
+      "y": 100,
+      "width": 360,
+      "height": 180,
+      "angle": 0,
+      "groupIds": ["group-details-card"],
+      "boundElements": null
+    },
+    {
+      "id": "details-copy",
+      "type": "text",
+      "x": 124,
+      "y": 124,
+      "width": 312,
+      "height": 132,
+      "groupIds": ["group-details-card"],
+      "containerId": null,
+      "text": "Access policy\nStudents sign in with an approved RMIT email.\nModerators act only within their societies.\nSystem admins handle global operations.",
+      "textAlign": "left",
+      "verticalAlign": "top"
+    }
+  ],
+  "appState": {},
+  "files": {}
+}
