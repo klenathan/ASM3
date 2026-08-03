@@ -5,6 +5,7 @@ import type { ModerationService } from "../application/moderation.service";
 import type { ReportService } from "../application/report.service";
 import { createModerationController } from "./moderation.controller";
 import {
+  adminReportsPageQuerySchema,
   createReportRequestSchema,
   dismissReportRequestSchema,
   errorSchema,
@@ -58,6 +59,20 @@ const listSocietyReportsRoute = createRoute({
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "Society moderator access is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const listGlobalReportsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/admin/reports",
+  tags: ["Platform administration"],
+  summary: "List the global report queue across all societies",
+  request: { query: adminReportsPageQuerySchema },
+  responses: {
+    200: { description: "Global report queue", content: { "application/json": { schema: reportPageSchema } } },
+    400: { description: "Invalid pagination", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
   },
 });
 
@@ -159,6 +174,7 @@ export function registerModerationRoutes(
   app.openapi(listReporterReportsRoute, (context) => controller.listReporterReports(context) as never);
   app.openapi(createReportRoute, (context) => controller.createReport(context) as never);
   app.openapi(listSocietyReportsRoute, (context) => controller.listSocietyReports(context) as never);
+  app.openapi(listGlobalReportsRoute, (context) => controller.listGlobalReports(context) as never);
   app.openapi(getReportRoute, (context) => controller.getReport(context) as never);
   app.openapi(claimReportRoute, (context) => controller.claimReport(context) as never);
   app.openapi(resolveReportRoute, (context) => controller.resolveReport(context) as never);

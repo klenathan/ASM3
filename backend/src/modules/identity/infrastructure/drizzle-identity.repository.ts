@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, lt, or, type SQL } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import type { TransactionManager } from "../../../shared/application/transaction";
@@ -68,6 +68,42 @@ export class DrizzleIdentityRepository implements IdentityRepository {
       .innerJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
       .where(inArray(authUsers.id, [...userIds]));
     return rows.map((row) => ({ user: toAuthUser(row.user), profile: toProfile(row.profile) }));
+  }
+
+  async findUsers(
+    page: PageRequest,
+    filter?: FindUsersFilter,
+  ): Promise<PageResult<IdentityAccountRecord>> {
+    const after = page.cursor === undefined ? undefined : userAfter(page.cursor);
+    const conditions: (SQL | undefined)[] = [];
+    if (filter?.status !== undefined) {
+      conditions.push(eq(userProfiles.status, filter.status));
+    }
+    const search = filter?.search?.trim();
+    if (search !== undefined && search.length > 0) {
+      const pattern = `%${search.toLowerCase()}%`;
+      conditions.push(or(ilike(authUsers.email, pattern), ilike(userProfiles.displayName, pattern)));
+    }
+    if (after !== undefined) {
+      conditions.push(after);
+    }
+
+    const where = and(...conditions);
+    const base = this.executor
+      .select({ user: authUsers, profile: userProfiles })
+      .from(authUsers)
+      .innerJoin(userProfiles, eq(userProfiles.userId, authUsers.id));
+
+    const rows = where === undefined
+      ? await base
+          .orderBy(desc(userProfiles.createdAt), desc(authUsers.id))
+          .limit(page.limit + 1)
+      : await base
+          .where(where)
+          .orderBy(desc(userProfiles.createdAt), desc(authUsers.id))
+          .limit(page.limit + 1);
+
+    return userPageResult(rows, page.limit);
   }
 
   async createUser(input: CreateAuthUserInput): Promise<AuthUserRecord> {
@@ -217,4 +253,49 @@ function isPlatformRole(value: string): value is PlatformRole {
 
 function isUserStatus(value: string): value is UserStatus {
   return value === "active" || value === "suspended" || value === "deactivated";
+}
+
+function toAccount(row: {
+  readonly user: typeof authUsers.$inferSelect;
+  readonly profile: typeof userProfiles.$inferSelect;
+}): IdentityAccountRecord {
+  return { user: toAuthUser(row.user), profile: toProfile(row.profile) };
+}
+
+function userPageResult(
+  rows: readonly {
+    readonly user: typeof authUsers.$inferSelect;
+    readonly profile: typeof userProfiles.$inferSelect;
+  }[],
+  limit: number,
+): PageResult<IdentityAccountRecord> {
+  const items = rows.slice(0, limit).map(toAccount);
+  const last = items.at(-1);
+  const hasMore = rows.length > limit;
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last !== undefined
+      ? encodeCursor(cursorFor(last.profile.createdAt, last.user.id))
+      : null,
+  };
+}
+
+function userAfter(encoded: string): SQL<unknown> | undefined {
+  const cursor = decodeCursor(encoded);
+  if (typeof cursor.value !== "string" || !isUuid(cursor.id)) {
+    throw new ApplicationError("INVALID_CURSOR", "The supplied cursor is invalid");
+  }
+  const date = new Date(cursor.value);
+  if (Number.isNaN(date.getTime())) {
+    throw new ApplicationError("INVALID_CURSOR", "The supplied cursor is invalid");
+  }
+  return or(
+    lt(userProfiles.createdAt, date),
+    and(eq(userProfiles.createdAt, date), lt(authUsers.id, cursor.id)),
+  );
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

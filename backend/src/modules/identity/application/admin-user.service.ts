@@ -1,5 +1,9 @@
 import type { Clock } from "../../../shared/application/clock";
 import type { TransactionManager } from "../../../shared/application/transaction";
+import {
+  normalizePageSize,
+  type PageRequest,
+} from "../../../shared/application/pagination";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import {
@@ -11,9 +15,10 @@ import type {
   SetUserRoleCommand,
   SuspendUserCommand,
   UserDto,
+  UserPageDto,
 } from "./identity.dto";
-import { toUserDto } from "./identity.mappers";
-import type { IdentityRepository } from "./identity.repository";
+import { toUserDto, toUserPageDto } from "./identity.mappers";
+import type { FindUsersFilter, IdentityRepository } from "./identity.repository";
 import type { IdentityAccountRecord } from "../domain/identity.types";
 
 export interface AdminUserServiceDependencies {
@@ -78,6 +83,23 @@ export class AdminUserService {
       platformRole: command.platformRole,
       updatedAt: this.clock.now(),
     });
+  }
+
+  async listUsers(
+    actor: RequestPrincipal,
+    page: PageRequest,
+    filter?: FindUsersFilter,
+  ): Promise<UserPageDto> {
+    const actorAccount = await this.repository.findAccountByUserId(actor.userId);
+    assertTargetExists(actorAccount);
+    assertAccountUsable(actorAccount, this.clock.now());
+    assertSystemAdmin(actorAccount);
+
+    const normalized: PageRequest = {
+      limit: normalizePageSize(page.limit),
+      ...(page.cursor === undefined ? {} : { cursor: page.cursor }),
+    };
+    return toUserPageDto(await this.repository.findUsers(normalized, filter));
   }
 
   private async authorize(actor: RequestPrincipal, targetUserId: string) {

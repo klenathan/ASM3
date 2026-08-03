@@ -16,7 +16,7 @@ import type {
   UpdateModerationUserInput,
   UpdateReportInput,
 } from "./moderation.repository";
-import type { ModerationActionRecord, ReportRecord } from "../domain/moderation";
+import type { ModerationActionRecord, ReportRecord, ReportStatus } from "../domain/moderation";
 import { ModerationService } from "./moderation.service";
 import { ReportService } from "./report.service";
 import type { CreateRuleInput, CreateSocietyInput, SocietyRepository, UpdateRuleInput, MembershipSocietyRecord } from "../../societies/application/society.repository";
@@ -161,6 +161,24 @@ describe("ModerationService", () => {
     expect(repository.memberships.get(`${society.id}:${thread.authorId}`)?.status).toBe("banned");
     expect(repository.actions[0]).toMatchObject({ action: "member_banned", targetType: "membership" });
   });
+
+  it("restricts the global report queue to system admins", async () => {
+    const repository = new FakeModerationRepository();
+    const reportService = createReportService(repository);
+    const service = createModerationService(repository);
+    const report = await reportService.createReport(reporter, {
+      societyId: society.id,
+      threadId: thread.id,
+      reason: "Global review",
+    });
+
+    await expect(service.listAllReports(reporter, { limit: 20 })).rejects.toMatchObject({
+      code: "ADMIN_REQUIRED",
+    });
+    await expect(service.listAllReports(admin, { limit: 20 })).resolves.toMatchObject({
+      items: [{ id: report.id }],
+    });
+  });
 });
 
 function createReportService(repository: FakeModerationRepository): ReportService {
@@ -202,6 +220,11 @@ class FakeModerationRepository implements ModerationRepository {
     return page([...this.reports.values()].filter(
       (item) => item.societyId === societyId && (item.status === "pending" || item.status === "in_review"),
     ));
+  }
+
+  async listAllReports(_page: PageRequest, status?: ReportStatus): Promise<PageResult<ReportRecord>> {
+    const all = [...this.reports.values()];
+    return page(status === undefined ? all : all.filter((item) => item.status === status));
   }
 
   async findReport(reportId: string): Promise<ReportRecord | null> { return this.reports.get(reportId) ?? null; }

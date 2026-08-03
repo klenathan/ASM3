@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import type { Clock } from "../../../shared/application/clock";
 import type { TransactionManager } from "../../../shared/application/transaction";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 import { UserService } from "./user.service";
 import type { AvatarMediaPort } from "./avatar-media.port";
 import type {
   IdentityRepository,
+  FindUsersFilter,
   UpdateUserProfileInput,
 } from "./identity.repository";
 import type {
   AuthUserRecord,
+  AuthSessionRecord,
   IdentityAccountRecord,
   UserProfileRecord,
 } from "../domain/identity.types";
@@ -145,6 +148,10 @@ class FakeIdentityRepository implements IdentityRepository {
     return [{ user: this.user, profile: this.profile }];
   }
 
+  async findUsers(_page: PageRequest, _filter?: FindUsersFilter): Promise<PageResult<IdentityAccountRecord>> {
+    return { items: [], nextCursor: null, hasMore: false };
+  }
+
   async createUser(): Promise<AuthUserRecord> {
     throw new Error("Not implemented");
   }
@@ -157,11 +164,11 @@ class FakeIdentityRepository implements IdentityRepository {
     throw new Error("Not implemented");
   }
 
-  async createSession() {
+  async createSession(): Promise<AuthSessionRecord> {
     throw new Error("Not implemented");
   }
 
-  async findSessionById() {
+  async findSessionById(): Promise<AuthSessionRecord | null> {
     throw new Error("Not implemented");
   }
 

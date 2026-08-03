@@ -14,6 +14,12 @@ export interface UserDto {
   readonly updatedAt: string;
 }
 
+export interface UserPageDto {
+  readonly items: readonly UserDto[];
+  readonly nextCursor: string | null;
+  readonly hasMore: boolean;
+}
+
 export interface AuthResultDto {
   readonly user: UserDto;
   readonly sessionToken: string;

@@ -16,6 +16,23 @@ export const userSchema = z
   })
   .openapi("IdentityUser");
 
+export const userPageSchema = z
+  .object({
+    items: z.array(userSchema),
+    nextCursor: z.string().nullable(),
+    hasMore: z.boolean(),
+  })
+  .openapi("IdentityUserPage");
+
+export const adminUsersPageQuerySchema = z
+  .object({
+    search: z.string().max(120).optional(),
+    status: z.enum(["active", "suspended", "deactivated"]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().min(1).optional(),
+  })
+  .openapi("AdminUsersPageQuery");
+
 export const authResultSchema = z
   .object({
     user: userSchema,

@@ -30,6 +30,16 @@ type PrincipalContext = {
   get(key: string): unknown;
 };
 
+export function validated<T>(
+  context: Context<AppEnvironment>,
+  target: "json" | "param" | "query",
+): T {
+  const request = context.req as unknown as {
+    valid(name: "json" | "param" | "query"): unknown;
+  };
+  return request.valid(target) as T;
+}
+
 export function getInjectedPrincipal(context: Context<AppEnvironment>): RequestPrincipal | undefined {
   const value = (context as unknown as PrincipalContext).get("principal");
   if (!isRequestPrincipal(value)) return undefined;

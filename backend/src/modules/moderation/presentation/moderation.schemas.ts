@@ -88,3 +88,11 @@ export const moderationPageQuerySchema = z
     cursor: z.string().min(1).optional(),
   })
   .openapi("ModerationPageQuery");
+
+export const adminReportsPageQuerySchema = z
+  .object({
+    status: z.enum(["pending", "in_review", "resolved", "dismissed"]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().min(1).optional(),
+  })
+  .openapi("AdminReportsPageQuery");

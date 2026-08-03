@@ -74,7 +74,7 @@ export class PlatformService {
     let database: PlatformHealthDto["database"] = "ok";
     try {
       await this.checkConnection();
-    } catch (error) {
+    } catch {
       database = "degraded";
     }
     return {

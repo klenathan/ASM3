@@ -2,7 +2,10 @@ import { useState } from "react";
 
 import { AppearanceSection } from "../../features/settings/appearance-section";
 import { PendingSection } from "../../features/settings/pending-section";
-import { SettingsRail, SettingsTabStrip } from "../../features/settings/settings-nav";
+import {
+  SettingsRail,
+  SettingsTabStrip,
+} from "../../features/settings/settings-nav";
 import {
   getSection,
   type SettingsSectionId,
@@ -13,7 +16,7 @@ export function SettingsPage() {
   const section = getSection(activeId);
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10 sm:py-14 lg:px-10">
+    <div className="mx-auto w-full max-w-5xl flex-1 px-6 lg:px-10">
       <header className="pb-6">
         <h1 className="font-heading text-[clamp(2.25rem,4.5vw,3.25rem)] leading-none font-semibold tracking-[-0.01em] text-balance uppercase">
           Settings

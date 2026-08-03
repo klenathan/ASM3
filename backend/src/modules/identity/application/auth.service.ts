@@ -20,6 +20,7 @@ import { toUserDto } from "./identity.mappers";
 import type { IdentityRepository } from "./identity.repository";
 import type { PasswordAdapter } from "./password.adapter";
 import type { SessionTokenAdapter } from "./session.adapter";
+import type { ConfigReader } from "../../platform/application/config-reader";
 
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30;
 
@@ -30,6 +31,7 @@ export interface AuthServiceDependencies {
   readonly sessionAdapter: SessionTokenAdapter;
   readonly clock: Clock;
   readonly allowedEmailDomains: readonly string[];
+  readonly configReader?: ConfigReader;
 }
 
 export class AuthService {
@@ -39,6 +41,7 @@ export class AuthService {
   private readonly sessionAdapter: SessionTokenAdapter;
   private readonly clock: Clock;
   private readonly allowedEmailDomains: readonly string[];
+  private readonly configReader: ConfigReader | undefined;
 
   constructor(dependencies: AuthServiceDependencies) {
     this.repository = dependencies.repository;
@@ -47,10 +50,11 @@ export class AuthService {
     this.sessionAdapter = dependencies.sessionAdapter;
     this.clock = dependencies.clock;
     this.allowedEmailDomains = dependencies.allowedEmailDomains;
+    this.configReader = dependencies.configReader;
   }
 
   async register(command: RegisterCommand): Promise<AuthResultDto> {
-    const email = assertRegistrationEmail(command.email, this.allowedEmailDomains);
+    const email = assertRegistrationEmail(command.email, await this.resolveAllowedDomains());
     assertPasswordPolicy(command.password);
     const displayName = normalizeDisplayName(command.displayName);
     const bio = normalizeBio(command.bio);
@@ -157,6 +161,20 @@ export class AuthService {
 
     assertAccountUsable(account, this.clock.now());
     return account;
+  }
+
+  private async resolveAllowedDomains(): Promise<readonly string[]> {
+    if (this.configReader === undefined) {
+      return this.allowedEmailDomains;
+    }
+    const configured = await this.configReader("allowed_email_domains");
+    if (configured === null) {
+      return this.allowedEmailDomains;
+    }
+    return configured
+      .split(",")
+      .map((domain) => domain.trim().toLowerCase())
+      .filter((domain) => domain.length > 0);
   }
 
   private authResult(

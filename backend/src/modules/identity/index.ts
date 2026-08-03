@@ -1,6 +1,7 @@
 import type { Database } from "../../db/client";
 import { ALLOWED_EMAIL_DOMAINS } from "../../config/email-domains";
 import { systemClock, type Clock } from "../../shared/application/clock";
+import type { ConfigReader } from "../platform/application/config-reader";
 import { AdminUserService } from "./application/admin-user.service";
 import { AuthService } from "./application/auth.service";
 import { UserService } from "./application/user.service";
@@ -15,6 +16,7 @@ export interface IdentityModuleDependencies {
   readonly database: Database;
   readonly clock?: Clock;
   readonly allowedEmailDomains?: readonly string[];
+  readonly configReader?: ConfigReader;
   readonly passwordAdapter?: PasswordAdapter;
   readonly sessionAdapter?: SessionTokenAdapter;
   readonly avatarMedia?: AvatarMediaPort;
@@ -37,6 +39,7 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
     sessionAdapter,
     clock,
     allowedEmailDomains,
+    ...(dependencies.configReader === undefined ? {} : { configReader: dependencies.configReader }),
   });
   const userService = new UserService({ repository, transactions, clock, avatarMedia });
   const adminUserService = new AdminUserService({ repository, transactions, clock });
@@ -72,4 +75,6 @@ export type {
   SuspendUserCommand,
   UpdateProfileCommand,
   UserDto,
+  UserPageDto,
 } from "./application/identity.dto";
+export type { FindUsersFilter } from "./application/identity.repository";

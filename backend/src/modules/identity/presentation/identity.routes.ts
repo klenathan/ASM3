@@ -9,6 +9,7 @@ import { sessionPrincipalMiddleware } from "./auth.middleware";
 import { createAuthController } from "./auth.controller";
 import { createUserController } from "./user.controller";
 import {
+  adminUsersPageQuerySchema,
   authResultSchema,
   errorSchema,
   publicUserSchema,
@@ -17,6 +18,7 @@ import {
   signInRequestSchema,
   suspendUserRequestSchema,
   updateProfileRequestSchema,
+  userPageSchema,
   userSchema,
 } from "./identity.schemas";
 
@@ -98,6 +100,20 @@ const getProfileRoute = createRoute({
     200: { description: "Current profile", content: { "application/json": { schema: userSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "Account cannot be used", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const listUsersRoute = createRoute({
+  method: "get",
+  path: "/api/v1/admin/users",
+  tags: ["Identity administration"],
+  summary: "List the platform user directory",
+  request: { query: adminUsersPageQuerySchema },
+  responses: {
+    200: { description: "User directory", content: { "application/json": { schema: userPageSchema } } },
+    400: { description: "Invalid pagination", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
   },
 });
 
@@ -203,6 +219,7 @@ export function registerIdentityRoutes(
   app.use("/api/v1/auth/me", principalMiddleware);
   app.use("/api/v1/users/me", principalMiddleware);
   app.use("/api/v1/users/*", principalMiddleware);
+  app.use("/api/v1/admin/users", principalMiddleware);
   app.use("/api/v1/admin/users/*", principalMiddleware);
 
   app.openapi(registerRoute, (context) => authController.register(context) as never);
@@ -217,6 +234,7 @@ export function registerIdentityRoutes(
     const adminController = createAdminUserController({
       adminUserService: dependencies.adminUserService,
     });
+    app.openapi(listUsersRoute, (context) => adminController.list(context) as never);
     app.openapi(suspendUserRoute, (context) => adminController.suspend(context) as never);
     app.openapi(deactivateUserRoute, (context) => adminController.deactivate(context) as never);
     app.openapi(setRoleRoute, (context) => adminController.setRole(context) as never);

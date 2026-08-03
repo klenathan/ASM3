@@ -14,6 +14,7 @@ import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
 import { createAuditModule } from "./modules/audit/index";
+import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
 import { NoopThreadEventPublisher } from "./modules/discussions/application/thread-events.port";
@@ -45,6 +46,7 @@ async function main(): Promise<void> {
   const identity = createIdentityModule({
     database: database.db,
     allowedEmailDomains: config.allowedEmailDomains,
+    configReader: createPlatformConfigReader(database.db),
     avatarMedia: media.mediaService,
   });
   const discussions = createDiscussionsModule({
@@ -90,6 +92,11 @@ async function main(): Promise<void> {
     database: database.db,
     societyRepository: societies.societyRepository,
   });
+  const platform = createPlatformModule({
+    database: database.db,
+    accountReader: identity.repository,
+    checkConnection: database.checkConnection,
+  });
   const audit = createAuditModule({
     database: database.db,
     region: config.awsRegion,
@@ -105,6 +112,7 @@ async function main(): Promise<void> {
     societies,
     discussions,
     moderation,
+    platform,
     media,
   });
 

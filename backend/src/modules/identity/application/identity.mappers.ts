@@ -1,5 +1,6 @@
-import type { PublicUserDto, UserDto } from "./identity.dto";
+import type { PublicUserDto, UserDto, UserPageDto } from "./identity.dto";
 import type { IdentityAccountRecord } from "../domain/identity.types";
+import type { PageResult } from "../../../shared/application/pagination";
 
 export function toUserDto(account: IdentityAccountRecord): UserDto {
   return {
@@ -14,6 +15,14 @@ export function toUserDto(account: IdentityAccountRecord): UserDto {
     suspendedUntil: account.profile.suspendedUntil?.toISOString() ?? null,
     createdAt: account.profile.createdAt.toISOString(),
     updatedAt: account.profile.updatedAt.toISOString(),
+  };
+}
+
+export function toUserPageDto(result: PageResult<IdentityAccountRecord>): UserPageDto {
+  return {
+    items: result.items.map(toUserDto),
+    nextCursor: result.nextCursor,
+    hasMore: result.hasMore,
   };
 }
 

@@ -19,6 +19,8 @@ import type { DiscussionRouteDependencies } from "./modules/discussions";
 import { registerDiscussionRoutes } from "./modules/discussions";
 import type { ModerationRouteDependencies } from "./modules/moderation";
 import { registerModerationRoutes } from "./modules/moderation";
+import type { PlatformRouteDependencies } from "./modules/platform";
+import { registerPlatformRoutes } from "./modules/platform";
 import type { MediaRouteDependencies } from "./modules/media";
 import { registerMediaRoutes } from "./modules/media";
 import type { AppConfig } from "./config/env";
@@ -42,6 +44,7 @@ interface AppDependencies {
   readonly societies?: SocietyRouteDependencies;
   readonly discussions?: DiscussionRouteDependencies;
   readonly moderation?: ModerationRouteDependencies;
+  readonly platform?: PlatformRouteDependencies;
   readonly media?: MediaRouteDependencies;
 }
 
@@ -132,8 +135,22 @@ export function createApp(dependencies: AppDependencies) {
       app.use("/api/v1/reports/*", principalMiddleware);
       app.use("/api/v1/mod", principalMiddleware);
       app.use("/api/v1/mod/*", principalMiddleware);
+      app.use("/api/v1/admin/reports", principalMiddleware);
+      app.use("/api/v1/admin/reports/*", principalMiddleware);
     }
     registerModerationRoutes(app, dependencies.moderation);
+  }
+
+  if (dependencies.platform !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/admin/config", principalMiddleware);
+      app.use("/api/v1/admin/config/*", principalMiddleware);
+      app.use("/api/v1/admin/health", principalMiddleware);
+    }
+    registerPlatformRoutes(app, dependencies.platform);
   }
 
   if (dependencies.media !== undefined) {

@@ -2,7 +2,6 @@ import type { Database } from "../../db/client";
 import type { IdentityRepository } from "../identity/application/identity.repository";
 import { PlatformService } from "./application/platform.service";
 import {
-  createPlatformConfigReader,
   DrizzlePlatformConfigRepository,
   DrizzlePlatformConfigTransactionManager,
 } from "./infrastructure/drizzle-platform.repository";

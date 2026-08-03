@@ -43,6 +43,13 @@
       "when": 1785746646683,
       "tag": "0005_brown_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785750104246,
+      "tag": "0006_loose_havok",
+      "breakpoints": true
     }
   ]
 }

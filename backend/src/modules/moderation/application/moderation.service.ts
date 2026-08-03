@@ -21,6 +21,7 @@ import {
   normalizeResolutionNote,
   type ModerationResolution,
   type ReportRecord,
+  type ReportStatus,
 } from "../domain/moderation";
 
 export interface ModerationServiceDependencies {
@@ -60,6 +61,19 @@ export class ModerationService {
     await this.assertAuthority(principal, societyId);
     return toReportPageDto(
       await this.repository.listSocietyReports(societyId, normalizePage(page)),
+    );
+  }
+
+  async listAllReports(
+    principal: RequestPrincipal,
+    page: PageRequest,
+    status?: ReportStatus,
+  ): Promise<ReportPageDto> {
+    if (principal.platformRole !== "system_admin") {
+      throw new ApplicationError("ADMIN_REQUIRED", "System-admin access is required");
+    }
+    return toReportPageDto(
+      await this.repository.listAllReports(normalizePage(page), status),
     );
   }
 

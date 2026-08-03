@@ -45,6 +45,7 @@ import {
   assertReportStatus,
   type ModerationActionRecord,
   type ReportRecord,
+  type ReportStatus,
   type ReportTargetType,
 } from "../domain/moderation";
 import { moderationActions, reports } from "./moderation.tables";
@@ -89,6 +90,22 @@ export class DrizzleModerationRepository implements ModerationRepository {
       .from(reports)
       .where(where)
       .orderBy(asc(reports.createdAt), asc(reports.id))
+      .limit(page.limit + 1);
+    return pageResult(rows, page.limit);
+  }
+
+  async listAllReports(
+    page: PageRequest,
+    status?: ReportStatus,
+  ): Promise<PageResult<ReportRecord>> {
+    const after = page.cursor === undefined ? undefined : reportAfter(page.cursor, "desc");
+    const statusFilter = status === undefined ? undefined : eq(reports.status, status);
+    const where = and(statusFilter, after);
+    const rows = await this.executor
+      .select()
+      .from(reports)
+      .where(where)
+      .orderBy(desc(reports.createdAt), desc(reports.id))
       .limit(page.limit + 1);
     return pageResult(rows, page.limit);
   }

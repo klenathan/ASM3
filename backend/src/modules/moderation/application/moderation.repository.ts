@@ -10,6 +10,7 @@ import type { MembershipRecord, MembershipRole, MembershipStatus } from "../../s
 import type {
   ModerationActionRecord,
   ReportRecord,
+  ReportStatus,
   ReportTargetType,
 } from "../domain/moderation";
 
@@ -78,6 +79,10 @@ export interface ModerationRepository {
   listSocietyReports(
     societyId: string,
     page: PageRequest,
+  ): Promise<PageResult<ReportRecord>>;
+  listAllReports(
+    page: PageRequest,
+    status?: ReportStatus,
   ): Promise<PageResult<ReportRecord>>;
   findReport(reportId: string): Promise<ReportRecord | null>;
   findReportForUpdate(reportId: string): Promise<ReportRecord | null>;

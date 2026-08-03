@@ -24,6 +24,10 @@ interface PageQuery {
   readonly cursor?: string;
 }
 
+interface GlobalReportsQuery extends PageQuery {
+  readonly status?: "pending" | "in_review" | "resolved" | "dismissed";
+}
+
 interface ReportPathParams {
   readonly reportId: string;
 }
@@ -82,6 +86,21 @@ export function createModerationController(dependencies: ModerationControllerDep
           principal,
           societySlug,
           pageFrom(validated<PageQuery>(context, "query")),
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return moderationErrorResponse(context, error);
+      }
+    },
+
+    async listGlobalReports(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const query = validated<GlobalReportsQuery>(context, "query");
+        const result = await dependencies.moderationService.listAllReports(
+          principal,
+          pageFrom(query),
+          query.status,
         );
         return context.json(result, 200);
       } catch (error) {
