@@ -107,12 +107,8 @@ export function SocietyDetailPage() {
         className="mt-8 border-t-2 border-foreground pt-8"
       >
         <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-5">
-            <a
-              href={avatarUrl.data?.url}
-              className="shrink-0"
-              aria-label={`${society.name} profile picture`}
-            >
+          <div className="flex flex-col md:flex-row items-start gap-5 md:items-between justify-between">
+            <div className="flex flex-row gap-4">
               <Avatar className="!size-20">
                 {avatarUrl.data ? (
                   <AvatarImage
@@ -125,44 +121,39 @@ export function SocietyDetailPage() {
                   {society.slug.toUpperCase().slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
-            </a>
-            <div className="min-w-0">
-              <span className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                /{society.slug}
-              </span>
-              <h1
-                id="society-title"
-                className="font-heading text-[clamp(2.25rem,4.5vw,3.5rem)] leading-none font-semibold tracking-[-0.01em] uppercase"
-              >
-                {society.name}
-              </h1>
+              <div className="min-w-0">
+                <div className="flex flex-col items-start sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                    /{society.slug}
+                  </span>
+                  {isMember && (
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                      <Check
+                        aria-hidden="true"
+                        className="size-4"
+                        strokeWidth={2.5}
+                      />
+                      {membership?.role === "moderator"
+                        ? "You help run this table"
+                        : "You sit at this table"}
+                    </span>
+                  )}
+                </div>
+
+                <h1
+                  id="society-title"
+                  className="font-heading text-[clamp(2.25rem,4.5vw,3.5rem)] leading-none font-semibold tracking-[-0.01em] uppercase"
+                >
+                  {society.name}
+                </h1>
+              </div>
             </div>
-          </div>
-          <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-            {society.description}
-          </p>
-        </div>
 
-        <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-foreground/15 pt-6">
-          {isMember && (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
-              <Check aria-hidden="true" className="size-4" strokeWidth={2.5} />
-              {membership?.role === "moderator"
-                ? "You help run this table"
-                : "You sit at this table"}
-            </span>
-          )}
-          {isBanned && (
-            <span className="text-sm font-medium text-muted-foreground">
-              You can’t join this table right now.
-            </span>
-          )}
-
-          <div className="ml-auto">
             {!isBanned && (
               <Button
                 type="button"
                 size="lg"
+                variant={isMember ? "outline" : "default"}
                 disabled={join.isPending || leave.isPending}
                 onClick={() => {
                   if (isMember) void leave.mutateAsync();
@@ -174,6 +165,17 @@ export function SocietyDetailPage() {
               </Button>
             )}
           </div>
+          <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
+            {society.description}
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-foreground/15 pt-6">
+          {isBanned && (
+            <span className="text-sm font-medium text-muted-foreground">
+              You can’t join this table right now.
+            </span>
+          )}
         </div>
 
         {(join.isError || leave.isError) && (
@@ -235,7 +237,7 @@ export function SocietyDetailPage() {
             </p>
           </div>
         ) : (
-          <div>
+          <div className="flex flex-col gap-4">
             {threads.map((thread) => {
               const item: DiscussionItem = {
                 id: thread.id,
