@@ -1,20 +1,20 @@
-# Lambda + Bedrock Content Analysis Plan
+# Lambda + OpenRouter DeepSeek Content Analysis Plan
 
-Status: proposed  
+Status: proposed; OpenRouter provider selected  
 Scope: automated thread validation and report-context analysis  
 AWS region: `us-east-1`
 
 ## 1. Objective
 
-Use an on-demand AWS Lambda function and Amazon Bedrock to evaluate thread text and attached images. Analyze reported content with additional context from comments and vote aggregates. Preserve an auditable, asynchronous workflow through the existing `thread-events` Amazon SQS queue.
+Use an on-demand AWS Lambda function and the OpenRouter API to evaluate thread text and attached images with a configurable DeepSeek model. Analyze reported content with additional context from comments and vote aggregates. Preserve an auditable, asynchronous workflow through the existing `thread-events` Amazon SQS queue.
 
-Lambda provides short-lived compute only when analysis is requested. A multimodal Bedrock foundation model performs text and image analysis. This avoids a managed agent runtime, dedicated worker, NAT Gateway, and paid VPC endpoints.
+Lambda provides short-lived compute only when analysis is requested. OpenRouter provides the external model gateway and the configured DeepSeek model performs text and image analysis. This avoids AWS-hosted model-access requirements, a managed agent runtime, dedicated worker, NAT Gateway, and paid VPC endpoints.
 
 Sentiment is supporting information, not a validity rule. Negative criticism can be policy-compliant, while positive text can violate policy. Evaluate validity against global community policy and society rules.
 
 ## 2. Architecture decision
 
-Visual companion: [Lambda + Bedrock content-analysis Excalidraw diagram](./LAMBDA_BEDROCK_CONTENT_ANALYSIS_ARCHITECTURE.excalidraw).
+Visual companion: [Lambda + OpenRouter content-analysis Excalidraw diagram](./LAMBDA_OPENROUTER_CONTENT_ANALYSIS_ARCHITECTURE.excalidraw).
 
 ```text
 Thread creation/update or report creation
@@ -27,7 +27,7 @@ Thread creation/update or report creation
       → rehydrate authoritative context from RDS
       → invoke Lambda synchronously
           → retrieve approved private images from S3
-          → invoke Bedrock Runtime multimodal model
+          → call OpenRouter chat completions with configured DeepSeek model
           → return strict JSON
       → validate and persist analysis result in RDS
       → publish thread or route to moderator review
@@ -38,7 +38,7 @@ Thread creation/update or report creation
 
 The existing ECS backend already consumes `thread-events` and can reach private RDS. Keep database queries and business orchestration there. Lambda receives a bounded analysis request containing text context and S3 object references; it never connects to PostgreSQL.
 
-Keep Lambda outside the VPC. It can call S3 and Bedrock through AWS service endpoints without adding a NAT Gateway or hourly-priced interface endpoints. A Lambda SQS event-source mapping is not the MVP default because direct event consumption would require either:
+Keep Lambda outside the VPC. It can read S3 and call the public OpenRouter HTTPS endpoint without adding a NAT Gateway or hourly-priced interface endpoints. A Lambda SQS event-source mapping is not the MVP default because direct event consumption would require either:
 
 - private-RDS access from a VPC-attached function plus paid outbound networking; or
 - extra snapshot and result queues to keep the function outside the VPC.
@@ -51,8 +51,8 @@ The target flow assumes private media access. Current `infras/storage.tf` permit
 
 - Existing ECS/EC2 and RDS remain baseline resources.
 - Lambda incurs request and execution-duration cost only during analysis.
-- Bedrock input/output and image inference is the main variable analysis cost.
-- No managed agent runtime, dedicated ECS worker, NAT Gateway, or Bedrock VPC endpoint is added.
+- OpenRouter input/output and image inference is the main variable analysis cost.
+- No AWS-hosted model service, managed agent runtime, dedicated ECS worker, NAT Gateway, or VPC endpoint is added.
 - Shadow rollout measures real invocation volume and token/image cost before enforcement.
 
 Use one queue dispatcher because multiple consumers on one SQS queue compete for messages. Independent audit and analysis consumers would not each receive every event. Introduce SNS or EventBridge fan-out only when a confirmed independent-consumer requirement exists.
@@ -69,7 +69,7 @@ Use one queue dispatcher because multiple consumers on one SQS queue compete for
    - current global policy and society rules;
    - attached, ready image object references.
 7. The backend invokes the analysis Lambda synchronously.
-8. Lambda validates the request, retrieves approved images from private S3, invokes Bedrock Runtime, and returns strict JSON.
+8. Lambda validates the request, retrieves approved images from private S3, calls OpenRouter, and returns strict JSON.
 9. The backend validates and stores the result.
 10. Apply the result transactionally:
     - `allow` → set thread to `published`;
@@ -95,11 +95,11 @@ Any material edit to title, body, or media emits `thread.updated` and requires n
    - deduplicated comment IDs, bodies, and scores;
    - `contextTruncated` when not every comment is included.
 5. Invoke Lambda with the bounded snapshot.
-6. Lambda retrieves approved images, calls Bedrock, and returns the result.
+6. Lambda retrieves approved images, calls OpenRouter, and returns the result.
 7. Persist the validated result linked to the report.
 8. Display it to authorized society moderators and system admins.
 
-Do not send voter identities to Lambda or Bedrock. Engagement is context and must not determine policy compliance.
+Do not send voter identities to Lambda or OpenRouter. Engagement is context and must not determine policy compliance.
 
 For a reported comment, include:
 
@@ -187,7 +187,7 @@ Requirements:
 - instruct the model to ignore instructions embedded in user content;
 - omit author identity, reporter identity, voter identity, email, and unrelated profile data.
 
-Lambda retrieves image bytes from S3, then supplies supported image blocks and text to the Bedrock Converse API. Reject objects whose actual metadata does not match the approved request.
+Lambda retrieves image bytes from S3, then supplies text and supported image data URLs to the OpenRouter chat completions API. Reject objects whose actual metadata does not match the approved request. The selected DeepSeek model must support image input when images are enabled.
 
 ### 6.2 Response
 
@@ -217,12 +217,12 @@ Do not request or store chain-of-thought. Evidence contains only concise excerpt
 Persist:
 
 - decision, sentiment, and structured findings;
-- Bedrock model ID;
+- OpenRouter model ID and provider;
 - Lambda function version or alias;
 - policy and prompt versions;
 - input hash and restricted snapshot/evidence;
 - context-capture timestamp;
-- Lambda request ID and Bedrock request ID when available;
+- Lambda request ID and OpenRouter request ID when available;
 - processing latency and sanitized failure code;
 - creation, start, and completion timestamps.
 
@@ -254,7 +254,7 @@ backend/src/modules/content-analysis/
 
 backend/src/functions/content-analysis/
 ├── handler.ts
-├── bedrock-content-analyzer.ts
+├── openrouter-content-analyzer.ts
 ├── contracts.ts
 └── prompt.ts
 ```
@@ -271,10 +271,10 @@ Add AWS SDK clients through the owning package manager:
 
 ```text
 @aws-sdk/client-lambda
-@aws-sdk/client-bedrock-runtime
+@aws-sdk/client-secrets-manager
 ```
 
-The ECS adapter uses `@aws-sdk/client-lambda`; function code uses `@aws-sdk/client-bedrock-runtime` and the existing S3 client.
+The ECS adapter uses `@aws-sdk/client-lambda`; function code uses the native `fetch`, `@aws-sdk/client-secrets-manager`, and the existing S3 client. The API key is loaded from Secrets Manager at runtime.
 
 ### 7.1 Queue dispatcher refactor
 
@@ -291,7 +291,7 @@ receive
 Retry behavior:
 
 - duplicate audit receipt is success, but handler completion must still be checked;
-- Lambda service errors, Bedrock throttling, and transient S3 failures use bounded exponential backoff;
+- Lambda service errors, OpenRouter rate limits/5xx responses, and transient S3 failures use bounded exponential backoff;
 - Lambda `FunctionError`, malformed output, and schema-invalid output are processing failures;
 - unsupported event versions remain unacknowledged and eventually reach the DLQ;
 - extend SQS visibility while synchronous Lambda analysis runs;
@@ -332,9 +332,10 @@ The relay publishes unpublished rows and then marks them published. Direct post-
 | `findings`                | Structured JSON result                         |
 | `input_snapshot`          | Restricted analysis evidence/context           |
 | `input_hash`              | Reproducibility and stale detection            |
-| `model_id`                | Invoked Bedrock model                          |
+| `model_id`                | Invoked OpenRouter DeepSeek model             |
 | `lambda_function_version` | Deployed function version or alias             |
 | `lambda_request_id`       | Invocation correlation                         |
+| `provider_request_id`     | OpenRouter request correlation when available  |
 | `prompt_version`          | Prompt contract version                        |
 | `policy_version`          | Community policy version                       |
 | `attempt_count`           | Invocation attempts                            |
@@ -400,7 +401,10 @@ ANALYSIS_TIMEOUT_MS=
 Lambda:
 
 ```text
-BEDROCK_MODEL_ID=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=deepseek/<approved-model-slug>
+OPENROUTER_API_KEY_SECRET_ARN=
+OPENROUTER_TIMEOUT_MS=50000
 ALLOWED_MEDIA_BUCKET=
 ALLOWED_MEDIA_PREFIX=
 MAX_MODEL_TOKENS=
@@ -413,7 +417,7 @@ Modes:
 - `shadow`: analyze asynchronously without changing visibility;
 - `enforce`: create or edit threads as `pending_analysis` and gate publication.
 
-Production configuration must fail validation when mode is `shadow` or `enforce` but Lambda settings are missing. Lambda startup must fail closed when model, bucket, or resource-limit settings are missing.
+Production configuration must fail validation when mode is `shadow` or `enforce` but Lambda settings are missing. Lambda startup must fail closed when the OpenRouter model, API-key secret, bucket, or resource-limit settings are missing. The API key must never be placed in Terraform configuration, ECS environment variables, or source control.
 
 ## 11. Security and moderation safeguards
 
@@ -421,9 +425,10 @@ Production configuration must fail validation when mode is `shadow` or `enforce`
 - Route uncertain, high-risk, invalid-output, and exhausted-failure outcomes to humans.
 - Remove the current public-read bucket policy and use private/signed media delivery before claiming media confidentiality.
 - Invoke only the configured function ARN and optional alias.
-- Grant the Lambda role only required logging, `s3:GetObject` on the media prefix, and `bedrock:InvokeModel` permissions.
+- Grant the Lambda role only required logging, `s3:GetObject` on the media prefix, and `secretsmanager:GetSecretValue` for the OpenRouter key secret. Do not add model-provider IAM permissions.
 - Grant the ECS task only `lambda:InvokeFunction` on the analysis function.
 - Keep Lambda outside the VPC; it has no database credentials or network path to RDS.
+- Send only the minimum analysis context to OpenRouter and treat the provider as an external data processor. Confirm the coursework/privacy requirements before sending user content.
 - Validate S3 bucket, key prefix, MIME type, object metadata, image count, and byte limits before model invocation.
 - Do not send voter identities, author email, reporter email, credentials, or unrelated profile data.
 - Delimit untrusted content and harden prompts against prompt injection.
@@ -440,7 +445,7 @@ Use structured CloudWatch logs containing identifiers and operational metadata o
 - attempt number and outcome;
 - ECS-to-Lambda latency and total processing latency;
 - Lambda request ID, function version, and sanitized error code;
-- Bedrock request ID, model ID, latency, throttling, and token usage when available;
+- OpenRouter request ID, model ID, latency, rate limits, and token usage when available;
 - SQS receive, visibility-extension, and acknowledgement result.
 
 Monitor:
@@ -450,7 +455,7 @@ Monitor:
 - SQS queue depth and oldest-message age;
 - DLQ depth;
 - Lambda errors, duration, throttles, and concurrent executions;
-- Bedrock latency, throttling, token usage, and invocation failures;
+- OpenRouter latency, rate limits, token usage, and invocation failures;
 - invalid response count;
 - moderator override/false-positive rate;
 - invocation cost during demos.
@@ -471,10 +476,11 @@ Provision only after Phase 0 succeeds:
 
 - one Lambda function with bounded memory, timeout, ephemeral storage, and reserved concurrency;
 - one CloudWatch log group with the existing short retention policy;
-- environment variables for model and media restrictions;
+- one Secrets Manager secret containing the OpenRouter API key, with the value populated after apply;
+- environment variables for OpenRouter endpoint/model and media restrictions;
 - function version/alias for reproducible audit evidence;
 - ECS configuration containing function ARN/alias;
-- permissions using the pre-created `LabRole` only when its trust and policies are compatible.
+- permissions using the pre-created `LabRole` only when its trust and policies are compatible, including secret read access.
 
 Do not add a NAT Gateway, Lambda VPC attachment, interface VPC endpoint, dedicated ECS worker, or new IAM role without explicit approval. Do not configure an SQS event-source mapping for the MVP architecture.
 
@@ -489,15 +495,15 @@ Recommended initial controls:
 
 ## 14. Implementation phases
 
-### Phase 0 — AWS feasibility gate
+### Phase 0 — OpenRouter/Learner Lab feasibility gate
 
-- Confirm Lambda and the selected multimodal Bedrock model are available in active Learner Lab `us-east-1`.
+- Confirm Lambda is available in active Learner Lab `us-east-1` and remains outside the VPC for outbound HTTPS.
 - Confirm the pre-created `LabRole` trust policy permits `lambda.amazonaws.com` to assume it.
 - Confirm ECS credentials can call `lambda:InvokeFunction` for the function.
-- Confirm Lambda credentials can call `bedrock:InvokeModel`, read the approved S3 prefix, and write CloudWatch logs.
-- Confirm model access is enabled and test one text request plus one image request.
+- Confirm Lambda credentials can read the OpenRouter API-key secret, read the approved S3 prefix, and write CloudWatch logs.
+- Confirm the OpenRouter key, endpoint, account credit/rate limits, and selected DeepSeek model. Test one text request plus one image request if the model supports vision.
 - Decide and verify the public-to-private media delivery migration before production use.
-- Stop and request approval if any condition fails. Do not add another runtime or paid networking silently.
+- Stop and request approval if any condition fails. Do not add another managed model service, runtime, or paid networking silently.
 
 ### Phase 1 — Durable events
 
@@ -514,7 +520,7 @@ Recommended initial controls:
 - Implement context ports.
 - Implement `LambdaContentAnalyzer` using synchronous invocation.
 - Add visibility heartbeat, bounded retries, timeout, and idempotency.
-- Build the Lambda artifact with S3 retrieval and direct Bedrock Runtime invocation.
+- Build the Lambda artifact with S3 retrieval and direct OpenRouter invocation.
 - Add OpenTofu resources only after Learner Lab permissions pass.
 
 ### Phase 3 — Shadow rollout
@@ -522,7 +528,7 @@ Recommended initial controls:
 - Analyze new threads without gating publication.
 - Analyze reports with capped comment and vote context.
 - Build an evaluation dataset covering valid criticism, toxicity, harassment, prompt injection, text in images, benign images, and mixed-language content.
-- Measure false positives, invalid responses, Lambda duration, Bedrock latency, and cost.
+- Measure false positives, invalid responses, Lambda duration, OpenRouter latency, rate limits, and cost.
 - Tune policy and prompt versions before enforcement.
 
 ### Phase 4 — Moderator and author UI
@@ -553,7 +559,7 @@ Recommended initial controls:
 
 - successful `allow` publishes pending thread;
 - `review` routes to moderation;
-- Lambda/Bedrock failure does not publish in enforce mode;
+- Lambda/OpenRouter failure does not publish in enforce mode;
 - report workflow remains available without AI result;
 - duplicate event does not duplicate effective analysis;
 - stale input triggers or recommends reanalysis;
@@ -587,20 +593,20 @@ Recommended initial controls:
 - toxic positive-language content;
 - harmful text embedded in an image;
 - malformed model response;
-- Lambda timeout, `FunctionError`, Bedrock throttling, and access denied.
+- Lambda timeout, `FunctionError`, OpenRouter rate limiting/5xx responses, malformed provider output, and access denied.
 
 ### Workflow acceptance tests
 
-- UI submission automatically invokes SQS, Lambda, and Bedrock and persists audit/result evidence.
+- UI submission automatically invokes SQS, Lambda, and OpenRouter and persists audit/result evidence.
 - Allowed thread becomes visible without manual database changes.
 - Flagged thread appears for a moderator and remains hidden publicly.
 - Report analysis includes comments and vote aggregates without voter IDs.
 - Moderator can resolve a report while analysis is pending or failed.
-- CloudWatch, SQS, Lambda, Bedrock, S3, and RDS provide demonstrable AWS invocation evidence.
+- CloudWatch, SQS, Lambda, S3, and RDS provide AWS invocation evidence; OpenRouter request IDs and sanitized provider metrics provide external-provider evidence.
 
 ## 16. AWS Academy blocker
 
-Lambda requires an execution role trusted by `lambda.amazonaws.com`. Direct Bedrock inference requires model-access and `bedrock:InvokeModel`; private media retrieval requires narrow `s3:GetObject`. The ECS backend requires `lambda:InvokeFunction`.
+Lambda requires an execution role trusted by `lambda.amazonaws.com`. OpenRouter requires an API key, outbound HTTPS, and a selected model; private media retrieval requires narrow `s3:GetObject`, and secret retrieval requires `secretsmanager:GetSecretValue`. The ECS backend requires `lambda:InvokeFunction`.
 
 The project targets AWS Academy Learner Lab, where creating or modifying IAM roles is generally blocked and the existing `LabRole` must be reused. Phase 0 is therefore a hard gate. Reuse `LabRole` only after verifying its trust policy and effective permissions in the active lab.
 
@@ -612,7 +618,7 @@ Do not add Terraform-managed IAM users, application roles, inline role policies,
 2. Whether rollout stops at shadow mode or later gates publication.
 3. Whether AI-flagged threads create automated reports or use a separate review status.
 4. Maximum comments, images, image bytes, invocation payload, and snapshot retention.
-5. Which multimodal Bedrock model the active lab permits.
+5. Which OpenRouter DeepSeek model is approved, and whether it supports image input.
 6. Whether users see finding details or only status.
 7. Moderator override and reanalysis rules.
 8. Behavior for unsupported media and animated images.
@@ -634,8 +640,8 @@ Recommended defaults:
 - [Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html)
 - [Lambda execution roles](https://docs.aws.amazon.com/lambda/latest/dg/lambda-intro-execution-role.html)
 - [Lambda VPC internet access](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc-internet.html)
-- [Amazon Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
-- [Amazon Bedrock image source](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ImageSource.html)
-- [Amazon Bedrock model invocation IAM actions](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html)
+- [OpenRouter API overview](https://openrouter.ai/docs/api-reference/overview)
+- [OpenRouter model routing](https://openrouter.ai/docs/guides/routing)
+- [OpenRouter multimodal inputs](https://openrouter.ai/docs/features/multimodal/images)
 - [Existing SQS audit implementation guide](./SQS_THREAD_AUDIT_GUIDE.md)
 - [Backend architecture baseline](./BACKEND_ARCHITECTURE.md)

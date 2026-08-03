@@ -33,7 +33,7 @@ await build({
   // AWS SDK v3 is available in the Lambda Node runtime; keep it external so
   // the bundle stays small and uses the runtime-managed SDK.
   external: [
-    "@aws-sdk/client-bedrock-runtime",
+    "@aws-sdk/client-secrets-manager",
     "@aws-sdk/client-s3",
     "@aws-sdk/s3-request-presigner",
   ],

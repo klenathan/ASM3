@@ -90,7 +90,7 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "AWS_REGION", value = var.aws_region },
       { name = "MEDIA_BUCKET", value = aws_s3_bucket.media.bucket },
       { name = "THREAD_EVENTS_QUEUE_URL", value = aws_sqs_queue.thread_events.url },
-      { name = "CONTENT_ANALYSIS_MODE", value = "off" },
+      { name = "CONTENT_ANALYSIS_MODE", value = var.enable_content_analysis_lambda ? var.content_analysis_mode : "off" },
       { name = "CONTENT_ANALYSIS_LAMBDA_FUNCTION", value = local.content_analysis_function },
       { name = "CONTENT_ANALYSIS_LAMBDA_QUALIFIER", value = local.content_analysis_qualifier },
       { name = "CONTENT_ANALYSIS_LAMBDA_ARN", value = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.content_analysis_function}:${local.content_analysis_qualifier}" },

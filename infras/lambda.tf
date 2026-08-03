@@ -1,17 +1,17 @@
 # ---------------------------------------------------------------------------
-# Lambda + Bedrock content-analysis function.
+# Lambda + OpenRouter content-analysis function.
 #
 # GATE: This whole file is inert until `enable_content_analysis_lambda` is set
 # true (Phase 0 must first confirm, in the ACTIVE lab):
 #   - LabRole trust policy permits `lambda.amazonaws.com` to assume it
 #     (aws_lambda_function requires an execution role; Learner Lab blocks
 #     iam:CreateRole, so we reuse LabRole).
-#   - LabRole effective permissions include `bedrock:InvokeModel` and
+#   - LabRole effective permissions include `secretsmanager:GetSecretValue` and
 #     `logs:CreateLogStream`/`logs:PutLogEvents`.
-#   - The preferred multimodal Bedrock model is enabled for the account.
+#   - The configured OpenRouter DeepSeek model and API key are available.
 #
 # Lambda stays OUTSIDE the VPC (no NAT, no VPC endpoints) and never connects
-# to RDS. It only reads approved S3 objects and calls the Bedrock Runtime.
+# to RDS. It only reads approved S3 objects and calls the OpenRouter HTTPS API.
 # No SQS event-source mapping; the ECS backend invokes it synchronously.
 # ---------------------------------------------------------------------------
 
@@ -29,24 +29,33 @@ resource "aws_lambda_function" "content_analysis" {
   source_code_hash = filebase64sha256(var.content_analysis_zip_path)
   publish          = true
 
+  lifecycle {
+    precondition {
+      condition     = trimspace(var.content_analysis_openrouter_model) != ""
+      error_message = "content_analysis_openrouter_model must be set when content analysis is enabled."
+    }
+  }
+
   architectures = ["x86_64"]
   memory_size   = var.content_analysis_memory
   timeout       = var.content_analysis_timeout_seconds
-  # Reserved concurrency caps demo cost while Bedrock/Lambda is being measured.
+  # Reserved concurrency caps demo cost while OpenRouter/Lambda is being measured.
   reserved_concurrent_executions = var.content_analysis_reserved_concurrency
 
   environment {
     variables = {
-      AWS_REGION            = var.aws_region
-      BEDROCK_MODEL_ID      = var.content_analysis_bedrock_model_id
-      ALLOWED_MEDIA_BUCKET  = aws_s3_bucket.media.bucket
-      ALLOWED_MEDIA_PREFIX  = "media/"
-      MAX_MODEL_TOKENS      = tostring(var.content_analysis_max_model_tokens)
-      MAX_IMAGE_BYTES       = tostring(var.content_analysis_max_image_bytes)
-      MAX_TOTAL_IMAGE_BYTES = tostring(var.content_analysis_max_total_image_bytes)
-      MAX_IMAGES            = tostring(var.content_analysis_max_images)
-      ALLOWED_MIME_TYPES    = var.content_analysis_allowed_mime_types
-      LOG_LEVEL             = "info"
+      AWS_REGION                    = var.aws_region
+      OPENROUTER_BASE_URL           = "https://openrouter.ai/api/v1"
+      OPENROUTER_MODEL              = var.content_analysis_openrouter_model
+      OPENROUTER_API_KEY_SECRET_ARN = aws_secretsmanager_secret.openrouter_api_key[0].arn
+      ALLOWED_MEDIA_BUCKET          = aws_s3_bucket.media.bucket
+      ALLOWED_MEDIA_PREFIX          = "media/"
+      MAX_MODEL_TOKENS              = tostring(var.content_analysis_max_model_tokens)
+      MAX_IMAGE_BYTES               = tostring(var.content_analysis_max_image_bytes)
+      MAX_TOTAL_IMAGE_BYTES         = tostring(var.content_analysis_max_total_image_bytes)
+      MAX_IMAGES                    = tostring(var.content_analysis_max_images)
+      ALLOWED_MIME_TYPES            = var.content_analysis_allowed_mime_types
+      LOG_LEVEL                     = "info"
     }
   }
 

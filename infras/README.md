@@ -7,6 +7,8 @@ OpenTofu provisions a low-cost demo environment in AWS:
 - S3 stores public media objects.
 - RDS PostgreSQL is Single-AZ and private across two database subnets.
 - Secrets Manager injects `DATABASE_URL`; ECR stores backend images.
+- Optional content analysis runs in AWS Lambda and calls the configured DeepSeek
+  model through OpenRouter over HTTPS. Its API key is read from Secrets Manager.
 - CloudWatch keeps application logs for 7 days and SSM provides shell access without SSH.
 - An ad hoc ECS task applies committed migrations and idempotently seeds initial data before the API service starts.
 
@@ -20,7 +22,8 @@ The design deliberately omits a directly managed CloudFront distribution, NAT Ga
 - Docker for building the backend image
 - pnpm, zip, and curl for publishing the frontend artifact
 
-Never put AWS keys, database passwords, or other secrets in `.tfvars` or source control.
+Never put AWS keys, database passwords, OpenRouter API keys, or other secrets in
+`.tfvars` or source control.
 
 ## 1. Create remote state
 
@@ -105,6 +108,35 @@ aws ecs update-service \
 ```
 
 Use immutable image tags in repeatable CI deployments rather than `latest`.
+
+### Optional OpenRouter content analysis
+
+Build the Lambda artifact before enabling the feature:
+
+```sh
+cd backend
+pnpm build:content-analysis
+cd ../infras
+tofu plan
+tofu apply
+```
+
+When the Lambda is enabled, retrieve the secret ARN and store the OpenRouter
+API key without putting it in Terraform state:
+
+```sh
+SECRET_ARN="$(tofu output -raw openrouter_api_key_secret_arn)"
+aws secretsmanager put-secret-value \
+  --secret-id "$SECRET_ARN" \
+  --secret-string 'YOUR_OPENROUTER_API_KEY'
+```
+
+Set `content_analysis_openrouter_model` to the approved OpenRouter DeepSeek
+model slug and use `content_analysis_mode = "shadow"` for the first rollout.
+The selected model must support image input while image analysis is enabled.
+Keep the Lambda outside the VPC so it has outbound HTTPS access without a NAT
+Gateway. The active Learner Lab `LabRole` must allow the function to read the
+secret, read approved S3 media, and write CloudWatch logs.
 
 ### Troubleshoot `voc-cancel-cred` upload failures
 

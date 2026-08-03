@@ -77,3 +77,8 @@ output "database_url_secret_arn" {
   description = "Secrets Manager ARN containing DATABASE_URL."
   value       = aws_secretsmanager_secret.database_url.arn
 }
+
+output "openrouter_api_key_secret_arn" {
+  description = "Secrets Manager ARN that must contain the OpenRouter API key when content analysis is enabled."
+  value       = try(aws_secretsmanager_secret.openrouter_api_key[0].arn, null)
+}

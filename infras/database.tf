@@ -61,3 +61,15 @@ resource "aws_secretsmanager_secret_version" "database_url" {
     var.db_name,
   )
 }
+
+# The secret value is intentionally not managed by OpenTofu. Populate it after
+# apply with `aws secretsmanager put-secret-value` so the API key is not stored
+# in Terraform configuration or state.
+resource "aws_secretsmanager_secret" "openrouter_api_key" {
+  count = var.enable_content_analysis_lambda ? 1 : 0
+
+  name                    = "${local.name}/openrouter-api-key"
+  description             = "OpenRouter API key consumed by the content-analysis Lambda"
+  recovery_window_in_days = var.environment == "prod" ? 7 : 0
+  tags                    = local.common_tags
+}

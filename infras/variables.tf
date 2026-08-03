@@ -148,11 +148,22 @@ variable "media_abandoned_object_days" {
   default     = 30
 }
 
-# ----- Lambda + Bedrock content analysis (Phase 0 gated) --------------------
+# ----- Lambda + OpenRouter content analysis (Phase 0 gated) -----------------
 variable "enable_content_analysis_lambda" {
-  description = "Deploy the content-analysis Lambda. Keep false until Phase 0 confirms LabRole trust + Bedrock model access in the active lab."
+  description = "Deploy the content-analysis Lambda. Keep false until Phase 0 confirms LabRole trust, Secrets Manager access, and OpenRouter connectivity in the active lab."
   type        = bool
   default     = false
+}
+
+variable "content_analysis_mode" {
+  description = "Content-analysis rollout mode. Use off, shadow, or enforce."
+  type        = string
+  default     = "off"
+
+  validation {
+    condition     = contains(["off", "shadow", "enforce"], var.content_analysis_mode)
+    error_message = "content_analysis_mode must be off, shadow, or enforce."
+  }
 }
 
 variable "content_analysis_zip_path" {
@@ -161,8 +172,8 @@ variable "content_analysis_zip_path" {
   default     = "../backend/dist-function/content-analysis.zip"
 }
 
-variable "content_analysis_bedrock_model_id" {
-  description = "Multimodal Bedrock model ID used for analysis by the Lambda function."
+variable "content_analysis_openrouter_model" {
+  description = "OpenRouter model slug for the DeepSeek analysis model. Use a vision-capable model when images are enabled."
   type        = string
   default     = ""
 }
@@ -186,7 +197,7 @@ variable "content_analysis_reserved_concurrency" {
 }
 
 variable "content_analysis_max_model_tokens" {
-  description = "Max output tokens for the Bedrock model."
+  description = "Max output tokens for the OpenRouter model."
   type        = number
   default     = 2048
 }

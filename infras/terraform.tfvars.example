@@ -1,5 +1,5 @@
 # Authentication is intentionally absent. Use AWS SSO or AWS_PROFILE.
-aws_region   = "ap-southeast-2"
+aws_region   = "us-east-1"
 project_name = "rmit-society"
 environment  = "demo"
 owner        = "s1234567"
@@ -13,9 +13,11 @@ app_desired_count = 0
 # Set true only when you want `tofu destroy` to remove non-empty demo buckets.
 force_destroy_buckets = false
 
-# ---- Lambda + Bedrock content analysis (Phase 0 gated) ----
+# ---- Lambda + OpenRouter/DeepSeek content analysis (Phase 0 gated) ---------
 # Leave disabled until Phase 0 confirms LabRole trust permits lambda.amazonaws.com
-# and the Bedrock model is enabled in the active lab. When enabling, set:
-#   enable_content_analysis_lambda         = true
-#   content_analysis_bedrock_model_id      = "amazon.nova-lite-v1:0"
-#   content_analysis_zip_path              = "../backend/dist-function/content-analysis.zip"
+# and the role can read the OpenRouter API-key secret. When enabling, set:
+#   enable_content_analysis_lambda    = true
+#   content_analysis_mode             = "shadow"
+#   content_analysis_openrouter_model = "deepseek/<approved-model-slug>"
+#   content_analysis_zip_path          = "../backend/dist-function/content-analysis.zip"
+# After apply, populate the reported secret ARN with the OpenRouter API key.

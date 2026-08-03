@@ -1,14 +1,18 @@
 /**
  * Lambda composition root. Imports AWS SDK adapters but MUST NOT contain
  * moderation policy, database access, or business rules. Reads config from
- * environment, validates requests, calls Bedrock, returns result.
+ * environment, validates requests, calls OpenRouter, returns result.
  */
-import { BedrockContentAnalyzer } from "./bedrock-content-analyzer";
+import { OpenRouterContentAnalyzer } from "./openrouter-content-analyzer";
 import type { LambdaEvent } from "./contracts";
 
 export interface HandlerConfig {
   modelId: string;
   region: string;
+  baseUrl: string;
+  apiKeySecretArn: string | undefined;
+  apiKey: string | undefined;
+  requestTimeoutMs: number;
   allowedMediaBucket: string;
   allowedMediaPrefix: string;
   maxModelTokens: number;
@@ -20,7 +24,7 @@ export interface HandlerConfig {
 
 function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
   const required = {
-    modelId: env.BEDROCK_MODEL_ID,
+    modelId: env.OPENROUTER_MODEL,
     allowedMediaBucket: env.ALLOWED_MEDIA_BUCKET,
     allowedMediaPrefix: env.ALLOWED_MEDIA_PREFIX,
   };
@@ -30,6 +34,10 @@ function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
   return {
     modelId: required.modelId!,
     region: env.AWS_REGION ?? "us-east-1",
+    baseUrl: env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+    apiKeySecretArn: env.OPENROUTER_API_KEY_SECRET_ARN,
+    apiKey: env.OPENROUTER_API_KEY,
+    requestTimeoutMs: Number(env.OPENROUTER_TIMEOUT_MS ?? 50_000),
     allowedMediaBucket: required.allowedMediaBucket!,
     allowedMediaPrefix: required.allowedMediaPrefix!,
     maxModelTokens: Number(env.MAX_MODEL_TOKENS ?? 2048),
@@ -43,7 +51,7 @@ function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
   };
 }
 
-let analyzer: BedrockContentAnalyzer | null = null;
+let analyzer: OpenRouterContentAnalyzer | null = null;
 
 export function handler(
   event: LambdaEvent,
@@ -52,14 +60,22 @@ export function handler(
 ): Promise<unknown> {
   // Fail closed at startup if required settings are missing or invalid.
   const config = loadConfig(env);
+  if (!config.apiKeySecretArn && !config.apiKey) {
+    throw new Error("missing required env: OPENROUTER_API_KEY_SECRET_ARN");
+  }
   if (!analyzer) {
-    analyzer = new BedrockContentAnalyzer(
+    analyzer = new OpenRouterContentAnalyzer(
       {
         modelId: config.modelId,
         region: config.region,
+        baseUrl: config.baseUrl,
+        apiKeySecretArn: config.apiKeySecretArn,
+        apiKey: config.apiKey,
         maxModelTokens: config.maxModelTokens,
+        requestTimeoutMs: config.requestTimeoutMs,
       },
       {
+        allowedBucket: config.allowedMediaBucket,
         allowedPrefix: config.allowedMediaPrefix,
         maxImageBytes: config.maxImageBytes,
         maxTotalBytes: config.maxTotalBytes,
