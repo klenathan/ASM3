@@ -5,6 +5,8 @@ import {
   FeedService,
 } from "./application/feed.service";
 import type { DiscussionProfilePort } from "./application/discussion.profile";
+import type { ThreadEventPublisher } from "./application/thread-events.port";
+import { NoopThreadEventPublisher } from "./application/thread-events.port";
 import type { ThreadMediaPort } from "./application/thread-media.port";
 import { ThreadService } from "./application/thread.service";
 import { VoteService } from "./application/vote.service";
@@ -17,6 +19,7 @@ export interface DiscussionsModuleDependencies {
   readonly societyRepository: SocietyRepository;
   readonly profile: DiscussionProfilePort;
   readonly media: ThreadMediaPort;
+  readonly events?: ThreadEventPublisher;
   readonly clock?: Clock;
 }
 
@@ -24,6 +27,7 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
   const repository = new DrizzleDiscussionRepository(dependencies.database);
   const transactions = new DrizzleDiscussionTransactionManager(dependencies.database);
   const clock = dependencies.clock ?? systemClock;
+  const events = dependencies.events ?? new NoopThreadEventPublisher();
   const authorization = {
     membershipRepository: dependencies.membershipRepository,
     societyRepository: dependencies.societyRepository,
@@ -34,6 +38,7 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
     clock,
     profile: dependencies.profile,
     media: dependencies.media,
+    events,
     ...authorization,
   });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });
@@ -62,6 +67,12 @@ export type {
 export { ThreadService } from "./application/thread.service";
 export type { ThreadServiceDependencies } from "./application/thread.service";
 export type { ThreadMediaPort } from "./application/thread-media.port";
+export type { ThreadEventPublisher } from "./application/thread-events.port";
+export {
+  NoopThreadEventPublisher,
+  buildThreadCreatedEvent,
+} from "./application/thread-events.port";
+export { SqsThreadEventPublisher } from "./infrastructure/thread-events.sqs.publisher";
 export { VoteService } from "./application/vote.service";
 export type { VoteServiceDependencies } from "./application/vote.service";
 export {

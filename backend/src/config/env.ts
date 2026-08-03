@@ -34,6 +34,14 @@ const environmentSchema = z.object({
     .transform((value) => value.split(",").map((domain) => domain.trim().toLowerCase()).filter(Boolean)),
   AWS_REGION: z.string().trim().min(1).optional(),
   MEDIA_BUCKET: z.string().trim().min(3).max(63).optional(),
+  THREAD_EVENTS_QUEUE_URL: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((value) => value.startsWith("https://"), {
+      message: "must be an HTTPS SQS queue URL",
+    })
+    .optional(),
 }).superRefine((value, context) => {
   if ((value.AWS_REGION === undefined) !== (value.MEDIA_BUCKET === undefined)) {
     context.addIssue({
@@ -42,10 +50,27 @@ const environmentSchema = z.object({
       message: "AWS_REGION and MEDIA_BUCKET must be configured together",
     });
   }
+  if (
+    value.THREAD_EVENTS_QUEUE_URL !== undefined
+    && value.AWS_REGION === undefined
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["THREAD_EVENTS_QUEUE_URL"],
+      message: "AWS_REGION is required when THREAD_EVENTS_QUEUE_URL is configured",
+    });
+  }
   if (value.NODE_ENV === "production" && value.MEDIA_BUCKET === undefined) {
     context.addIssue({
       code: "custom",
       path: ["MEDIA_BUCKET"],
+      message: "is required in production",
+    });
+  }
+  if (value.NODE_ENV === "production" && value.THREAD_EVENTS_QUEUE_URL === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["THREAD_EVENTS_QUEUE_URL"],
       message: "is required in production",
     });
   }
@@ -63,6 +88,7 @@ export interface AppConfig {
   readonly allowedEmailDomains: readonly string[];
   readonly awsRegion: string | null;
   readonly mediaBucket: string | null;
+  readonly threadEventsQueueUrl: string | null;
 }
 
 export function loadConfig(
@@ -90,5 +116,6 @@ export function loadConfig(
     allowedEmailDomains: result.data.ALLOWED_EMAIL_DOMAINS,
     awsRegion: result.data.AWS_REGION ?? null,
     mediaBucket: result.data.MEDIA_BUCKET ?? null,
+    threadEventsQueueUrl: result.data.THREAD_EVENTS_QUEUE_URL ?? null,
   };
 }

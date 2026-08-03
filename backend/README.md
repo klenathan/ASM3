@@ -78,8 +78,10 @@ Their remote URLs remain readable through `RemoteMediaStorage`. When
 `request signed PUT → browser uploads directly to S3 → API verifies metadata →
 thread stores the ready media id`. This works in local development and production.
 
-Every seeded student shares the dev password `SeedPass123!` (change logins via
-the existing auth flow in a real deployment).
+The seeded system admin (`seed.admin@rmit.edu.au`) and every seeded student
+share the dev password `SeedPass123!` (change logins via the existing auth flow
+in a real deployment). Re-running the seed restores the admin's email, password,
+role, and active status.
 
 No migration exists yet because phase one intentionally contains no product schema.
 

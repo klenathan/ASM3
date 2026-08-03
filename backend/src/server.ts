@@ -13,8 +13,11 @@ import { createIdentityModule } from "./modules/identity/index";
 import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
+import { createAuditModule } from "./modules/audit/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
+import { NoopThreadEventPublisher } from "./modules/discussions/application/thread-events.port";
+import { SqsThreadEventPublisher } from "./modules/discussions/infrastructure/thread-events.sqs.publisher";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -32,6 +35,13 @@ async function main(): Promise<void> {
     storage: new RemoteMediaStorage(s3Storage),
     attachmentPort: new DrizzleThreadAttachmentAdapter(database.db),
   });
+  const threadEventPublisher = config.awsRegion !== null && config.threadEventsQueueUrl !== null
+    ? new SqsThreadEventPublisher({
+        region: config.awsRegion,
+        queueUrl: config.threadEventsQueueUrl,
+        logger,
+      })
+    : new NoopThreadEventPublisher();
   const identity = createIdentityModule({
     database: database.db,
     allowedEmailDomains: config.allowedEmailDomains,
@@ -42,6 +52,7 @@ async function main(): Promise<void> {
     membershipRepository: societies.membershipRepository,
     societyRepository: societies.societyRepository,
     media: media.mediaService,
+    events: threadEventPublisher,
     profile: {
       findPublicIdentity: async (userId) => {
         const account = await identity.repository.findAccountByUserId(userId);
@@ -79,6 +90,13 @@ async function main(): Promise<void> {
     database: database.db,
     societyRepository: societies.societyRepository,
   });
+  const audit = createAuditModule({
+    database: database.db,
+    region: config.awsRegion,
+    threadEventsQueueUrl: config.threadEventsQueueUrl,
+    logger,
+  });
+  audit.start();
   const app = createApp({
     config,
     logger,
@@ -128,6 +146,7 @@ async function main(): Promise<void> {
           else resolve();
         });
       });
+      await audit.stop();
       await database.close();
       clearTimeout(forceShutdown);
       logger.info("shutdown complete");

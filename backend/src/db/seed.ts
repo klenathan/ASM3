@@ -43,7 +43,7 @@ import {
   LocalPasswordAdapter,
 } from "../modules/identity/infrastructure/local-password.adapter";
 
-/** Shared dev login password for every seeded student. */
+/** Shared dev login password for every seeded user. */
 const SEED_PASSWORD = "SeedPass123!";
 
 /** Deterministic seed owner. Created idempotently and reused as society creator. */
@@ -628,15 +628,22 @@ async function main(): Promise<void> {
 
     const now = new Date();
 
-    // 1. Seed owner user (idempotent).
+    // 1. Seed owner user (idempotent) and restore its demo login/admin access.
+    const ownerPasswordHash = await passwordAdapter.hashPassword(SEED_PASSWORD);
     await database.db
       .insert(authUsers)
       .values({
         id: SEED_OWNER.id,
         email: SEED_OWNER.email,
-        passwordHash: "seed-password-disabled",
+        passwordHash: ownerPasswordHash,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: authUsers.id,
+        set: {
+          email: SEED_OWNER.email,
+          passwordHash: ownerPasswordHash,
+        },
+      });
 
     await database.db
       .insert(userProfiles)
@@ -645,7 +652,17 @@ async function main(): Promise<void> {
         createdAt: now,
         updatedAt: now,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: {
+          displayName: SEED_OWNER_PROFILE.displayName,
+          bio: SEED_OWNER_PROFILE.bio,
+          platformRole: SEED_OWNER_PROFILE.platformRole,
+          status: SEED_OWNER_PROFILE.status,
+          suspendedUntil: null,
+          updatedAt: now,
+        },
+      });
 
     // 2. Seed societies and, per society, its rules (both idempotent).
     const societyIds: Map<string, string> = new Map();

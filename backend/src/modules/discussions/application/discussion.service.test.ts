@@ -27,6 +27,7 @@ import { ThreadService } from "./thread.service";
 import { VoteService } from "./vote.service";
 import type { DiscussionProfilePort } from "./discussion.profile";
 import type { ThreadMediaPort } from "./thread-media.port";
+import type { ThreadEventPublisher } from "./thread-events.port";
 
 const society: SocietyRecord = {
   id: "society-id",
@@ -78,6 +79,40 @@ describe("discussion services", () => {
         mediaIds: ["media-id"],
       }),
     ).rejects.toThrow("media is not ready");
+    expect(repository.threads.size).toBe(0);
+  });
+
+  it("emits a thread.created event exactly once after a successful creation", async () => {
+    const repository = new FakeDiscussionRepository();
+    const publishedThreads: { id: string; title: string }[] = [];
+    const publisher: ThreadEventPublisher = {
+      publishThreadCreated: async (thread) => {
+        publishedThreads.push(thread);
+      },
+    };
+    const service = createThreadService(repository, undefined, publisher);
+
+    await service.createThread(member, society.id, { title: "Event", body: "Body" });
+
+    expect(publishedThreads).toHaveLength(1);
+    expect(publishedThreads[0]!.title).toBe("Event");
+    expect(repository.threads.size).toBe(1);
+  });
+
+  it("does not emit a thread.created event when creation is rejected", async () => {
+    const repository = new FakeDiscussionRepository();
+    let published = 0;
+    const service = createThreadService(repository, undefined, {
+      publishThreadCreated: async () => {
+        published += 1;
+      },
+    });
+
+    await expect(
+      service.createThread(inactive, society.id, { title: "No access", body: "Body" }),
+    ).rejects.toMatchObject({ code: "SOCIETY_FORBIDDEN" });
+
+    expect(published).toBe(0);
     expect(repository.threads.size).toBe(0);
   });
 
@@ -181,6 +216,7 @@ describe("discussion services", () => {
 function createThreadService(
   repository: FakeDiscussionRepository,
   media: ThreadMediaPort = readyMedia,
+  events: ThreadEventPublisher = { publishThreadCreated: async () => undefined },
 ): ThreadService {
   return new ThreadService({
     repository,
@@ -188,6 +224,7 @@ function createThreadService(
     clock,
     profile: fakeProfile,
     media,
+    events,
     membershipRepository: new FakeMembershipRepository(),
     societyRepository: new FakeSocietyRepository(),
   });

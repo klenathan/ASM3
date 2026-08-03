@@ -30,13 +30,13 @@ Do not include the thread body or media content. Consumers can retrieve authorit
 
 ### Backend
 
-- [ ] Add an application event-publisher port to the discussions module.
-- [ ] Inject the port into `ThreadService`.
-- [ ] In `ThreadService.createThread`, publish the event only after the existing transaction has committed.
-- [ ] Add an SQS infrastructure adapter using `@aws-sdk/client-sqs`.
-- [ ] Validate `AWS_REGION` and `THREAD_EVENTS_QUEUE_URL` in backend configuration.
-- [ ] Use a no-op publisher and do not start the consumer when the queue URL is not configured, allowing local development without AWS.
-- [ ] Wire the publisher and consumer from `backend/src/server.ts`; controllers remain unaware of AWS transport concerns.
+- [x] Add an application event-publisher port to the discussions module.
+- [x] Inject the port into `ThreadService`.
+- [x] In `ThreadService.createThread`, publish the event only after the existing transaction has committed.
+- [x] Add an SQS infrastructure adapter using `@aws-sdk/client-sqs`.
+- [x] Validate `AWS_REGION` and `THREAD_EVENTS_QUEUE_URL` in backend configuration.
+- [x] Use a no-op publisher and do not start the consumer when the queue URL is not configured, allowing local development without AWS.
+- [x] Wire the publisher and consumer from `backend/src/server.ts`; controllers remain unaware of AWS transport concerns.
 
 ## Audit Consumer
 
@@ -53,29 +53,34 @@ Initially run the long-polling consumer in the existing API process. This avoids
 
 ### Infrastructure
 
-- [ ] Add a standard SQS primary queue in Terraform.
-- [ ] Add a dead-letter queue and redrive policy.
-- [ ] Configure server-side encryption, tags, long polling, visibility timeout, and bounded receive attempts.
-- [ ] Add backend ECS task environment variables for `AWS_REGION` and `THREAD_EVENTS_QUEUE_URL`.
-- [ ] Add Terraform outputs for the primary queue and DLQ URLs.
-- [ ] Confirm the Learner Lab role permits `sqs:SendMessage`, `ReceiveMessage`, `DeleteMessage`, `ChangeMessageVisibility`, and `GetQueueAttributes`.
+- [x] Add a standard SQS primary queue in Terraform.
+- [x] Add a dead-letter queue and redrive policy.
+- [x] Configure server-side encryption, tags, long polling, visibility timeout, and bounded receive attempts.
+- [x] Add backend ECS task environment variables for `AWS_REGION` and `THREAD_EVENTS_QUEUE_URL`.
+- [x] Add Terraform outputs for the primary queue and DLQ URLs.
+- [x] Verify effective SQS access through the primary queue resource policy for
+  the existing Learner Lab role. Do not attempt to modify `LabRole`, because
+  Learner Lab denies `iam:PutRolePolicy`.
 
-The project reuses the AWS Academy Learner Lab role and cannot provision a dedicated IAM role. Confirm that role allows `sqs:SendMessage`, `ReceiveMessage`, `DeleteMessage`, `ChangeMessageVisibility`, and `GetQueueAttributes` before deployment.
+The project reuses the AWS Academy Learner Lab role and cannot provision or
+modify a dedicated IAM role. The SQS queue resource policy grants that existing
+role `sqs:SendMessage`, `ReceiveMessage`, `DeleteMessage`,
+`ChangeMessageVisibility`, and `GetQueueAttributes` on the primary queue.
 
 ### Tests
 
-- [ ] Unit test that successful thread creation emits one event after commit.
-- [ ] Unit test that authorization or validation failures emit no event.
-- [ ] Unit test SQS command construction and publisher failure logging.
-- [ ] Unit test consumer validation, acknowledge-after-persist ordering, duplicate delivery handling, and shutdown behavior.
-- [ ] Add PostgreSQL integration coverage for the audit table's unique event-ID constraint.
+- [x] Unit test that successful thread creation emits one event after commit.
+- [x] Unit test that authorization or validation failures emit no event.
+- [x] Unit test SQS command construction and publisher failure logging.
+- [x] Unit test consumer validation, acknowledge-after-persist ordering, duplicate delivery handling, and shutdown behavior.
+- [x] Add PostgreSQL integration coverage for the audit table's unique event-ID constraint.
 - [ ] Smoke test the deployed path: UI thread creation, SQS delivery, audit-row persistence, CloudWatch logs, and a forced failure that reaches the DLQ.
 
 ### Demo And Documentation
 
 - [ ] Demonstrate a student creating a thread through the UI.
 - [ ] Correlate the thread ID and event ID in backend and consumer CloudWatch logs and the persisted audit record.
-- [ ] Document queue metrics, DLQ inspection/replay, teardown steps, and the direct-publish delivery limitation.
+- [x] Document queue metrics, DLQ inspection/replay, teardown steps, and the direct-publish delivery limitation.
 
 ## Future Extension
 

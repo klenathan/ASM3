@@ -33,6 +33,16 @@ output "media_bucket_name" {
   value       = aws_s3_bucket.media.id
 }
 
+output "thread_events_queue_url" {
+  description = "Standard SQS queue receiving thread.created events."
+  value       = aws_sqs_queue.thread_events.url
+}
+
+output "thread_events_dlq_url" {
+  description = "SQS dead-letter queue for repeatedly failing thread.created messages."
+  value       = aws_sqs_queue.thread_events_dlq.url
+}
+
 output "backend_ecr_repository_url" {
   description = "ECR repository URL for the backend image."
   value       = aws_ecr_repository.backend.repository_url

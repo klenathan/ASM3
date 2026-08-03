@@ -19,6 +19,7 @@ import type {
 } from "./discussion.dto";
 import { toThreadDto } from "./discussion.mappers";
 import type { DiscussionProfilePort } from "./discussion.profile";
+import type { ThreadEventPublisher } from "./thread-events.port";
 import type { ThreadMediaPort } from "./thread-media.port";
 import type {
   CreateThreadInput,
@@ -36,6 +37,7 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly clock: Clock;
   readonly profile: DiscussionProfilePort;
   readonly media: ThreadMediaPort;
+  readonly events: ThreadEventPublisher;
 }
 
 export class ThreadService {
@@ -45,6 +47,7 @@ export class ThreadService {
   private readonly authorization: DiscussionAuthorizationDependencies;
   private readonly profile: DiscussionProfilePort;
   private readonly media: ThreadMediaPort;
+  private readonly events: ThreadEventPublisher;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
@@ -53,6 +56,7 @@ export class ThreadService {
     this.authorization = dependencies;
     this.profile = dependencies.profile;
     this.media = dependencies.media;
+    this.events = dependencies.events;
   }
 
   async createThread(
@@ -81,6 +85,8 @@ export class ThreadService {
       await repository.replaceThreadMedia(created.id, mediaIds);
       return created;
     });
+
+    await this.events.publishThreadCreated(thread);
 
     const vote = principal === undefined
       ? null

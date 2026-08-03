@@ -36,6 +36,13 @@
       "when": 1785639440029,
       "tag": "0004_rainy_turbo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785746646683,
+      "tag": "0005_brown_fantastic_four",
+      "breakpoints": true
     }
   ]
 }

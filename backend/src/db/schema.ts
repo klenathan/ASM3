@@ -8,6 +8,7 @@ export {
   threads,
 } from "../modules/discussions/infrastructure/discussion.tables";
 export { mediaAssets } from "../modules/media/infrastructure/media.tables";
+export { integrationAuditEvents } from "../modules/audit/infrastructure/audit-events.tables";
 export {
   moderationActions,
   reports,

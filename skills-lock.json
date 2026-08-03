@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "excalidraw-diagram-generator": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "a01740948f1c49eef0ad100b7706b226f8e8fd0618c56c99d0caf909ca30c446"
+    },
     "impeccable": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",

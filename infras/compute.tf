@@ -89,6 +89,7 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "DATABASE_POOL_MAX", value = "5" },
       { name = "AWS_REGION", value = var.aws_region },
       { name = "MEDIA_BUCKET", value = aws_s3_bucket.media.bucket },
+      { name = "THREAD_EVENTS_QUEUE_URL", value = aws_sqs_queue.thread_events.url },
     ]
     secrets = [{
       name      = "DATABASE_URL"
@@ -131,6 +132,9 @@ resource "aws_ecs_task_definition" "database_bootstrap" {
       { name = "NODE_ENV", value = "production" },
       { name = "DATABASE_SSL", value = "true" },
       { name = "DATABASE_POOL_MAX", value = "2" },
+      { name = "AWS_REGION", value = var.aws_region },
+      { name = "MEDIA_BUCKET", value = aws_s3_bucket.media.bucket },
+      { name = "THREAD_EVENTS_QUEUE_URL", value = aws_sqs_queue.thread_events.url },
     ]
     secrets = [{
       name      = "DATABASE_URL"
