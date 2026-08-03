@@ -13,7 +13,7 @@ TARGET_PLATFORM ?= linux/amd64
 
 .DEFAULT_GOAL := help
 
-.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend migrate-seed
+.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend migrate-seed remote
 
 define with_env
 	@set -a; \
@@ -39,7 +39,8 @@ help:
 		'  make migrate-seed                    Run the one-shot ECS migration and seed task.' \
 		'  make validate|fmt                    Validate or format both stacks.' \
 		'  make tofu ARGS="<command>"           Run an authenticated root OpenTofu command.' \
-		'  make bootstrap-tofu ARGS="<command>" Run an authenticated bootstrap OpenTofu command.'
+		'  make bootstrap-tofu ARGS="<command>" Run an authenticated bootstrap OpenTofu command.' \
+		'  make cd                          CD: apply infra (-auto-approve), run remote DB migrations, deploy latest BE then FE.'
 
 whoami:
 	$(call with_env,$(AWS) sts get-caller-identity)
@@ -67,6 +68,12 @@ plan:
 
 apply:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) apply)
+
+cd:
+	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) apply -auto-approve)
+	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/run-database-bootstrap.sh
+	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/push-backend-ecr.sh
+	@./scripts/deploy-frontend.sh
 
 destroy:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) destroy)
