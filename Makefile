@@ -90,6 +90,9 @@ migrate-seed:
 deploy-frontend:
 	@./scripts/deploy-frontend.sh
 
+push-content-analysis:
+	@./scripts/push-content-analysis-lambda.sh
+
 validate:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) validate)
 	$(call with_env,$(TOFU) -chdir=$(BOOTSTRAP_DIR) validate)

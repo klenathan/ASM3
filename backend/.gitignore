@@ -8,6 +8,7 @@ out/
 /lib/
 .esbuild/
 .turbo/
+dist-function/
 
 # TypeScript
 *.tsbuildinfo

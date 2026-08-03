@@ -19,3 +19,4 @@ export {
   societyRules,
 } from "../modules/societies/infrastructure/society.tables";
 export { platformConfig } from "../modules/platform/infrastructure/platform.tables";
+export { contentAnalysisRuns } from "../modules/content-analysis/infrastructure/content-analysis.tables";
