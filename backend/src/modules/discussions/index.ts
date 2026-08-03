@@ -5,6 +5,7 @@ import {
   FeedService,
 } from "./application/feed.service";
 import type { DiscussionProfilePort } from "./application/discussion.profile";
+import type { ThreadMediaPort } from "./application/thread-media.port";
 import { ThreadService } from "./application/thread.service";
 import { VoteService } from "./application/vote.service";
 import { DrizzleDiscussionRepository, DrizzleDiscussionTransactionManager } from "./infrastructure/drizzle-discussion.repository";
@@ -15,6 +16,7 @@ export interface DiscussionsModuleDependencies {
   readonly membershipRepository: MembershipRepository;
   readonly societyRepository: SocietyRepository;
   readonly profile: DiscussionProfilePort;
+  readonly media: ThreadMediaPort;
   readonly clock?: Clock;
 }
 
@@ -31,6 +33,7 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
     transactions,
     clock,
     profile: dependencies.profile,
+    media: dependencies.media,
     ...authorization,
   });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });
@@ -58,6 +61,7 @@ export type {
 } from "./application/feed.service";
 export { ThreadService } from "./application/thread.service";
 export type { ThreadServiceDependencies } from "./application/thread.service";
+export type { ThreadMediaPort } from "./application/thread-media.port";
 export { VoteService } from "./application/vote.service";
 export type { VoteServiceDependencies } from "./application/vote.service";
 export {

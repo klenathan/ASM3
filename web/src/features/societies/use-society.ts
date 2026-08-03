@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 
 import {
-  createSocietyThread,
+  createSocietyThreadFromDraft,
   fetchMembership,
   fetchMySocieties,
   fetchSociety,
@@ -17,7 +17,7 @@ import {
   joinSociety,
   leaveSociety,
 } from "./api";
-import type { CreateThreadInput, ThreadPage } from "./types";
+import type { CreateThreadDraft, ThreadPage } from "./types";
 
 export function useSocietyDiscovery(query: string) {
   const normalized = query.trim().toLowerCase()
@@ -73,7 +73,7 @@ export function useCreateSocietyThread(slug: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: CreateThreadInput) => createSocietyThread(slug, input),
+    mutationFn: (draft: CreateThreadDraft) => createSocietyThreadFromDraft(slug, draft),
     onSuccess: (thread) => {
       queryClient.setQueryData<InfiniteData<ThreadPage>>(
         ["societies", slug, "threads"],

@@ -147,6 +147,7 @@ export const userThreadActivitySchema = z
     body: z.string().nullable(),
     score: z.number().int(),
     commentCount: z.number().int().nonnegative(),
+    mediaIds: z.array(z.string().uuid()),
     createdAt: isoDate,
     updatedAt: isoDate,
     societyId: z.string().uuid(),

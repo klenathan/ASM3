@@ -1,5 +1,7 @@
 import { request } from "../../lib/http";
+import { deleteMediaUpload, uploadThreadImage } from "../media/api";
 import type {
+  CreateThreadDraft,
   CreateThreadInput,
   MySociety,
   Society,
@@ -48,6 +50,27 @@ export function createSocietyThread(
     method: "POST",
     body: JSON.stringify(input),
   })
+}
+
+export async function createSocietyThreadFromDraft(
+  slug: string,
+  draft: CreateThreadDraft,
+): Promise<Thread> {
+  const uploadedIds: string[] = []
+  try {
+    for (const image of draft.images) {
+      const uploaded = await uploadThreadImage(image)
+      uploadedIds.push(uploaded.id)
+    }
+    return await createSocietyThread(slug, {
+      title: draft.title,
+      body: draft.body,
+      ...(uploadedIds.length === 0 ? {} : { mediaIds: uploadedIds }),
+    })
+  } catch (error) {
+    await Promise.allSettled(uploadedIds.map(deleteMediaUpload))
+    throw error
+  }
 }
 
 export function fetchMembership(slug: string): Promise<SocietyMembership | null> {

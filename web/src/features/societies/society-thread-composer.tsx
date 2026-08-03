@@ -1,11 +1,15 @@
-import { LockKeyhole, PenLine, Send, X } from "lucide-react";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { ImagePlus, LockKeyhole, PenLine, Send, Trash2, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Textarea } from "../../components/ui/textarea";
-import type { CreateThreadInput } from "./types";
+import type { CreateThreadDraft } from "./types";
+
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGES = 20;
 
 export type ThreadPostingAccess = "loading" | "member" | "guest" | "banned";
 
@@ -15,12 +19,13 @@ interface SocietyThreadComposerProps {
   readonly access: ThreadPostingAccess;
   readonly isSubmitting: boolean;
   readonly serverError?: string;
-  readonly onCreate: (input: CreateThreadInput) => Promise<void>;
+  readonly onCreate: (input: CreateThreadDraft) => Promise<void>;
 }
 
 interface ComposerErrors {
   readonly title?: string;
   readonly body?: string;
+  readonly images?: string;
 }
 
 export function SocietyThreadComposer({
@@ -33,13 +38,18 @@ export function SocietyThreadComposer({
 }: SocietyThreadComposerProps) {
   const titleId = useId();
   const bodyId = useId();
+  const imagesId = useId();
   const titleErrorId = `${titleId}-error`;
   const bodyErrorId = `${bodyId}-error`;
+  const imagesErrorId = `${imagesId}-error`;
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [images, setImages] = useState<File[]>([]);
+  const previews = useImagePreviews(images);
   const [errors, setErrors] = useState<ComposerErrors>({});
   const [published, setPublished] = useState(false);
   const [unexpectedError, setUnexpectedError] = useState<string>();
@@ -104,15 +114,51 @@ export function SocietyThreadComposer({
     }
 
     try {
-      await onCreate({ title: title.trim(), body: body.trim() });
+      await onCreate({ title: title.trim(), body: body.trim(), images });
       setTitle("");
       setBody("");
+      setImages([]);
       setErrors({});
       setIsOpen(false);
       setPublished(true);
     } catch {
       setUnexpectedError("Your thread was not published. Review it and try again.");
     }
+  }
+
+  function addImages(selectedFiles: FileList | null) {
+    if (selectedFiles === null) return;
+    const selected = Array.from(selectedFiles);
+    const existingKeys = new Set(images.map(fileKey));
+    const accepted: File[] = [];
+    let imageError: string | undefined;
+
+    for (const file of selected) {
+      if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+        imageError = "Choose JPG, PNG, GIF, or WebP images only.";
+        continue;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        imageError = `${file.name} is larger than 10 MB.`;
+        continue;
+      }
+      if (existingKeys.has(fileKey(file))) continue;
+      if (images.length + accepted.length >= MAX_IMAGES) {
+        imageError = `A thread can include up to ${MAX_IMAGES} images.`;
+        break;
+      }
+      existingKeys.add(fileKey(file));
+      accepted.push(file);
+    }
+
+    if (accepted.length > 0) setImages((current) => [...current, ...accepted]);
+    setErrors((current) => ({ ...current, images: imageError }));
+    if (imageInputRef.current !== null) imageInputRef.current.value = "";
+  }
+
+  function removeImage(index: number) {
+    setImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setErrors((current) => ({ ...current, images: undefined }));
   }
 
   if (!isOpen) {
@@ -237,6 +283,85 @@ export function SocietyThreadComposer({
           )}
         </div>
 
+        <div className="border-t border-foreground/15 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Images</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                JPG, PNG, GIF, or WebP · 10 MB each
+              </p>
+            </div>
+            <input
+              ref={imageInputRef}
+              id={imagesId}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              multiple
+              className="sr-only"
+              disabled={isSubmitting || images.length >= MAX_IMAGES}
+              aria-label="Choose thread images"
+              aria-describedby={errors.images === undefined ? undefined : imagesErrorId}
+              onChange={(event) => addImages(event.currentTarget.files)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-none shadow-none"
+              disabled={isSubmitting || images.length >= MAX_IMAGES}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <ImagePlus aria-hidden="true" />
+              Add images
+            </Button>
+          </div>
+
+          {previews.length > 0 && (
+            <ul aria-label="Selected images" className="mt-4 grid gap-2 sm:grid-cols-2">
+              {previews.map(({ file, url }, index) => (
+                <li
+                  key={fileKey(file)}
+                  className="flex min-w-0 items-center gap-3 border border-foreground/15 bg-background p-2"
+                >
+                  <div className="size-14 shrink-0 overflow-hidden bg-muted">
+                    {url === null ? (
+                      <span className="flex size-full items-center justify-center text-muted-foreground">
+                        <ImagePlus aria-hidden="true" className="size-5" />
+                      </span>
+                    ) : (
+                      <img
+                        src={url}
+                        alt={`Preview of ${file.name}`}
+                        className="size-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{file.name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-none"
+                    disabled={isSubmitting}
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => removeImage(index)}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {errors.images && (
+            <p id={imagesErrorId} role="alert" className="mt-3 text-sm text-destructive">
+              {errors.images}
+            </p>
+          )}
+        </div>
+
         {submissionError && (
           <p role="alert" className="border-t border-destructive/30 pt-4 text-sm text-destructive">
             {submissionError}
@@ -260,11 +385,40 @@ export function SocietyThreadComposer({
           disabled={isSubmitting}
         >
           <Send aria-hidden="true" />
-          {isSubmitting ? "Publishing…" : "Publish thread"}
+          {isSubmitting
+            ? images.length > 0 ? "Uploading & publishing…" : "Publishing…"
+            : "Publish thread"}
         </Button>
       </div>
     </form>
   );
+}
+
+function useImagePreviews(images: readonly File[]) {
+  const previews = useMemo(
+    () => images.map((file) => ({
+      file,
+      url: typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null,
+    })),
+    [images],
+  );
+
+  useEffect(() => () => {
+    for (const preview of previews) {
+      if (preview.url !== null) URL.revokeObjectURL(preview.url);
+    }
+  }, [previews]);
+
+  return previews;
+}
+
+function fileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function formatFileSize(byteSize: number): string {
+  if (byteSize < 1024 * 1024) return `${Math.max(1, Math.round(byteSize / 1024))} KB`;
+  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function initials(displayName: string): string {

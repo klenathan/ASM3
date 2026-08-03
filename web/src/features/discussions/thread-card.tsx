@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import { cn } from "../../lib/utils";
+import { ThreadMedia } from "../media/thread-media";
 import { timeAgo } from "./use-thread-vote";
 import type { DiscussionItem } from "./types";
 
@@ -17,13 +18,14 @@ export function DiscussionCard({
   onToggleLike,
   showSociety = true,
 }: {
-  readonly item: DiscussionItem
-  readonly onToggleLike?: () => void
-  readonly showSociety?: boolean
+  readonly item: DiscussionItem;
+  readonly onToggleLike?: () => void;
+  readonly showSociety?: boolean;
 }) {
   const navigate = useNavigate();
   const liked = item.myVote === 1;
-  const threadUrl = item.societySlug === null ? null : `/s/${item.societySlug}/t/${item.id}`;
+  const threadUrl =
+    item.societySlug === null ? null : `/s/${item.societySlug}/t/${item.id}`;
   const openThread = () => {
     if (threadUrl !== null) navigate(threadUrl);
   };
@@ -44,11 +46,16 @@ export function DiscussionCard({
       tabIndex={threadUrl === null ? undefined : 0}
       onClick={openThread}
       onKeyDown={(event) => {
-        if (threadUrl === null || (event.key !== "Enter" && event.key !== " ")) return;
+        if (threadUrl === null || (event.key !== "Enter" && event.key !== " "))
+          return;
         event.preventDefault();
         openThread();
       }}
-      className={threadUrl === null ? undefined : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"}
+      className={
+        threadUrl === null
+          ? undefined
+          : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      }
     >
       <CardHeader className="gap-1.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -65,7 +72,10 @@ export function DiscussionCard({
             </>
           )}
           <span>
-            Posted by {author ?? <span className="text-muted-foreground/70">[deleted]</span>}
+            Posted by{" "}
+            {author ?? (
+              <span className="text-muted-foreground/70">[deleted]</span>
+            )}
           </span>
           <span aria-hidden="true">·</span>
           <span>{timeAgo(item.createdAt)}</span>
@@ -76,8 +86,13 @@ export function DiscussionCard({
         <CardTitle className="text-lg font-semibold leading-snug">
           {item.title}
         </CardTitle>
-        {item.body !== null && (
-          <p className="line-clamp-3 leading-7 text-muted-foreground">{item.body}</p>
+        {item.body !== null && item.body.length > 0 && (
+          <p className="line-clamp-3 leading-7 text-muted-foreground">
+            {item.body}
+          </p>
+        )}
+        {item.mediaIds !== undefined && item.mediaIds.length > 0 && (
+          <ThreadMedia mediaIds={item.mediaIds} size="md" />
         )}
       </CardContent>
 
@@ -119,7 +134,11 @@ export function DiscussionCard({
           disabled={threadUrl === null}
           className="inline-flex items-center gap-1 hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground"
         >
-          <MessageCircle aria-hidden="true" className="size-4" strokeWidth={2} />
+          <MessageCircle
+            aria-hidden="true"
+            className="size-4"
+            strokeWidth={2}
+          />
           {item.commentCount} comment{item.commentCount === 1 ? "" : "s"}
         </button>
         <span className="inline-flex items-center gap-1">

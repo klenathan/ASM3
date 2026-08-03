@@ -127,19 +127,15 @@ export class MediaService {
     }
   }
 
-  async attachToThread(
-    principal: RequestPrincipal,
-    command: AttachMediaCommand,
-  ): Promise<MediaAttachmentDto> {
-    assertNonEmpty(command.threadId, "MEDIA_ATTACH_INVALID", "A thread id is required");
-    if (command.mediaIds.length === 0 || command.mediaIds.length > 20) {
-      throw new ApplicationError("MEDIA_ATTACH_INVALID", "A thread can contain between 1 and 20 media assets");
-    }
-    if (new Set(command.mediaIds).size !== command.mediaIds.length) {
-      throw new ApplicationError("MEDIA_ATTACH_INVALID", "Media asset ids must be unique");
+  async assertReadyThreadAttachments(
+    ownerId: string,
+    mediaIds: readonly string[],
+  ): Promise<void> {
+    if (mediaIds.length > 20 || new Set(mediaIds).size !== mediaIds.length) {
+      throw new ApplicationError("MEDIA_ATTACH_INVALID", "A thread can contain at most 20 unique media assets");
     }
 
-    const assets = await Promise.all(command.mediaIds.map((mediaId) => this.assetForOwner(principal, mediaId)));
+    const assets = await Promise.all(mediaIds.map((mediaId) => this.assetForOwnerId(ownerId, mediaId)));
     for (const asset of assets) {
       if (asset.status !== "ready") {
         throw new ApplicationError("MEDIA_NOT_READY", "Only ready media assets can be attached");
@@ -148,6 +144,17 @@ export class MediaService {
         throw new ApplicationError("MEDIA_PURPOSE_NOT_ALLOWED", "Only thread attachments can be attached to threads");
       }
     }
+  }
+
+  async attachToThread(
+    principal: RequestPrincipal,
+    command: AttachMediaCommand,
+  ): Promise<MediaAttachmentDto> {
+    assertNonEmpty(command.threadId, "MEDIA_ATTACH_INVALID", "A thread id is required");
+    if (command.mediaIds.length === 0) {
+      throw new ApplicationError("MEDIA_ATTACH_INVALID", "At least one media asset is required");
+    }
+    await this.assertReadyThreadAttachments(principal.userId, command.mediaIds);
 
     await this.attachmentPort.attachMediaToThread({
       threadId: command.threadId,
@@ -161,6 +168,9 @@ export class MediaService {
     const asset = await this.repository.findAsset(mediaId);
     if (asset === null || asset.status === "deleted") {
       throw new ApplicationError("NOT_FOUND", "The media asset was not found");
+    }
+    if (asset.status !== "ready") {
+      throw new ApplicationError("MEDIA_NOT_READY", "The media asset is not ready for delivery");
     }
 
     return {
@@ -177,15 +187,22 @@ export class MediaService {
     return purpose;
   }
 
-  private async assetForOwner(
+  private assetForOwner(
     principal: RequestPrincipal,
+    mediaId: string,
+  ): Promise<MediaAssetRecord> {
+    return this.assetForOwnerId(principal.userId, mediaId);
+  }
+
+  private async assetForOwnerId(
+    ownerId: string,
     mediaId: string,
   ): Promise<MediaAssetRecord> {
     const asset = await this.repository.findAsset(mediaId);
     if (asset === null || asset.status === "deleted") {
       throw new ApplicationError("NOT_FOUND", "The media asset was not found");
     }
-    if (asset.ownerId !== principal.userId) {
+    if (asset.ownerId !== ownerId) {
       throw new ApplicationError("MEDIA_NOT_OWNER", "You do not own this media asset");
     }
     return asset;

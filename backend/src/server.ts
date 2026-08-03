@@ -13,7 +13,7 @@ import { createIdentityModule } from "./modules/identity/index";
 import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
-import { createMediaModule, UnconfiguredMediaStorage } from "./modules/media/index";
+import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
 
 async function main(): Promise<void> {
@@ -25,10 +25,22 @@ async function main(): Promise<void> {
     allowedEmailDomains: config.allowedEmailDomains,
   });
   const societies = createSocietyModule({ database: database.db });
+  const s3Storage = config.awsRegion === null || config.mediaBucket === null
+    ? undefined
+    : new S3MediaStorage({
+        region: config.awsRegion,
+        bucket: config.mediaBucket,
+      });
+  const media = createMediaModule({
+    database: database.db,
+    storage: new RemoteMediaStorage(s3Storage),
+    attachmentPort: new DrizzleThreadAttachmentAdapter(database.db),
+  });
   const discussions = createDiscussionsModule({
     database: database.db,
     membershipRepository: societies.membershipRepository,
     societyRepository: societies.societyRepository,
+    media: media.mediaService,
     profile: {
       findPublicIdentity: async (userId) => {
         const account = await identity.repository.findAccountByUserId(userId);
@@ -65,11 +77,6 @@ async function main(): Promise<void> {
   const moderation = createModerationModule({
     database: database.db,
     societyRepository: societies.societyRepository,
-  });
-  const media = createMediaModule({
-    database: database.db,
-    storage: new UnconfiguredMediaStorage(),
-    attachmentPort: new DrizzleThreadAttachmentAdapter(database.db),
   });
   const app = createApp({
     config,

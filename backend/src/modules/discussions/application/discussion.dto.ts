@@ -52,6 +52,7 @@ export interface UserThreadActivityDto {
   readonly body: string | null;
   readonly score: number;
   readonly commentCount: number;
+  readonly mediaIds: readonly string[];
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly societyId: string;

@@ -82,6 +82,13 @@ export interface CommentPage {
 export interface CreateThreadInput {
   readonly title: string
   readonly body: string
+  readonly mediaIds?: readonly string[]
+}
+
+export interface CreateThreadDraft {
+  readonly title: string
+  readonly body: string
+  readonly images: readonly File[]
 }
 
 export interface SocietyMembership {

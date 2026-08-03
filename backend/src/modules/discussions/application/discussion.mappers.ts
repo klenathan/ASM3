@@ -120,6 +120,7 @@ export function toUserThreadActivityDto(
   society: SocietyRecord,
   identity: ProfileIdentity,
   myVote: -1 | 0 | 1 = 0,
+  media: readonly ThreadMediaRecord[] = [],
 ): UserThreadActivityDto {
   return {
     id: record.id,
@@ -127,6 +128,7 @@ export function toUserThreadActivityDto(
     body: record.body,
     score: record.score,
     commentCount: record.commentCount,
+    mediaIds: media.map((item) => item.mediaId),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     societyId: society.id,

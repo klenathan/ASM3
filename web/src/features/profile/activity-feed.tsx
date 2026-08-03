@@ -94,6 +94,7 @@ export function ActivityFeed({
                 societySlug: thread.societySlug,
                 societyName: thread.societyName,
                 myVote: thread.myVote,
+                mediaIds: thread.mediaIds,
               };
               return (
                 <DiscussionCard

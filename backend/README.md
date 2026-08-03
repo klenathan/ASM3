@@ -24,8 +24,6 @@ Deferred:
 
 - product database tables and migrations
 - Better Auth and email verification
-- S3 media workflows
-- AWS SDK integrations
 - analytics
 
 ## Requirements
@@ -62,7 +60,26 @@ pnpm test:watch   # interactive tests
 pnpm db:generate  # generate migrations from Drizzle schema
 pnpm db:migrate   # apply committed migrations
 pnpm db:studio    # inspect local database
+pnpm db:seed      # seed demo data (idempotent)
 ```
+
+## Seed data
+
+`pnpm db:seed` is idempotent and inserts deterministic demo data:
+
+- a `system_admin` owner, plus 8 login-capable student users
+- 10 societies with rules, and society-scoped memberships (`member`/`moderator`)
+- 26 threads, some with attached images, plus nested comments
+- random-but-deterministic upvotes on threads and comments
+
+Seeded avatars and thread images resolve through the public **picsum.photos** API.
+Their remote URLs remain readable through `RemoteMediaStorage`. When
+`AWS_REGION` and `MEDIA_BUCKET` are configured, new images use the remote bucket:
+`request signed PUT → browser uploads directly to S3 → API verifies metadata →
+thread stores the ready media id`. This works in local development and production.
+
+Every seeded student shares the dev password `SeedPass123!` (change logins via
+the existing auth flow in a real deployment).
 
 No migration exists yet because phase one intentionally contains no product schema.
 
@@ -81,6 +98,8 @@ Copy `.env.example` to `.env` for local development. Never commit `.env`.
 | `DATABASE_URL` | Yes | — | PostgreSQL connection URL |
 | `DATABASE_SSL` | No | `false` | Enable verified TLS for PostgreSQL |
 | `DATABASE_POOL_MAX` | No | `10` | Maximum PostgreSQL pool clients |
+| `AWS_REGION` | Production | — | Region containing the media bucket; configure with `MEDIA_BUCKET` |
+| `MEDIA_BUCKET` | Production | — | S3 bucket receiving direct browser uploads |
 
 Production values are injected through the ECS task definition. ECS sets `DATABASE_SSL=true`; the production image includes AWS's RDS CA bundle through `NODE_EXTRA_CA_CERTS`, so certificate verification remains enabled. Secrets must come from ECS-supported SSM Parameter Store or Secrets Manager references, never image layers or source files.
 

@@ -10,4 +10,5 @@ export interface DiscussionItem {
   readonly societySlug: string | null
   readonly societyName: string | null
   readonly myVote: -1 | 0 | 1
+  readonly mediaIds: readonly string[]
 }

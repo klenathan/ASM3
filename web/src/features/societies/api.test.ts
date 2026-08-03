@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createSocietyThread } from "./api";
+import { createSocietyThread, createSocietyThreadFromDraft } from "./api";
 import type { Thread } from "./types";
 
 const thread: Thread = {
@@ -49,5 +49,91 @@ describe("society posting API", () => {
       title: thread.title,
       body: thread.body,
     });
+  });
+
+  it("uploads selected images to S3, completes them, then attaches them to the thread", async () => {
+    const mediaId = "44444444-4444-4444-8444-444444444444";
+    const upload = {
+      id: mediaId,
+      objectKey: `media/thread_attachment/${mediaId}`,
+      purpose: "thread_attachment",
+      contentType: "image/png",
+      byteSize: 5,
+      checksum: null,
+      status: "pending",
+      createdAt: "2026-08-02T00:00:00.000Z",
+      completedAt: null,
+      deletedAt: null,
+      uploadUrl: "https://bucket.s3.amazonaws.com/signed-upload",
+      uploadUrlExpiresAt: "2026-08-02T00:05:00.000Z",
+    };
+    const ready = { ...upload, status: "ready", completedAt: "2026-08-02T00:00:01.000Z" };
+    const threadWithMedia = { ...thread, mediaIds: [mediaId] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(upload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(ready), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(threadWithMedia), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const image = new File(["image"], "campus.png", { type: "image/png" });
+
+    await expect(createSocietyThreadFromDraft("cloud-club", {
+      title: thread.title,
+      body: thread.body ?? "",
+      images: [image],
+    })).resolves.toEqual(threadWithMedia);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const [uploadUrl, uploadInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(uploadUrl).toBe(upload.uploadUrl);
+    expect(uploadInit).toMatchObject({
+      method: "PUT",
+      body: image,
+      headers: { "Content-Type": "image/png" },
+    });
+    const [, threadInit] = fetchMock.mock.calls[3] as [string, RequestInit];
+    expect(JSON.parse(String(threadInit.body))).toEqual({
+      title: thread.title,
+      body: thread.body,
+      mediaIds: [mediaId],
+    });
+  });
+
+  it("deletes completed uploads when thread creation fails", async () => {
+    const mediaId = "44444444-4444-4444-8444-444444444444";
+    const upload = {
+      id: mediaId,
+      objectKey: `media/thread_attachment/${mediaId}`,
+      purpose: "thread_attachment",
+      contentType: "image/png",
+      byteSize: 5,
+      checksum: null,
+      status: "pending",
+      createdAt: "2026-08-02T00:00:00.000Z",
+      completedAt: null,
+      deletedAt: null,
+      uploadUrl: "https://bucket.s3.amazonaws.com/signed-upload",
+      uploadUrlExpiresAt: "2026-08-02T00:05:00.000Z",
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(upload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...upload, status: "ready" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { code: "CONFLICT", message: "Thread could not be created" },
+      }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createSocietyThreadFromDraft("cloud-club", {
+      title: thread.title,
+      body: thread.body ?? "",
+      images: [new File(["image"], "campus.png", { type: "image/png" })],
+    })).rejects.toMatchObject({ code: "CONFLICT" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    const [cleanupUrl, cleanupInit] = fetchMock.mock.calls[4] as [string, RequestInit];
+    expect(cleanupUrl).toContain(`/api/v1/media/uploads/${mediaId}`);
+    expect(cleanupInit.method).toBe("DELETE");
   });
 });

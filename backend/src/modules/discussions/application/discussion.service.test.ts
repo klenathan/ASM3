@@ -26,6 +26,7 @@ import type {
 import { ThreadService } from "./thread.service";
 import { VoteService } from "./vote.service";
 import type { DiscussionProfilePort } from "./discussion.profile";
+import type { ThreadMediaPort } from "./thread-media.port";
 
 const society: SocietyRecord = {
   id: "society-id",
@@ -58,6 +59,26 @@ describe("discussion services", () => {
     await expect(
       service.createThread(member, society.id, { title: "A thread", body: "Body" }),
     ).resolves.toMatchObject({ authorId: member.userId, status: "published" });
+  });
+
+  it("validates media ownership and readiness before creating a thread", async () => {
+    const repository = new FakeDiscussionRepository();
+    const media: ThreadMediaPort = {
+      assertReadyThreadAttachments: async (ownerId, mediaIds) => {
+        expect(ownerId).toBe(member.userId);
+        expect(mediaIds).toEqual(["media-id"]);
+        throw new Error("media is not ready");
+      },
+    };
+
+    await expect(
+      createThreadService(repository, media).createThread(member, society.id, {
+        title: "Thread with image",
+        body: "Body",
+        mediaIds: ["media-id"],
+      }),
+    ).rejects.toThrow("media is not ready");
+    expect(repository.threads.size).toBe(0);
   });
 
   it("validates same-thread parents, caps depth, and updates comment count", async () => {
@@ -157,16 +178,24 @@ describe("discussion services", () => {
   });
 });
 
-function createThreadService(repository: FakeDiscussionRepository): ThreadService {
+function createThreadService(
+  repository: FakeDiscussionRepository,
+  media: ThreadMediaPort = readyMedia,
+): ThreadService {
   return new ThreadService({
     repository,
     transactions: immediateTransaction(repository),
     clock,
     profile: fakeProfile,
+    media,
     membershipRepository: new FakeMembershipRepository(),
     societyRepository: new FakeSocietyRepository(),
   });
 }
+
+const readyMedia: ThreadMediaPort = {
+  assertReadyThreadAttachments: async () => undefined,
+};
 
 const fakeProfile: DiscussionProfilePort = {
   findPublicIdentity: async () => null,

@@ -32,6 +32,23 @@ const environmentSchema = z.object({
     .string()
     .default(ALLOWED_EMAIL_DOMAINS.join(","))
     .transform((value) => value.split(",").map((domain) => domain.trim().toLowerCase()).filter(Boolean)),
+  AWS_REGION: z.string().trim().min(1).optional(),
+  MEDIA_BUCKET: z.string().trim().min(3).max(63).optional(),
+}).superRefine((value, context) => {
+  if ((value.AWS_REGION === undefined) !== (value.MEDIA_BUCKET === undefined)) {
+    context.addIssue({
+      code: "custom",
+      path: ["MEDIA_BUCKET"],
+      message: "AWS_REGION and MEDIA_BUCKET must be configured together",
+    });
+  }
+  if (value.NODE_ENV === "production" && value.MEDIA_BUCKET === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["MEDIA_BUCKET"],
+      message: "is required in production",
+    });
+  }
 });
 
 export interface AppConfig {
@@ -44,6 +61,8 @@ export interface AppConfig {
   readonly databaseSsl: boolean;
   readonly databasePoolMax: number;
   readonly allowedEmailDomains: readonly string[];
+  readonly awsRegion: string | null;
+  readonly mediaBucket: string | null;
 }
 
 export function loadConfig(
@@ -69,5 +88,7 @@ export function loadConfig(
     databaseSsl: result.data.DATABASE_SSL,
     databasePoolMax: result.data.DATABASE_POOL_MAX,
     allowedEmailDomains: result.data.ALLOWED_EMAIL_DOMAINS,
+    awsRegion: result.data.AWS_REGION ?? null,
+    mediaBucket: result.data.MEDIA_BUCKET ?? null,
   };
 }

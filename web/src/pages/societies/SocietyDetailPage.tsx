@@ -249,6 +249,7 @@ export function SocietyDetailPage() {
                 societySlug: society.slug,
                 societyName: society.name,
                 myVote: thread.myVote,
+                mediaIds: thread.mediaIds,
               };
               return (
                 <DiscussionCard

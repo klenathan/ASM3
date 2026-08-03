@@ -147,6 +147,7 @@ export class FeedService {
     const identity = await this.authorActivity(viewer, authorId);
     const result = await this.repository.listThreadsByAuthor(authorId, normalizePage(page));
     const societyById = await this.societiesFor(result.items);
+    const mediaByThread = await this.mediaByThread(result.items);
     const voteByThread = new Map<string, -1 | 0 | 1>();
     if (viewer !== undefined) {
       const votes = await this.repository.findThreadVotes(
@@ -159,7 +160,13 @@ export class FeedService {
       const society = societyById.get(thread.societyId);
       return society === undefined
         ? []
-        : [toUserThreadActivityDto(thread, society, identity, voteByThread.get(thread.id) ?? 0)];
+        : [toUserThreadActivityDto(
+            thread,
+            society,
+            identity,
+            voteByThread.get(thread.id) ?? 0,
+            mediaByThread.get(thread.id) ?? [],
+          )];
     });
     return {
       items,

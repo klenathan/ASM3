@@ -20,6 +20,7 @@ import {
   type CommentSort,
 } from "../../features/discussions/comment-tree";
 import { MarkdownContent } from "../../features/discussions/markdown-content";
+import { ThreadMedia } from "../../features/media/thread-media";
 import {
   useCommentVote,
   useCreateComment,
@@ -156,6 +157,13 @@ export function ThreadPage() {
                       <MarkdownContent>{thread.body}</MarkdownContent>
                     </div>
                   )}
+                  {thread.mediaIds !== undefined &&
+                    thread.mediaIds.length > 0 && (
+                      <ThreadMedia
+                        mediaIds={thread.mediaIds}
+                        className="mt-7"
+                      />
+                    )}
                   <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-foreground/15 pt-4">
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
                       <MessageCircle aria-hidden="true" className="size-4" />{" "}

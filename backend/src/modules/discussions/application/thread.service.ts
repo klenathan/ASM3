@@ -19,6 +19,7 @@ import type {
 } from "./discussion.dto";
 import { toThreadDto } from "./discussion.mappers";
 import type { DiscussionProfilePort } from "./discussion.profile";
+import type { ThreadMediaPort } from "./thread-media.port";
 import type {
   CreateThreadInput,
   DiscussionRepository,
@@ -34,6 +35,7 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly transactions: TransactionManager<DiscussionRepository>;
   readonly clock: Clock;
   readonly profile: DiscussionProfilePort;
+  readonly media: ThreadMediaPort;
 }
 
 export class ThreadService {
@@ -42,6 +44,7 @@ export class ThreadService {
   private readonly clock: Clock;
   private readonly authorization: DiscussionAuthorizationDependencies;
   private readonly profile: DiscussionProfilePort;
+  private readonly media: ThreadMediaPort;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
@@ -49,6 +52,7 @@ export class ThreadService {
     this.clock = dependencies.clock;
     this.authorization = dependencies;
     this.profile = dependencies.profile;
+    this.media = dependencies.media;
   }
 
   async createThread(
@@ -70,6 +74,7 @@ export class ThreadService {
       updatedAt: now,
     };
     const mediaIds = normalizeMediaIds(command.mediaIds);
+    await this.media.assertReadyThreadAttachments(principal.userId, mediaIds);
 
     const thread = await this.transactions.withTransaction(async (repository) => {
       const created = await repository.createThread(input);
@@ -134,6 +139,9 @@ export class ThreadService {
       ...(command.body === undefined ? {} : { body: normalizeThreadBody(command.body) }),
     };
     const mediaIds = command.mediaIds === undefined ? undefined : normalizeMediaIds(command.mediaIds);
+    if (mediaIds !== undefined) {
+      await this.media.assertReadyThreadAttachments(current.authorId, mediaIds);
+    }
 
     const updated = await this.transactions.withTransaction(async (repository) => {
       const locked = await repository.findThreadForUpdate(threadId);

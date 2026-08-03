@@ -25,6 +25,8 @@ export function createMediaModule(dependencies: MediaModuleDependencies) {
 
 export { MediaService } from "./application/media.service";
 export { UnconfiguredMediaStorage } from "./application/media.storage";
+export { RemoteMediaStorage } from "./infrastructure/remote-media.storage";
+export { S3MediaStorage } from "./infrastructure/s3-media.storage";
 export type { MediaStoragePort } from "./application/media.storage";
 export type { ThreadAttachmentPort } from "./application/media.attachment";
 export { registerMediaRoutes } from "./presentation/media.routes";

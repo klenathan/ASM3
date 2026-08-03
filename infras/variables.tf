@@ -135,3 +135,9 @@ variable "force_destroy_buckets" {
   type        = bool
   default     = false
 }
+
+variable "media_cors_allowed_origins" {
+  description = "Additional browser origins allowed to upload directly to the media bucket."
+  type        = list(string)
+  default     = ["http://localhost:5173"]
+}
