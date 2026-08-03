@@ -101,6 +101,7 @@ async function main(): Promise<void> {
     database: database.db,
     region: config.awsRegion,
     threadEventsQueueUrl: config.threadEventsQueueUrl,
+    accountReader: identity.repository,
     logger,
   });
   audit.start();
@@ -114,6 +115,7 @@ async function main(): Promise<void> {
     moderation,
     platform,
     media,
+    audit,
   });
 
   const server = serve(

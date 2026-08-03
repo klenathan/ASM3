@@ -23,6 +23,8 @@ import type { PlatformRouteDependencies } from "./modules/platform";
 import { registerPlatformRoutes } from "./modules/platform";
 import type { MediaRouteDependencies } from "./modules/media";
 import { registerMediaRoutes } from "./modules/media";
+import type { AuditRouteDependencies } from "./modules/audit";
+import { registerAuditRoutes } from "./modules/audit";
 import type { AppConfig } from "./config/env";
 import {
   OPENAPI_CONFIG,
@@ -46,6 +48,7 @@ interface AppDependencies {
   readonly moderation?: ModerationRouteDependencies;
   readonly platform?: PlatformRouteDependencies;
   readonly media?: MediaRouteDependencies;
+  readonly audit?: AuditRouteDependencies;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -162,6 +165,16 @@ export function createApp(dependencies: AppDependencies) {
       app.use("/api/v1/media/*", principalMiddleware);
     }
     registerMediaRoutes(app, dependencies.media);
+  }
+
+  if (dependencies.audit !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/admin/audit", principalMiddleware);
+    }
+    registerAuditRoutes(app, dependencies.audit);
   }
 
   app.doc(OPENAPI_PATH, OPENAPI_CONFIG);

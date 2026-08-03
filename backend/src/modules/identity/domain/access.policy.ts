@@ -10,7 +10,9 @@ export function assertAccountUsable(account: IdentityAccountRecord, now: Date): 
     account.profile.status === "suspended" &&
     (account.profile.suspendedUntil === null || account.profile.suspendedUntil > now)
   ) {
-    throw new ApplicationError("USER_SUSPENDED", "This account is suspended");
+    throw new ApplicationError("USER_SUSPENDED", "This account is suspended", {
+      suspendedUntil: account.profile.suspendedUntil?.toISOString() ?? null,
+    });
   }
 }
 

@@ -25,13 +25,21 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly requestId?: string
+  readonly details?: Record<string, unknown>
 
-  constructor(status: number, code: string, message: string, requestId?: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    requestId?: string,
+    details?: Record<string, unknown>,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.requestId = requestId
+    this.details = details
   }
 }
 
@@ -61,6 +69,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       error?.code ?? 'REQUEST_FAILED',
       error?.message ?? 'Something went wrong. Try again.',
       error?.requestId,
+      error?.details,
     )
   }
 

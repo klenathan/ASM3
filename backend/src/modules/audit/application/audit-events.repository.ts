@@ -1,3 +1,4 @@
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 import type { AuditEventRecord } from "../domain/audit.event";
 
 export interface RecordAuditEventInput {
@@ -21,4 +22,8 @@ export interface AuditEventRepository {
    * durably processed and may be acknowledged.
    */
   record(input: RecordAuditEventInput): Promise<AuditEventRecord | "duplicate">;
+  /**
+   * Read the durable audit trail, newest first, using cursor pagination.
+   */
+  list(page: PageRequest): Promise<PageResult<AuditEventRecord>>;
 }

@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  History,
   ShieldCheck,
   SlidersHorizontal,
   UserCog,
@@ -11,6 +12,7 @@ export type AdminSectionId =
   | "users"
   | "moderation"
   | "health"
+  | "audit"
   | "config"
   | "analytics";
 
@@ -50,6 +52,14 @@ export const adminSections: AdminSection[] = [
     heading: "System health",
     icon: Activity,
     blurb: "Platform health and connectivity at a glance.",
+    pending: false,
+  },
+  {
+    id: "audit",
+    label: "Audit trail",
+    heading: "Audit & event trail",
+    icon: History,
+    blurb: "Platform events captured from the event pipeline.",
     pending: false,
   },
   {

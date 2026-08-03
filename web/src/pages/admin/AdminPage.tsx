@@ -10,6 +10,7 @@ import { PendingSection } from "../../features/admin/pending-section";
 import { UsersSection } from "../../features/admin/users-section";
 import { ModerationSection } from "../../features/admin/moderation-section";
 import { HealthSection } from "../../features/admin/health-section";
+import { AuditSection } from "../../features/admin/audit-section";
 import { ConfigSection } from "../../features/admin/config-section";
 
 export function AdminPage() {
@@ -20,6 +21,7 @@ export function AdminPage() {
     users: () => <UsersSection />,
     moderation: () => <ModerationSection />,
     health: () => <HealthSection />,
+    audit: () => <AuditSection />,
     config: () => <ConfigSection />,
     analytics: () => <PendingSection section={section} />,
   };

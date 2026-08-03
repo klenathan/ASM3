@@ -1,4 +1,13 @@
 import type { Database } from "../../../db/client";
+import {
+  cursorFor,
+  decodeCursor,
+  encodeCursor,
+  type PageRequest,
+  type PageResult,
+} from "../../../shared/application/pagination";
+import { ApplicationError } from "../../../shared/domain/errors";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { AuditEventRecord } from "../domain/audit.event";
 import type {
   AuditEventRepository,
@@ -6,7 +15,7 @@ import type {
 } from "../application/audit-events.repository";
 import { integrationAuditEvents } from "./audit-events.tables";
 
-type AuditExecutor = Pick<Database, "insert">;
+type AuditExecutor = Pick<Database, "select" | "insert">;
 
 export class DrizzleAuditEventRepository implements AuditEventRepository {
   private readonly executor: AuditExecutor;
@@ -42,6 +51,18 @@ export class DrizzleAuditEventRepository implements AuditEventRepository {
       throw error;
     }
   }
+
+  async list(page: PageRequest): Promise<PageResult<AuditEventRecord>> {
+    const after = page.cursor === undefined ? undefined : auditEventAfter(page.cursor);
+    const where = after === undefined ? undefined : after;
+    const rows = await this.executor
+      .select()
+      .from(integrationAuditEvents)
+      .where(where)
+      .orderBy(desc(integrationAuditEvents.receivedAt), desc(integrationAuditEvents.id))
+      .limit(page.limit + 1);
+    return pageResult(rows, page.limit);
+  }
 }
 
 function toAuditEvent(row: typeof integrationAuditEvents.$inferSelect): AuditEventRecord {
@@ -58,6 +79,41 @@ function toAuditEvent(row: typeof integrationAuditEvents.$inferSelect): AuditEve
     receivedAt: row.receivedAt,
     processingStatus: "processed",
   };
+}
+
+function pageResult(
+  rows: readonly (typeof integrationAuditEvents.$inferSelect)[],
+  limit: number,
+): PageResult<AuditEventRecord> {
+  const items = rows.slice(0, limit).map(toAuditEvent);
+  const last = items.at(-1);
+  const hasMore = rows.length > limit;
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last !== undefined
+      ? encodeCursor(cursorFor(last.receivedAt, last.id))
+      : null,
+  };
+}
+
+function auditEventAfter(encoded: string) {
+  const cursor = decodeCursor(encoded);
+  if (typeof cursor.value !== "string" || !isUuid(cursor.id)) {
+    throw new ApplicationError("INVALID_CURSOR", "The supplied cursor is invalid");
+  }
+  const date = new Date(cursor.value);
+  if (Number.isNaN(date.getTime())) {
+    throw new ApplicationError("INVALID_CURSOR", "The supplied cursor is invalid");
+  }
+  return or(
+    lt(integrationAuditEvents.receivedAt, date),
+    and(eq(integrationAuditEvents.receivedAt, date), lt(integrationAuditEvents.id, cursor.id)),
+  );
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function isUniqueViolation(error: unknown): boolean {

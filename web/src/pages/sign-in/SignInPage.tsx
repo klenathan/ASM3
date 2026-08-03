@@ -56,7 +56,7 @@ export function SignInPage() {
               "UNKNOWN_ERROR",
               "Unable to sign you in right now.",
             );
-      if (nextError.status === 403) {
+      if (nextError.status === 403 && nextError.code !== "USER_SUSPENDED") {
         navigate("/403", { replace: true });
       } else {
         setError(nextError);
@@ -124,9 +124,17 @@ export function SignInPage() {
                   <AlertTitle>
                     {error.code === "AUTH_INVALID_CREDENTIALS"
                       ? "That sign-in did not match."
-                      : "We could not sign you in."}
+                      : error.code === "USER_SUSPENDED"
+                        ? "This account is suspended."
+                        : "We could not sign you in."}
                   </AlertTitle>
-                  <AlertDescription>{error.message}</AlertDescription>
+                  {error.code === "USER_SUSPENDED" ? (
+                    <AlertDescription>
+                      {formatSuspendedUntil(error.details?.suspendedUntil)}
+                    </AlertDescription>
+                  ) : (
+                    <AlertDescription>{error.message}</AlertDescription>
+                  )}
                 </Alert>
               )}
 
@@ -211,4 +219,21 @@ export function SignInPage() {
       </main>
     </div>
   );
+}
+
+function formatSuspendedUntil(value: unknown): string {
+  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+    return "Your account is suspended, and this suspension has no set end date.";
+  }
+  const date = new Date(value);
+  const formatted = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(date);
+  return `Your account is suspended until ${formatted}.`;
 }
