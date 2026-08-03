@@ -85,15 +85,104 @@ describe("MediaService", () => {
       service.assertReadyThreadAttachments(principal.userId, ["foreign-media"]),
     ).rejects.toMatchObject({ code: "MEDIA_NOT_OWNER" });
   });
+
+  it("accepts a ready avatar owned by the caller", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("avatar", asset({
+      id: "avatar",
+      purpose: "avatar",
+      status: "ready",
+    }));
+    const service = createService(repository, new FakeMediaStorage());
+
+    await expect(
+      service.assertAvatarReadyForOwner(principal.userId, "avatar"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects a ready avatar owned by another user", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("avatar", asset({
+      id: "avatar",
+      ownerId: "another-owner",
+      purpose: "avatar",
+      status: "ready",
+    }));
+    const service = createService(repository, new FakeMediaStorage());
+
+    await expect(
+      service.assertAvatarReadyForOwner(principal.userId, "avatar"),
+    ).rejects.toMatchObject({ code: "MEDIA_NOT_OWNER" });
+  });
+
+  it("rejects a non-avatar ready asset as an avatar", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("thread", asset({
+      id: "thread",
+      purpose: "thread_attachment",
+      status: "ready",
+    }));
+    const service = createService(repository, new FakeMediaStorage());
+
+    await expect(
+      service.assertAvatarReadyForOwner(principal.userId, "thread"),
+    ).rejects.toMatchObject({ code: "MEDIA_NOT_READY" });
+  });
+
+  it("rejects a pending avatar", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("avatar", asset({
+      id: "avatar",
+      purpose: "avatar",
+      status: "pending",
+    }));
+    const service = createService(repository, new FakeMediaStorage());
+
+    await expect(
+      service.assertAvatarReadyForOwner(principal.userId, "avatar"),
+    ).rejects.toMatchObject({ code: "MEDIA_NOT_READY" });
+  });
+
+  it("soft-deletes the asset before removing the S3 object", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("media", asset({ id: "media", objectKey: "media/avatar/media" }));
+    const storage = new FakeMediaStorage();
+    const service = createService(repository, storage);
+
+    await service.deleteUpload(principal, "media");
+
+    expect(repository.assets.get("media")?.status).toBe("deleted");
+    expect(storage.deletedKeys).toEqual(["media/avatar/media"]);
+  });
+
+  it("still deletes the asset when S3 cleanup fails", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("media", asset({ id: "media", objectKey: "media/avatar/media" }));
+    const storage = new FakeMediaStorage({ deleteFails: true });
+    const failures: Array<{ key: string }> = [];
+    const service = createService(repository, storage, {
+      onObjectDeleteFailure: (_, key) => failures.push({ key }),
+    });
+
+    await expect(service.deleteUpload(principal, "media")).resolves.toBeUndefined();
+
+    expect(repository.assets.get("media")?.status).toBe("deleted");
+    expect(failures).toEqual([{ key: "media/avatar/media" }]);
+  });
 });
 
-function createService(repository: MediaRepository, storage: MediaStoragePort): MediaService {
+function createService(
+  repository: MediaRepository,
+  storage: MediaStoragePort,
+  overrides: { onObjectDeleteFailure?: (error: unknown, objectKey: string) => void } = {},
+): MediaService {
   return new MediaService({
     repository,
     storage,
     attachmentPort: noAttachments,
     clock: { now: () => now },
     idGenerator: () => "00000000-0000-4000-8000-000000000001",
+    ...overrides,
   });
 }
 
@@ -104,6 +193,12 @@ const noAttachments: ThreadAttachmentPort = {
 class FakeMediaStorage implements MediaStoragePort {
   requested: RequestUploadInput | null = null;
   metadata: StoredObjectMetadata | null = null;
+  deletedKeys: string[] = [];
+  private readonly deleteFails: boolean;
+
+  constructor(options: { deleteFails?: boolean } = {}) {
+    this.deleteFails = options.deleteFails ?? false;
+  }
 
   async requestUpload(input: RequestUploadInput) {
     this.requested = input;
@@ -117,7 +212,10 @@ class FakeMediaStorage implements MediaStoragePort {
     return this.metadata;
   }
 
-  async deleteObject(): Promise<void> {}
+  async deleteObject(objectKey: string): Promise<void> {
+    if (this.deleteFails) throw new Error("s3 delete failed");
+    this.deletedKeys.push(objectKey);
+  }
 
   async getObjectUrl(): Promise<string> {
     return "https://downloads.example.test/signed";

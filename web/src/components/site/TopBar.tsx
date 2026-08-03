@@ -2,7 +2,8 @@ import { Bell, ChevronDown, LogOut, Search, Settings, UserRound, type LucideIcon
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { useMediaUrl } from "../../features/media/use-media-url";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import { LogoMark } from "./LogoMark";
 export function TopBar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const currentAvatar = useMediaUrl(user?.avatarMediaId);
   const menuItems: {
     label: string;
     icon: LucideIcon;
@@ -88,6 +90,11 @@ export function TopBar() {
             >
               <Button variant="ghost">
                 <Avatar className="size-8">
+                  <AvatarImage
+                    data-testid="topbar-avatar-image"
+                    src={currentAvatar.data?.url}
+                    alt="Your avatar"
+                  />
                   <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
                     {initials}
                   </AvatarFallback>

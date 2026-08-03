@@ -30,6 +30,8 @@ export interface MediaServiceDependencies {
   readonly clock?: Clock;
   readonly policy?: MediaPolicy;
   readonly idGenerator?: () => string;
+  /** Best-effort observer invoked when S3 cleanup fails after the DB delete committed. */
+  readonly onObjectDeleteFailure?: (error: unknown, objectKey: string) => void;
 }
 
 export class MediaService {
@@ -39,6 +41,7 @@ export class MediaService {
   private readonly clock: Clock;
   private readonly policy: MediaPolicy;
   private readonly idGenerator: () => string;
+  private readonly onObjectDeleteFailure: (error: unknown, objectKey: string) => void;
 
   constructor(dependencies: MediaServiceDependencies) {
     this.repository = dependencies.repository;
@@ -47,6 +50,7 @@ export class MediaService {
     this.clock = dependencies.clock ?? { now: () => new Date() };
     this.policy = dependencies.policy ?? defaultMediaPolicy;
     this.idGenerator = dependencies.idGenerator ?? randomUUID;
+    this.onObjectDeleteFailure = dependencies.onObjectDeleteFailure ?? (() => undefined);
   }
 
   async requestUpload(
@@ -120,10 +124,15 @@ export class MediaService {
     const asset = await this.assetForOwner(principal, mediaId);
     if (asset.status === "deleted") return;
 
-    await this.storage.deleteObject(asset.objectKey);
     const deleted = await this.repository.deleteAsset(mediaId, this.clock.now());
     if (deleted === null) {
       throw new ApplicationError("NOT_FOUND", "The media asset was not found");
+    }
+
+    try {
+      await this.storage.deleteObject(asset.objectKey);
+    } catch (error) {
+      this.onObjectDeleteFailure(error, asset.objectKey);
     }
   }
 

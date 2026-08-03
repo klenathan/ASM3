@@ -4,8 +4,12 @@ import { Button } from "../../components/ui/button";
 import { Spinner } from "../../components/ui/spinner";
 import { Switch } from "../../components/ui/switch";
 import { useAuth } from "../../features/auth/auth-context";
+import { deleteMediaUpload, uploadAvatar } from "../../features/media/api";
 import { ActivityFeed } from "../../features/profile/activity-feed";
-import { EditProfileDialog } from "../../features/profile/edit-profile-dialog";
+import {
+  EditProfileDialog,
+  type AvatarChangeAction,
+} from "../../features/profile/edit-profile-dialog";
 import { PrivateProfileState } from "../../features/profile/private-state";
 import { ProfileHeader } from "../../features/profile/profile-header";
 import {
@@ -13,10 +17,12 @@ import {
   useUserComments,
   useUserThreads,
 } from "../../features/profile/use-profile";
+import type { UpdateProfileInput } from "../../features/profile/api";
 
 export function ProfilePage() {
   const { user, status, refresh } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
+  const [avatarSubmitting, setAvatarSubmitting] = useState(false);
   const [isPublic, setIsPublic] = useState(user?.isPublic ?? true);
 
   useEffect(() => {
@@ -41,11 +47,32 @@ export function ProfilePage() {
     );
   }
 
-  function handleSave(input: Parameters<typeof update.mutate>[0]) {
-    update.mutate(input, {
-      onSuccess: () => void refresh(),
-    });
-    setEditOpen(false);
+  async function handleSave(
+    input: UpdateProfileInput,
+    avatar: AvatarChangeAction,
+  ) {
+    let uploadedId: string | null = null
+    try {
+      let profileInput = input
+      if (avatar.type === "upload") {
+        setAvatarSubmitting(true)
+        const asset = await uploadAvatar(avatar.file)
+        uploadedId = asset.id
+        profileInput = { ...input, avatarMediaId: asset.id }
+      } else if (avatar.type === "remove") {
+        profileInput = { ...input, avatarMediaId: null }
+      }
+
+      await update.mutateAsync(profileInput)
+      setEditOpen(false)
+      void refresh()
+    } catch {
+      if (uploadedId !== null) {
+        void deleteMediaUpload(uploadedId).catch(() => undefined)
+      }
+    } finally {
+      setAvatarSubmitting(false)
+    }
   }
 
   function handleVisibility(next: boolean) {
@@ -141,8 +168,9 @@ export function ProfilePage() {
         onOpenChange={setEditOpen}
         initialDisplayName={user.displayName}
         initialBio={user.bio}
+        initialAvatarMediaId={user.avatarMediaId}
         onSave={handleSave}
-        isSaving={update.isPending}
+        isSaving={update.isPending || avatarSubmitting}
         error={update.isError ? (update.error?.message ?? null) : null}
       />
     </div>

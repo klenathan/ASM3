@@ -21,6 +21,7 @@ import {
 } from "../../features/discussions/comment-tree";
 import { MarkdownContent } from "../../features/discussions/markdown-content";
 import { ThreadMedia } from "../../features/media/thread-media";
+import { AuthorLink } from "../../features/profile/author-link";
 import {
   useCommentVote,
   useCreateComment,
@@ -91,7 +92,6 @@ export function ThreadPage() {
     );
   }
 
-  const author = thread.authorDisplayName ?? "[deleted]";
   const interactionNotice = !isAuthenticated
     ? "Sign in to join this discussion."
     : !isMember
@@ -134,16 +134,7 @@ export function ThreadPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    {thread.authorDisplayName === null ? (
-                      <span>{author}</span>
-                    ) : (
-                      <Link
-                        to={`/u/${thread.authorId}`}
-                        className="font-semibold text-foreground hover:text-primary"
-                      >
-                        u/{author}
-                      </Link>
-                    )}
+                    <AuthorLink authorId={thread.authorId} />
                     <span>posted {timeAgo(thread.createdAt)}</span>
                     {thread.updatedAt !== thread.createdAt && (
                       <span>edited</span>

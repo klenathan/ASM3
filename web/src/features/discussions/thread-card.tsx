@@ -72,7 +72,6 @@ export function DiscussionCard({
             </>
           )}
           <span>
-            Posted by{" "}
             {author ?? (
               <span className="text-muted-foreground/70">[deleted]</span>
             )}
