@@ -4,6 +4,7 @@ import { ApplicationError } from "../../../shared/domain/errors";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import { assertAccountUsable, assertTargetExists } from "../domain/access.policy";
 import { normalizeBio, normalizeDisplayName } from "../domain/registration.policy";
+import type { AvatarMediaPort } from "./avatar-media.port";
 import type { PublicUserDto, UpdateProfileCommand, UserDto } from "./identity.dto";
 import { toPublicUserDto, toUserDto } from "./identity.mappers";
 import type { IdentityRepository } from "./identity.repository";
@@ -12,17 +13,20 @@ export interface UserServiceDependencies {
   readonly repository: IdentityRepository;
   readonly transactions: TransactionManager<IdentityRepository>;
   readonly clock: Clock;
+  readonly avatarMedia: AvatarMediaPort | undefined;
 }
 
 export class UserService {
   private readonly repository: IdentityRepository;
   private readonly transactions: TransactionManager<IdentityRepository>;
   private readonly clock: Clock;
+  private readonly avatarMedia: AvatarMediaPort | undefined;
 
   constructor(dependencies: UserServiceDependencies) {
     this.repository = dependencies.repository;
     this.transactions = dependencies.transactions;
     this.clock = dependencies.clock;
+    this.avatarMedia = dependencies.avatarMedia;
   }
 
   async getProfile(principal: RequestPrincipal): Promise<UserDto> {
@@ -47,6 +51,17 @@ export class UserService {
 
     if (Object.keys(input).length === 1) {
       return toUserDto(account);
+    }
+
+    if (
+      command.avatarMediaId !== undefined
+      && command.avatarMediaId !== null
+      && this.avatarMedia !== undefined
+    ) {
+      await this.avatarMedia.assertAvatarReadyForOwner(
+        principal.userId,
+        command.avatarMediaId,
+      );
     }
 
     return toUserDto(

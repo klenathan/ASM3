@@ -33,7 +33,6 @@ if [[ -z "$AWS_REGION" ]]; then
   exit 1
 fi
 
-IMAGE_TAG="${1:-${IMAGE_TAG:-latest}}"
 TARGET_PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
 BUILD_TARGET="${BUILD_TARGET:-runtime}"
 
@@ -53,6 +52,17 @@ case "$BUILD_TARGET" in
     ;;
 esac
 
+# The runtime image is always published under the 'latest' tag referenced by the
+# ECS task definition, then the service is force-deployed below. The
+# database-bootstrap target keeps its caller-provided tag so it matches the
+# one-shot task definition instead of the service.
+if [[ "$BUILD_TARGET" == "runtime" ]]; then
+  IMAGE_TAG="latest"
+elif [[ -z "${IMAGE_TAG:-}" ]]; then
+  echo "IMAGE_TAG is required when BUILD_TARGET=database-bootstrap." >&2
+  exit 1
+fi
+
 REPOSITORY_URL="${ECR_REPOSITORY_URL:-$(tofu -chdir="$INFRA_DIR" output -raw backend_ecr_repository_url)}"
 REGISTRY="${REPOSITORY_URL%%/*}"
 IMAGE_URI="$REPOSITORY_URL:$IMAGE_TAG"
@@ -71,3 +81,14 @@ docker buildx build \
   "$BACKEND_DIR"
 
 echo "Pushed $IMAGE_URI"
+
+if [[ "$BUILD_TARGET" == "runtime" ]]; then
+  CLUSTER=$(tofu -chdir="$INFRA_DIR" output -raw ecs_cluster_name)
+  SERVICE=$(tofu -chdir="$INFRA_DIR" output -raw ecs_service_name)
+  aws ecs update-service \
+    --region "$AWS_REGION" \
+    --cluster "$CLUSTER" \
+    --service "$SERVICE" \
+    --force-new-deployment >/dev/null
+  echo "Forced a new task deployment for ECS service $SERVICE"
+fi

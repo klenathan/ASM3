@@ -35,7 +35,7 @@ help:
 		'  make init STATE_BUCKET=<bucket>      Initialize the root remote-state backend.' \
 		'  make plan|apply|destroy|output       Manage the root infrastructure stack.' \
 		'  make deploy-frontend                 Build and publish the React app to Amplify.' \
-		'  make push-backend                    Build/push x86 backend image to ECR.' \
+		'  make push-backend                    Build/push x86 backend image (latest) to ECR and force-deploy ECS.' \
 		'  make migrate-seed                    Run the one-shot ECS migration and seed task.' \
 		'  make validate|fmt                    Validate or format both stacks.' \
 		'  make tofu ARGS="<command>"           Run an authenticated root OpenTofu command.' \
@@ -75,7 +75,7 @@ output:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) output)
 
 push-backend:
-	@IMAGE_TAG="$(BACKEND_IMAGE_TAG)" TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/push-backend-ecr.sh
+	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/push-backend-ecr.sh
 
 migrate-seed:
 	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/run-database-bootstrap.sh

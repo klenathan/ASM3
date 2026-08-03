@@ -8,6 +8,7 @@ import type {
 export interface UpdateProfileInput {
   readonly displayName?: string
   readonly bio?: string | null
+  readonly avatarMediaId?: string | null
   readonly isPublic?: boolean
 }
 

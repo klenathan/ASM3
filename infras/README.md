@@ -64,12 +64,12 @@ The script sources an optional root `.env`, builds `web/`, then creates and star
 an Amplify deployment using a signed archive upload. It sets `VITE_API_URL` to the
 Amplify site origin so API requests use Amplify's `/api/*` rewrite rule.
 
-Build and push the backend runtime image from an authenticated development machine. The image downloads AWS's global RDS CA bundle at build time and keeps PostgreSQL certificate verification enabled; rebuild after AWS publishes a required CA update:
+Build and push the backend runtime image from an authenticated development machine. The image downloads AWS's global RDS CA bundle at build time and keeps PostgreSQL certificate verification enabled; rebuild after AWS publishes a required CA update. The script always publishes under the `latest` tag (which the ECS task definition references) and then force-deploys the ECS service so the running backend picks up the new image immediately:
 
 ```sh
-./scripts/push-backend-ecr.sh latest
+./scripts/push-backend-ecr.sh
 # or
-make push-backend BACKEND_IMAGE_TAG=latest
+make push-backend
 ```
 
 The script uses `linux/amd64` by default because the Learner Lab ECS instance uses
@@ -77,7 +77,7 @@ an x86 `t3.micro`. It cross-builds correctly on Apple Silicon. Override only whe
 deployment infrastructure is ARM-based:
 
 ```sh
-TARGET_PLATFORM=linux/arm64 ./scripts/push-backend-ecr.sh latest
+TARGET_PLATFORM=linux/arm64 ./scripts/push-backend-ecr.sh
 ```
 
 The backend GitHub Actions workflow builds pull requests. Learner Lab blocks

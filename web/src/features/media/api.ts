@@ -27,11 +27,22 @@ export function fetchMediaUrl(mediaId: string): Promise<MediaUrl> {
   return request<MediaUrl>(`/api/v1/media/${encodeURIComponent(mediaId)}/url`)
 }
 
-export async function uploadThreadImage(file: File): Promise<MediaAsset> {
+export function uploadThreadImage(file: File): Promise<MediaAsset> {
+  return uploadMedia("thread_attachment", file)
+}
+
+export function uploadAvatar(file: File): Promise<MediaAsset> {
+  return uploadMedia("avatar", file)
+}
+
+async function uploadMedia(
+  purpose: MediaAsset["purpose"],
+  file: File,
+): Promise<MediaAsset> {
   const upload = await request<MediaUpload>("/api/v1/media/uploads", {
     method: "POST",
     body: JSON.stringify({
-      purpose: "thread_attachment",
+      purpose,
       contentType: file.type,
       byteSize: file.size,
     }),

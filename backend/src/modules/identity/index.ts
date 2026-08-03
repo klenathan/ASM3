@@ -6,6 +6,7 @@ import { AuthService } from "./application/auth.service";
 import { UserService } from "./application/user.service";
 import type { PasswordAdapter } from "./application/password.adapter";
 import type { SessionTokenAdapter } from "./application/session.adapter";
+import type { AvatarMediaPort } from "./application/avatar-media.port";
 import { DrizzleIdentityRepository, DrizzleIdentityTransactionManager } from "./infrastructure/drizzle-identity.repository";
 import { DrizzlePasswordCredentialStore, LocalPasswordAdapter } from "./infrastructure/local-password.adapter";
 import { OpaqueSessionAdapter } from "./infrastructure/opaque-session.adapter";
@@ -16,6 +17,7 @@ export interface IdentityModuleDependencies {
   readonly allowedEmailDomains?: readonly string[];
   readonly passwordAdapter?: PasswordAdapter;
   readonly sessionAdapter?: SessionTokenAdapter;
+  readonly avatarMedia?: AvatarMediaPort;
 }
 
 export function createIdentityModule(dependencies: IdentityModuleDependencies) {
@@ -26,6 +28,7 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
     ?? new LocalPasswordAdapter(new DrizzlePasswordCredentialStore(dependencies.database));
   const sessionAdapter = dependencies.sessionAdapter ?? new OpaqueSessionAdapter();
   const allowedEmailDomains = dependencies.allowedEmailDomains ?? ALLOWED_EMAIL_DOMAINS;
+  const avatarMedia: AvatarMediaPort | undefined = dependencies.avatarMedia;
 
   const authService = new AuthService({
     repository,
@@ -35,7 +38,7 @@ export function createIdentityModule(dependencies: IdentityModuleDependencies) {
     clock,
     allowedEmailDomains,
   });
-  const userService = new UserService({ repository, transactions, clock });
+  const userService = new UserService({ repository, transactions, clock, avatarMedia });
   const adminUserService = new AdminUserService({ repository, transactions, clock });
 
   return {
@@ -57,6 +60,7 @@ export { registerIdentityRoutes } from "./presentation/identity.routes";
 export type { IdentityRouteDependencies } from "./presentation/identity.routes";
 export { sessionPrincipalMiddleware, extractSessionToken } from "./presentation/auth.middleware";
 export type { IdentityRepository } from "./application/identity.repository";
+export type { AvatarMediaPort } from "./application/avatar-media.port";
 export type { PasswordAdapter, PasswordCredentialStore } from "./application/password.adapter";
 export type { SessionTokenAdapter } from "./application/session.adapter";
 export type {

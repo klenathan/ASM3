@@ -127,6 +127,16 @@ export class MediaService {
     }
   }
 
+  async assertAvatarReadyForOwner(ownerId: string, mediaId: string): Promise<void> {
+    const asset = await this.assetForOwnerId(ownerId, mediaId);
+    if (asset.status !== "ready" || asset.purpose !== "avatar") {
+      throw new ApplicationError(
+        "MEDIA_NOT_READY",
+        "The media asset is not ready to use as an avatar",
+      );
+    }
+  }
+
   async assertReadyThreadAttachments(
     ownerId: string,
     mediaIds: readonly string[],

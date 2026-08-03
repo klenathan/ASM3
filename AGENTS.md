@@ -1,5 +1,11 @@
 # RMIT Society — Project Instructions
 
+## Token efficiency & exploration scope
+
+- Prefer the subagent system over the main loop to save tokens: delegate long-running, independent, or read-heavy work (research, exploration, bulk reads) to subagents instead of doing it inline.
+- Keep the main thread thin; hand off tool-heavy or exploratory tasks to subagents and consume only their summarized results.
+- When exploring, stay inside this repository only. Do not explore, search, or read outside this repo (no system-wide scans, no unrelated paths) unless the task explicitly requires it.
+
 ## Product vocabulary
 
 - **Society** means an RMIT community, equivalent to a subreddit.
