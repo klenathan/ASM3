@@ -1,0 +1,65 @@
+/**
+ * Lambda-side contracts. Mirrors the backend module DTOs
+ * (modules/content-analysis/application/content-analysis.dto.ts). The Lambda
+ * bundle is self-contained; it cannot import other backend source.
+ */
+
+export type AnalysisTriggerType =
+  | "thread_created"
+  | "thread_updated"
+  | "report_created"
+  | "reanalysis";
+
+export interface ContentAnalysisRequest {
+  analysisId: string;
+  triggerType: AnalysisTriggerType;
+  policyVersion: string;
+  promptVersion: string;
+  globalPolicy: string;
+  societyRules: Array<{ id: string; title: string; description: string }>;
+  content: {
+    title?: string;
+    body?: string;
+    reportReason?: string;
+    reportDetails?: string;
+    comments: Array<{ id: string; body: string; score: number }>;
+  };
+  images: Array<{
+    bucket: string;
+    key: string;
+    contentType: string;
+    byteSize: number;
+  }>;
+  engagement: {
+    upvotes: number;
+    downvotes: number;
+    netScore: number;
+    visibleCommentCount: number;
+    contextTruncated: boolean;
+  };
+  contextCapturedAt: string;
+}
+
+export type AnalysisDecision = "allow" | "review";
+export type SentimentLabel = "positive" | "neutral" | "negative" | "mixed";
+export type Severity = "low" | "medium" | "high";
+export type FindingSource = "title" | "body" | "image" | "comment";
+
+export interface ContentAnalysisResult {
+  decision: AnalysisDecision;
+  sentiment: { label: SentimentLabel; confidence: number };
+  findings: Array<{
+    category: string;
+    severity: Severity;
+    confidence: number;
+    source: FindingSource;
+    sourceId?: string;
+    evidence: string;
+  }>;
+  summary: string;
+}
+
+/** Invocation payload envelope (event passed by the backend). */
+export interface LambdaEvent {
+  request: ContentAnalysisRequest;
+}

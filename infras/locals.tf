@@ -11,6 +11,12 @@ locals {
     Owner       = var.owner
     ManagedBy   = "OpenTofu"
   }
+
+  # Content-analysis Lambda references. try() keeps these empty strings when
+  # the function is disabled (count = 0), so the backend task can still plan.
+  content_analysis_function  = var.enable_content_analysis_lambda ? try(aws_lambda_function.content_analysis[0].function_name, "") : ""
+  content_analysis_qualifier = var.enable_content_analysis_lambda ? try(aws_lambda_alias.content_analysis[0].name, "") : ""
+  content_analysis_model_id  = var.enable_content_analysis_lambda ? var.content_analysis_bedrock_model_id : ""
 }
 
 data "aws_caller_identity" "current" {}

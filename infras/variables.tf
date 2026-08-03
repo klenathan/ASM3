@@ -147,3 +147,70 @@ variable "media_abandoned_object_days" {
   type        = number
   default     = 30
 }
+
+# ----- Lambda + Bedrock content analysis (Phase 0 gated) --------------------
+variable "enable_content_analysis_lambda" {
+  description = "Deploy the content-analysis Lambda. Keep false until Phase 0 confirms LabRole trust + Bedrock model access in the active lab."
+  type        = bool
+  default     = false
+}
+
+variable "content_analysis_zip_path" {
+  description = "Path to the built Lambda bundle zip (backend/dist-function/content-analysis.zip)."
+  type        = string
+  default     = "../backend/dist-function/content-analysis.zip"
+}
+
+variable "content_analysis_bedrock_model_id" {
+  description = "Multimodal Bedrock model ID used for analysis by the Lambda function."
+  type        = string
+  default     = ""
+}
+
+variable "content_analysis_memory" {
+  description = "Lambda memory in MB for the content-analysis function."
+  type        = number
+  default     = 512
+}
+
+variable "content_analysis_timeout_seconds" {
+  description = "Lambda timeout in seconds; must stay below the SQS visibility timeout."
+  type        = number
+  default     = 55
+}
+
+variable "content_analysis_reserved_concurrency" {
+  description = "Lambda reserved concurrency; keep 1 for demo workloads."
+  type        = number
+  default     = 1
+}
+
+variable "content_analysis_max_model_tokens" {
+  description = "Max output tokens for the Bedrock model."
+  type        = number
+  default     = 2048
+}
+
+variable "content_analysis_max_images" {
+  description = "Max images analyzed per request."
+  type        = number
+  default     = 4
+}
+
+variable "content_analysis_max_image_bytes" {
+  description = "Max bytes for a single analyzed image."
+  type        = number
+  default     = 5242880
+}
+
+variable "content_analysis_max_total_image_bytes" {
+  description = "Max total bytes across all analyzed images."
+  type        = number
+  default     = 10485760
+}
+
+variable "content_analysis_allowed_mime_types" {
+  description = "Comma-separated MIME types the function will accept for images."
+  type        = string
+  default     = "image/jpeg,image/png,image/webp"
+}
