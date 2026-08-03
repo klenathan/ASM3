@@ -141,3 +141,9 @@ variable "media_cors_allowed_origins" {
   type        = list(string)
   default     = ["http://localhost:5173"]
 }
+
+variable "media_abandoned_object_days" {
+  description = "Days after which uncompleted direct uploads (orphaned pending objects) are expired by the S3 lifecycle rule."
+  type        = number
+  default     = 30
+}

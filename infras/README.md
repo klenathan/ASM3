@@ -106,6 +106,37 @@ aws ecs update-service \
 
 Use immutable image tags in repeatable CI deployments rather than `latest`.
 
+### Troubleshoot `voc-cancel-cred` upload failures
+
+An S3 error naming `assumed-role/voclabs/user...` and the
+`voc-cancel-cred` policy means the upload URL was signed with interactive
+Learner Lab credentials that Vocareum has explicitly denied. Bucket policy
+changes cannot override that deny.
+
+1. Start/resume the Learner Lab and wait until AWS access is green.
+2. Refresh local temporary credentials if using AWS CLI deployment scripts.
+3. Restart any local API process after refreshing credentials; existing signed
+   upload URLs retain the cancelled signer and must be requested again.
+4. For the deployed app, apply the current task definition and force a new ECS
+   deployment. The task definition assigns `LabRole` as `task_role_arn`; do not
+   inject `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `AWS_SESSION_TOKEN`
+   into the ECS container.
+
+Confirm the active task definition before retrying:
+
+```sh
+aws ecs describe-task-definition \
+  --task-definition "$(aws ecs describe-services \
+    --cluster "$(tofu output -raw ecs_cluster_name)" \
+    --services "$(tofu output -raw ecs_service_name)" \
+    --query 'services[0].taskDefinition' --output text)" \
+  --query 'taskDefinition.taskRoleArn' --output text
+```
+
+Expected suffix: `role/LabRole`. If access remains denied while the lab is
+active, stop changing bucket policies and contact course/lab support; only
+Vocareum can remove an identity-policy explicit deny.
+
 ## Optional custom domain
 
 The generated API Gateway URL is already HTTPS. For a branded domain, request or import an ACM certificate in the same region as this stack, then set both `api_custom_domain_name` and `api_custom_domain_certificate_arn`. After apply, create a CNAME at your DNS provider using `api_custom_domain_target`, or a Route 53 alias using that target and `api_custom_domain_hosted_zone_id`. API Gateway custom domains support TLS 1.2.

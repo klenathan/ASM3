@@ -5,12 +5,16 @@ import type { MediaService } from "../application/media.service";
 import { createMediaController } from "./media.controller";
 import {
   attachMediaSchema,
+  completeUploadBatchSchema,
   completeUploadSchema,
   errorSchema,
   mediaAssetSchema,
   mediaAttachmentSchema,
+  mediaBatchResultSchema,
+  mediaUploadBatchSchema,
   mediaUploadSchema,
   mediaUrlSchema,
+  requestUploadBatchSchema,
   requestUploadSchema,
 } from "./media.schemas";
 
@@ -43,6 +47,36 @@ const completeUploadRoute = createRoute({
     400: { description: "Upload metadata did not match", content: { "application/json": { schema: errorSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Media asset was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const requestUploadBatchRoute = createRoute({
+  method: "post",
+  path: "/api/v1/media/uploads/batch",
+  tags: ["Media"],
+  summary: "Request direct uploads for a manifest of media files",
+  request: {
+    body: { content: { "application/json": { schema: requestUploadBatchSchema } } },
+  },
+  responses: {
+    201: { description: "One upload instruction per manifest file", content: { "application/json": { schema: mediaUploadBatchSchema } } },
+    400: { description: "Invalid upload manifest", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const completeUploadBatchRoute = createRoute({
+  method: "post",
+  path: "/api/v1/media/uploads/complete-batch",
+  tags: ["Media"],
+  summary: "Verify a batch of direct uploads and mark them ready",
+  request: {
+    body: { content: { "application/json": { schema: completeUploadBatchSchema } } },
+  },
+  responses: {
+    200: { description: "Per-upload verification result", content: { "application/json": { schema: mediaBatchResultSchema } } },
+    400: { description: "Invalid completion batch", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
   },
 });
 
@@ -98,6 +132,8 @@ export function registerMediaRoutes(
   const controller = createMediaController(dependencies);
   app.openapi(requestUploadRoute, (context) => controller.requestUpload(context) as never);
   app.openapi(completeUploadRoute, (context) => controller.completeUpload(context) as never);
+  app.openapi(requestUploadBatchRoute, (context) => controller.requestUploadBatch(context) as never);
+  app.openapi(completeUploadBatchRoute, (context) => controller.completeUploadBatch(context) as never);
   app.openapi(deleteUploadRoute, (context) => controller.deleteUpload(context) as never);
   app.openapi(attachToThreadRoute, (context) => controller.attachToThread(context) as never);
   app.openapi(getMediaUrlRoute, (context) => controller.getMediaUrl(context) as never);

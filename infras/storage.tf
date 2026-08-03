@@ -14,12 +14,30 @@ resource "aws_s3_bucket_public_access_block" "content" {
 
 data "aws_iam_policy_document" "media_public_read" {
   statement {
+    sid       = "AllowPublicMediaRead"
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.media.arn}/*"]
 
     principals {
       type        = "*"
       identifiers = ["*"]
+    }
+  }
+
+  # Learner Lab blocks modifying LabRole. Grant only media-object operations
+  # through the bucket policy, matching the role assigned to ECS tasks.
+  statement {
+    sid = "AllowApplicationMediaManagement"
+    actions = [
+      "s3:DeleteObject",
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+    resources = ["${aws_s3_bucket.media.arn}/media/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [data.aws_iam_role.learner_lab.arn]
     }
   }
 }
@@ -64,6 +82,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "content" {
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
+    }
+  }
+
+  # Remove direct uploads that were never completed (orphaned "pending" objects).
+  # S3 cannot see application state, so any media object older than the configured
+  # window is expired; a browser that abandons an upload leaves an object here that
+  # this rule cleans up automatically.
+  rule {
+    id     = "expire-abandoned-uploads"
+    status = "Enabled"
+
+    filter {
+      prefix = "media/"
+    }
+
+    expiration {
+      days = var.media_abandoned_object_days
     }
   }
 }

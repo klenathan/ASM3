@@ -14,7 +14,6 @@ import type {
   StoredObjectMetadata,
 } from "./media.storage";
 import type { MediaAssetRecord } from "../domain/media";
-
 const principal: RequestPrincipal = { userId: "owner-id", platformRole: "student" };
 const now = new Date("2026-04-01T00:00:00.000Z");
 
@@ -30,7 +29,7 @@ describe("MediaService", () => {
       byteSize: 512,
     });
 
-    expect(storage.requested).toEqual({
+    expect(storage.requestedInputs[0]).toEqual({
       objectKey: `media/thread_attachment/${upload.id}`,
       contentType: "image/png",
       byteSize: 512,
@@ -51,6 +50,119 @@ describe("MediaService", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("requests uploads for a manifest and verifies them in one batch", async () => {
+    const repository = new FakeMediaRepository();
+    const storage = new FakeMediaStorage();
+    const service = createService(repository, storage);
+
+    const uploads = await service.requestUploadBatch(principal, {
+      purpose: "thread_attachment",
+      files: [
+        { contentType: "image/jpeg", byteSize: 240_000 },
+        { contentType: "image/png", byteSize: 510_000 },
+      ],
+    });
+
+    expect(uploads).toHaveLength(2);
+    expect(storage.requestedInputs.map((requested) => requested.contentType)).toEqual([
+      "image/jpeg",
+      "image/png",
+    ]);
+    const [jpegUpload, pngUpload] = [uploads[0]!, uploads[1]!];
+    for (const upload of uploads) {
+      storage.metadataByKey.set(upload.objectKey, {
+        objectKey: upload.objectKey,
+        contentType: upload.contentType,
+        byteSize: upload.byteSize,
+      });
+    }
+
+    const result = await service.completeUploadBatch(principal, {
+      mediaIds: uploads.map((upload) => upload.id),
+    });
+
+    expect(result.items).toEqual([
+      { mediaId: jpegUpload.id, status: "ready" },
+      { mediaId: pngUpload.id, status: "ready" },
+    ]);
+    await expect(
+      service.assertReadyThreadAttachments(principal.userId, uploads.map((upload) => upload.id)),
+    ).resolves.toBeUndefined();
+  });
+
+  it("marks individual batch items failed when their S3 metadata differs", async () => {
+    const repository = new FakeMediaRepository();
+    const storage = new FakeMediaStorage();
+    const service = createService(repository, storage);
+
+    const uploads = await service.requestUploadBatch(principal, {
+      purpose: "thread_attachment",
+      files: [
+        { contentType: "image/jpeg", byteSize: 100 },
+        { contentType: "image/png", byteSize: 200 },
+      ],
+    });
+    const [goodUpload, badUpload] = [uploads[0]!, uploads[1]!];
+    storage.metadataByKey.set(goodUpload.objectKey, {
+      objectKey: goodUpload.objectKey,
+      contentType: "image/jpeg",
+      byteSize: 100,
+    });
+    storage.metadataByKey.set(badUpload.objectKey, {
+      objectKey: badUpload.objectKey,
+      contentType: "image/webp",
+      byteSize: 999,
+    });
+
+    const result = await service.completeUploadBatch(principal, {
+      mediaIds: uploads.map((upload) => upload.id),
+    });
+
+    expect(result.items).toEqual([
+      { mediaId: goodUpload.id, status: "ready" },
+      {
+        mediaId: badUpload.id,
+        status: "failed",
+        code: "MEDIA_METADATA_MISMATCH",
+        message: "Uploaded object metadata does not match the request",
+      },
+    ]);
+    expect(repository.assets.get(badUpload.id)?.status).toBe("failed");
+  });
+
+  it("rejects a manifest that exceeds the batch limit", async () => {
+    const service = createService(new FakeMediaRepository(), new FakeMediaStorage());
+    const files = Array.from({ length: 21 }, () => ({
+      contentType: "image/jpeg",
+      byteSize: 1_024,
+    }));
+
+    await expect(
+      service.requestUploadBatch(principal, { purpose: "thread_attachment", files }),
+    ).rejects.toMatchObject({ code: "MEDIA_BATCH_SIZE_INVALID" });
+  });
+
+  it("does not let a batch completion touch media owned by another user", async () => {
+    const repository = new FakeMediaRepository();
+    repository.assets.set("foreign", asset({
+      id: "foreign",
+      ownerId: "another-owner",
+      status: "uploading",
+    }));
+    const service = createService(repository, new FakeMediaStorage());
+
+    const result = await service.completeUploadBatch(principal, { mediaIds: ["foreign"] });
+
+    expect(result.items).toEqual([
+      {
+        mediaId: "foreign",
+        status: "failed",
+        code: "MEDIA_NOT_OWNER",
+        message: "You do not own this media asset",
+      },
+    ]);
+  });
+
   it("rejects uploaded objects whose S3 metadata differs from the request", async () => {
     const repository = new FakeMediaRepository();
     const storage = new FakeMediaStorage();
@@ -69,7 +181,7 @@ describe("MediaService", () => {
     await expect(service.completeUpload(principal, upload.id)).rejects.toMatchObject({
       code: "MEDIA_METADATA_MISMATCH",
     });
-    expect(repository.assets.get(upload.id)?.status).toBe("pending");
+    expect(repository.assets.get(upload.id)?.status).toBe("failed");
   });
 
   it("rejects attachment references owned by another user", async () => {
@@ -181,9 +293,16 @@ function createService(
     storage,
     attachmentPort: noAttachments,
     clock: { now: () => now },
-    idGenerator: () => "00000000-0000-4000-8000-000000000001",
+    idGenerator: nextTestId,
     ...overrides,
   });
+}
+
+let testIdCounter = 0;
+
+function nextTestId(): string {
+  testIdCounter += 1;
+  return `00000000-0000-4000-8000-${String(testIdCounter).padStart(12, "0")}`;
 }
 
 const noAttachments: ThreadAttachmentPort = {
@@ -191,8 +310,9 @@ const noAttachments: ThreadAttachmentPort = {
 };
 
 class FakeMediaStorage implements MediaStoragePort {
-  requested: RequestUploadInput | null = null;
+  requestedInputs: RequestUploadInput[] = [];
   metadata: StoredObjectMetadata | null = null;
+  metadataByKey: Map<string, StoredObjectMetadata> = new Map();
   deletedKeys: string[] = [];
   private readonly deleteFails: boolean;
 
@@ -201,14 +321,15 @@ class FakeMediaStorage implements MediaStoragePort {
   }
 
   async requestUpload(input: RequestUploadInput) {
-    this.requested = input;
+    this.requestedInputs.push(input);
     return {
-      uploadUrl: "https://uploads.example.test/signed",
+      uploadUrl: `https://uploads.example.test/signed/${input.objectKey}`,
       expiresAt: new Date("2026-04-01T00:05:00.000Z"),
     };
   }
 
-  async headObject(): Promise<StoredObjectMetadata | null> {
+  async headObject(objectKey: string): Promise<StoredObjectMetadata | null> {
+    if (this.metadataByKey.has(objectKey)) return this.metadataByKey.get(objectKey)!;
     return this.metadata;
   }
 
@@ -229,6 +350,12 @@ class FakeMediaRepository implements MediaRepository {
     return this.assets.get(mediaId) ?? null;
   }
 
+  async findAssets(mediaIds: readonly string[]): Promise<MediaAssetRecord[]> {
+    return mediaIds
+      .map((mediaId) => this.assets.get(mediaId))
+      .filter((asset): asset is MediaAssetRecord => asset !== undefined);
+  }
+
   async createAsset(input: CreateMediaAssetInput): Promise<MediaAssetRecord> {
     const created = asset({
       ...input,
@@ -241,12 +368,27 @@ class FakeMediaRepository implements MediaRepository {
     return created;
   }
 
+  async markUploading(mediaIds: readonly string[]): Promise<number> {
+    let count = 0;
+    for (const mediaId of mediaIds) {
+      const current = this.assets.get(mediaId);
+      if (current === undefined || (current.status !== "pending" && current.status !== "failed")) {
+        continue;
+      }
+      this.assets.set(mediaId, asset({ ...current, status: "uploading" }));
+      count += 1;
+    }
+    return count;
+  }
+
   async completeAsset(
     mediaId: string,
     input: CompleteMediaAssetInput,
   ): Promise<MediaAssetRecord | null> {
     const current = this.assets.get(mediaId);
-    if (current === undefined || current.status !== "pending") return null;
+    if (current === undefined || (current.status !== "pending" && current.status !== "uploading")) {
+      return null;
+    }
     const completed = asset({
       ...current,
       status: "ready",
@@ -255,6 +397,16 @@ class FakeMediaRepository implements MediaRepository {
     });
     this.assets.set(mediaId, completed);
     return completed;
+  }
+
+  async markFailed(mediaId: string): Promise<MediaAssetRecord | null> {
+    const current = this.assets.get(mediaId);
+    if (current === undefined || (current.status !== "pending" && current.status !== "uploading")) {
+      return null;
+    }
+    const failed = asset({ ...current, status: "failed" });
+    this.assets.set(mediaId, failed);
+    return failed;
   }
 
   async deleteAsset(mediaId: string, deletedAt: Date): Promise<MediaAssetRecord | null> {

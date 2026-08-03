@@ -4,7 +4,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Ban, MoreHorizontal, Settings2, UserX } from "lucide-react";
+import { Ban, MoreHorizontal, Settings2, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "../../components/ui/badge";
@@ -55,6 +55,7 @@ import {
 
 import { useAuth } from "../auth/auth-context";
 import {
+  activateUser,
   deactivateUser,
   fetchAdminUsers,
   setUserRole,
@@ -91,9 +92,17 @@ function statusBadge(status: AdminUser["status"]) {
     case "active":
       return <Badge variant="secondary">Active</Badge>;
     case "suspended":
-      return <Badge variant="outline" className="text-destructive">Suspended</Badge>;
+      return (
+        <Badge variant="outline" className="text-destructive">
+          Suspended
+        </Badge>
+      );
     case "deactivated":
-      return <Badge variant="outline" className="opacity-60">Deactivated</Badge>;
+      return (
+        <Badge variant="outline" className="opacity-60">
+          Deactivated
+        </Badge>
+      );
   }
 }
 
@@ -149,7 +158,10 @@ function SetRoleDialog({
         </DialogHeader>
         <div className="grid gap-2">
           <Label htmlFor={`role-select-${user.userId}`}>Role</Label>
-          <Select value={role} onValueChange={(value) => setRole(value as PlatformRole)}>
+          <Select
+            value={role}
+            onValueChange={(value) => setRole(value as PlatformRole)}
+          >
             <SelectTrigger id={`role-select-${user.userId}`} className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -195,7 +207,10 @@ function SuspendDialog({
 
   const mutation = useMutation({
     mutationFn: (value: string) =>
-      suspendUser(user.userId, value === "" ? null : new Date(value).toISOString()),
+      suspendUser(
+        user.userId,
+        value === "" ? null : new Date(value).toISOString(),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       toast.success(`${user.displayName} suspended.`);
@@ -218,12 +233,14 @@ function SuspendDialog({
         <DialogHeader>
           <DialogTitle>Suspend {user.displayName}</DialogTitle>
           <DialogDescription>
-            They can’t sign in while suspended. Leave the time blank for an indefinite
-            suspension.
+            They can’t sign in while suspended. Leave the time blank for an
+            indefinite suspension.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">
-          <Label htmlFor={`suspend-until-${user.userId}`}>Suspended until (optional)</Label>
+          <Label htmlFor={`suspend-until-${user.userId}`}>
+            Suspended until (optional)
+          </Label>
           <Input
             id={`suspend-until-${user.userId}`}
             type="datetime-local"
@@ -279,8 +296,8 @@ function DeactivateAlert({
         <AlertDialogHeader>
           <AlertDialogTitle>Deactivate {user.displayName}</AlertDialogTitle>
           <AlertDialogDescription>
-            They lose access to the platform until an admin re-activates them. This can’t be
-            undone from this screen.
+            They lose access to the platform until an admin re-activates them.
+            This can be undone from this screen.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -306,10 +323,63 @@ function DeactivateAlert({
   );
 }
 
+function ActivateAlert({
+  user,
+  open,
+  onOpenChange,
+}: {
+  user: AdminUser;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () => activateUser(user.userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast.success(`${user.displayName} activated.`);
+      onOpenChange(false);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Activate {user.displayName}</AlertDialogTitle>
+          <AlertDialogDescription>
+            They regain access to the platform and can sign in again.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={mutation.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+              mutation.mutate();
+            }}
+          >
+            Activate
+          </AlertDialogAction>
+        </AlertDialogFooter>
+        {mutation.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {mutation.error?.message}
+          </p>
+        )}
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function RowActions({ user, isSelf }: { user: AdminUser; isSelf: boolean }) {
   const [roleOpen, setRoleOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
+  const isDeactivated = user.status === "deactivated";
 
   if (isSelf) {
     return <span className="text-sm text-muted-foreground">—</span>;
@@ -319,7 +389,11 @@ function RowActions({ user, isSelf }: { user: AdminUser; isSelf: boolean }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${user.displayName}`}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Actions for ${user.displayName}`}
+          >
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -333,15 +407,38 @@ function RowActions({ user, isSelf }: { user: AdminUser; isSelf: boolean }) {
             Suspend
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setDeactivateOpen(true)}>
-            <UserX className="size-4" />
-            Deactivate
-          </DropdownMenuItem>
+          {isDeactivated ? (
+            <DropdownMenuItem onSelect={() => setActivateOpen(true)}>
+              <UserCheck className="size-4" />
+              Activate
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setDeactivateOpen(true)}
+            >
+              <UserX className="size-4" />
+              Deactivate
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <SetRoleDialog user={user} open={roleOpen} onOpenChange={setRoleOpen} />
-      <SuspendDialog user={user} open={suspendOpen} onOpenChange={setSuspendOpen} />
-      <DeactivateAlert user={user} open={deactivateOpen} onOpenChange={setDeactivateOpen} />
+      <SuspendDialog
+        user={user}
+        open={suspendOpen}
+        onOpenChange={setSuspendOpen}
+      />
+      <DeactivateAlert
+        user={user}
+        open={deactivateOpen}
+        onOpenChange={setDeactivateOpen}
+      />
+      <ActivateAlert
+        user={user}
+        open={activateOpen}
+        onOpenChange={setActivateOpen}
+      />
     </>
   );
 }
@@ -369,8 +466,12 @@ function UsersTable({
           <TableRow key={user.userId}>
             <TableCell>
               <div className="flex flex-col">
-                <span className="font-medium text-foreground">{user.displayName}</span>
-                <span className="text-xs text-muted-foreground">{user.email}</span>
+                <span className="font-medium text-foreground">
+                  {user.displayName}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {user.email}
+                </span>
               </div>
             </TableCell>
             <TableCell>{roleBadge(user.platformRole)}</TableCell>
@@ -446,7 +547,10 @@ export function UsersSection() {
         {query.isPending && (
           <div className="space-y-4">
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center gap-4 py-3">
+              <div
+                key={i}
+                className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center gap-4 py-3"
+              >
                 <Skeleton className="h-9" />
                 <Skeleton className="h-5 w-20" />
                 <Skeleton className="h-5 w-20" />
@@ -474,7 +578,9 @@ export function UsersSection() {
         )}
 
         {query.isSuccess && users.length === 0 && (
-          <p className="py-8 leading-7 text-muted-foreground">No users match that filter.</p>
+          <p className="py-8 leading-7 text-muted-foreground">
+            No users match that filter.
+          </p>
         )}
 
         {query.isSuccess && users.length > 0 && (

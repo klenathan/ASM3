@@ -180,6 +180,20 @@ const deactivateUserRoute = createRoute({
   },
 });
 
+const activateUserRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/users/{userId}/activate",
+  tags: ["Identity administration"],
+  summary: "Activate (unban) a deactivated user account",
+  request: { params: userIdParams },
+  responses: {
+    200: { description: "Activated user", content: { "application/json": { schema: userSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "User was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
 const setRoleRoute = createRoute({
   method: "patch",
   path: "/api/v1/admin/users/{userId}/role",
@@ -237,6 +251,7 @@ export function registerIdentityRoutes(
     app.openapi(listUsersRoute, (context) => adminController.list(context) as never);
     app.openapi(suspendUserRoute, (context) => adminController.suspend(context) as never);
     app.openapi(deactivateUserRoute, (context) => adminController.deactivate(context) as never);
+    app.openapi(activateUserRoute, (context) => adminController.activate(context) as never);
     app.openapi(setRoleRoute, (context) => adminController.setRole(context) as never);
   }
 }

@@ -31,7 +31,7 @@ export const mediaAssets = pgTable(
     check("media_assets_byte_size_positive_check", sql`${table.byteSize} > 0`),
     check(
       "media_assets_status_check",
-      sql`${table.status} in ('pending', 'ready', 'quarantined', 'deleted')`,
+      sql`${table.status} in ('pending', 'uploading', 'ready', 'quarantined', 'failed', 'deleted')`,
     ),
   ],
 );

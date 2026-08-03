@@ -2,7 +2,13 @@ export const MEDIA_PURPOSES = ["thread_attachment", "avatar"] as const;
 
 export type MediaPurpose = (typeof MEDIA_PURPOSES)[number];
 
-export type MediaAssetStatus = "pending" | "ready" | "quarantined" | "deleted";
+export type MediaAssetStatus =
+  | "pending"
+  | "uploading"
+  | "ready"
+  | "quarantined"
+  | "failed"
+  | "deleted";
 
 export interface MediaPurposePolicy {
   readonly allowedMimeTypes: readonly string[];
@@ -43,5 +49,5 @@ export function isMediaPurpose(value: string): value is MediaPurpose {
 }
 
 export function isMediaAssetStatus(value: string): value is MediaAssetStatus {
-  return ["pending", "ready", "quarantined", "deleted"].includes(value);
+  return ["pending", "uploading", "ready", "quarantined", "failed", "deleted"].includes(value);
 }

@@ -19,7 +19,7 @@ export const mediaAssetSchema = z
     contentType: z.string(),
     byteSize: z.number().int().positive(),
     checksum: z.string().nullable(),
-    status: z.enum(["pending", "ready", "quarantined", "deleted"]),
+    status: z.enum(["pending", "uploading", "ready", "quarantined", "failed", "deleted"]),
     createdAt: z.string().datetime(),
     completedAt: z.string().datetime().nullable(),
     deletedAt: z.string().datetime().nullable(),
@@ -33,6 +33,12 @@ export const mediaUploadSchema = mediaAssetSchema
   })
   .openapi("MediaUpload");
 
+export const mediaUploadBatchSchema = z
+  .object({
+    uploads: z.array(mediaUploadSchema).min(1).max(20),
+  })
+  .openapi("MediaUploadBatch");
+
 export const requestUploadSchema = z
   .object({
     purpose: z.enum(["thread_attachment", "avatar"]),
@@ -41,9 +47,43 @@ export const requestUploadSchema = z
   })
   .openapi("RequestMediaUpload");
 
+export const requestUploadBatchSchema = z
+  .object({
+    purpose: z.enum(["thread_attachment", "avatar"]),
+    files: z
+      .array(
+        z.object({
+          contentType: z.string().min(1).max(100),
+          byteSize: z.number().int().positive(),
+        }),
+      )
+      .min(1)
+      .max(20),
+  })
+  .openapi("RequestMediaUploadBatch");
+
 export const completeUploadSchema = z
   .object({ checksum: z.string().min(1).max(128).optional() })
   .openapi("CompleteMediaUpload");
+
+export const completeUploadBatchSchema = z
+  .object({
+    mediaIds: z.array(z.string().uuid()).min(1).max(20),
+  })
+  .openapi("CompleteMediaUploadBatch");
+
+export const mediaBatchResultSchema = z
+  .object({
+    items: z.array(
+      z.object({
+        mediaId: z.string().uuid(),
+        status: z.enum(["ready", "failed"]),
+        code: z.string().optional(),
+        message: z.string().optional(),
+      }),
+    ),
+  })
+  .openapi("MediaBatchResult");
 
 export const attachMediaSchema = z
   .object({

@@ -25,6 +25,8 @@ async function main(): Promise<void> {
   const logger = createLogger(config);
   const database = createDatabase(config, logger);
   const societies = createSocietyModule({ database: database.db });
+  // ECS resolves its LabRole through the AWS SDK credential provider chain.
+  // Never inject temporary Learner Lab user credentials into the task.
   const s3Storage = config.awsRegion === null || config.mediaBucket === null
     ? undefined
     : new S3MediaStorage({

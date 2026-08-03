@@ -58,6 +58,12 @@ export function deactivateUser(userId: string): Promise<AdminUser> {
   });
 }
 
+export function activateUser(userId: string): Promise<AdminUser> {
+  return request<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}/activate`, {
+    method: "POST",
+  });
+}
+
 export function setUserRole(userId: string, platformRole: PlatformRole): Promise<AdminUser> {
   return request<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}/role`, {
     method: "PATCH",

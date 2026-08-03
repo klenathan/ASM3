@@ -17,10 +17,13 @@ export interface CompleteMediaAssetInput {
 
 export interface MediaRepository {
   findAsset(mediaId: string): Promise<MediaAssetRecord | null>;
+  findAssets(mediaIds: readonly string[]): Promise<MediaAssetRecord[]>;
   createAsset(input: CreateMediaAssetInput): Promise<MediaAssetRecord>;
+  markUploading(mediaIds: readonly string[]): Promise<number>;
   completeAsset(
     mediaId: string,
     input: CompleteMediaAssetInput,
   ): Promise<MediaAssetRecord | null>;
+  markFailed(mediaId: string): Promise<MediaAssetRecord | null>;
   deleteAsset(mediaId: string, deletedAt: Date): Promise<MediaAssetRecord | null>;
 }

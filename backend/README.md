@@ -76,7 +76,9 @@ Seeded avatars and thread images resolve through the public **picsum.photos** AP
 Their remote URLs remain readable through `RemoteMediaStorage`. When
 `AWS_REGION` and `MEDIA_BUCKET` are configured, new images use the remote bucket:
 `request signed PUT → browser uploads directly to S3 → API verifies metadata →
-thread stores the ready media id`. This works in local development and production.
+thread stores the ready media id`. Production uses the ECS task's `LabRole`.
+Local development uses the standard AWS SDK credential chain and therefore
+requires an active AWS session with `s3:PutObject` permission.
 
 The seeded system admin (`seed.admin@rmit.edu.au`) and every seeded student
 share the dev password `SeedPass123!` (change logins via the existing auth flow

@@ -91,7 +91,9 @@ export function DiscussionCard({
           </p>
         )}
         {item.mediaIds !== undefined && item.mediaIds.length > 0 && (
-          <ThreadMedia mediaIds={item.mediaIds} size="md" />
+          <div>
+            <ThreadMedia mediaIds={item.mediaIds} size="md" />
+          </div>
         )}
       </CardContent>
 

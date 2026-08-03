@@ -70,6 +70,19 @@ export function createAdminUserController(dependencies: AdminUserControllerDepen
       }
     },
 
+    async activate(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const result = await dependencies.adminUserService.activateUser(
+          principal,
+          context.req.param("userId") ?? "",
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return identityErrorResponse(context, error);
+      }
+    },
+
     async setRole(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);

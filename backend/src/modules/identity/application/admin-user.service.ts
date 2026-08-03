@@ -69,6 +69,19 @@ export class AdminUserService {
     });
   }
 
+  async activateUser(actor: RequestPrincipal, userId: string): Promise<UserDto> {
+    const target = await this.authorize(actor, userId);
+    if (target.user.id === actor.userId) {
+      throw new ApplicationError("SELF_ADMIN_ACTION_FORBIDDEN", "You cannot activate your own account");
+    }
+
+    return this.updateAccess(target, {
+      status: "active",
+      suspendedUntil: null,
+      updatedAt: this.clock.now(),
+    });
+  }
+
   async setRole(
     actor: RequestPrincipal,
     userId: string,

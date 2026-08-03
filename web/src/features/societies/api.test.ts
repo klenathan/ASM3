@@ -67,12 +67,13 @@ describe("society posting API", () => {
       uploadUrl: "https://bucket.s3.amazonaws.com/signed-upload",
       uploadUrlExpiresAt: "2026-08-02T00:05:00.000Z",
     };
-    const ready = { ...upload, status: "ready", completedAt: "2026-08-02T00:00:01.000Z" };
     const threadWithMedia = { ...thread, mediaIds: [mediaId] };
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(upload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ uploads: [upload] }), { status: 201 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(ready), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        items: [{ mediaId, status: "ready" }],
+      }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(threadWithMedia), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
     const image = new File(["image"], "campus.png", { type: "image/png" });
@@ -84,6 +85,12 @@ describe("society posting API", () => {
     })).resolves.toEqual(threadWithMedia);
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
+    const [manifestUrl, manifestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(manifestUrl).toContain("/api/v1/media/uploads/batch");
+    expect(JSON.parse(String(manifestInit.body))).toEqual({
+      purpose: "thread_attachment",
+      files: [{ contentType: "image/png", byteSize: 5 }],
+    });
     const [uploadUrl, uploadInit] = fetchMock.mock.calls[1] as [string, RequestInit];
     expect(uploadUrl).toBe(upload.uploadUrl);
     expect(uploadInit).toMatchObject({
@@ -91,6 +98,9 @@ describe("society posting API", () => {
       body: image,
       headers: { "Content-Type": "image/png" },
     });
+    const [completeUrl, completeInit] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(completeUrl).toContain("/api/v1/media/uploads/complete-batch");
+    expect(JSON.parse(String(completeInit.body))).toEqual({ mediaIds: [mediaId] });
     const [, threadInit] = fetchMock.mock.calls[3] as [string, RequestInit];
     expect(JSON.parse(String(threadInit.body))).toEqual({
       title: thread.title,
@@ -116,9 +126,11 @@ describe("society posting API", () => {
       uploadUrlExpiresAt: "2026-08-02T00:05:00.000Z",
     };
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(upload), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ uploads: [upload] }), { status: 201 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ...upload, status: "ready" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        items: [{ mediaId, status: "ready" }],
+      }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         error: { code: "CONFLICT", message: "Thread could not be created" },
       }), { status: 409 }))
@@ -133,6 +145,40 @@ describe("society posting API", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(5);
     const [cleanupUrl, cleanupInit] = fetchMock.mock.calls[4] as [string, RequestInit];
+    expect(cleanupUrl).toContain(`/api/v1/media/uploads/${mediaId}`);
+    expect(cleanupInit.method).toBe("DELETE");
+  });
+
+  it("cleans up and aborts when an image fails to reach S3", async () => {
+    const mediaId = "44444444-4444-4444-8444-444444444444";
+    const upload = {
+      id: mediaId,
+      objectKey: `media/thread_attachment/${mediaId}`,
+      purpose: "thread_attachment",
+      contentType: "image/png",
+      byteSize: 5,
+      checksum: null,
+      status: "pending",
+      createdAt: "2026-08-02T00:00:00.000Z",
+      completedAt: null,
+      deletedAt: null,
+      uploadUrl: "https://bucket.s3.amazonaws.com/signed-upload",
+      uploadUrlExpiresAt: "2026-08-02T00:05:00.000Z",
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ uploads: [upload] }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createSocietyThreadFromDraft("cloud-club", {
+      title: thread.title,
+      body: thread.body ?? "",
+      images: [new File(["image"], "campus.png", { type: "image/png" })],
+    })).rejects.toMatchObject({ code: "MEDIA_UPLOAD_FAILED" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const [cleanupUrl, cleanupInit] = fetchMock.mock.calls[2] as [string, RequestInit];
     expect(cleanupUrl).toContain(`/api/v1/media/uploads/${mediaId}`);
     expect(cleanupInit.method).toBe("DELETE");
   });

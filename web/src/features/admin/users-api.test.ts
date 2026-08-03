@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  activateUser,
   deactivateUser,
   fetchAdminUsers,
   setUserRole,
@@ -106,6 +107,22 @@ describe("admin users API", () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain(`/api/v1/admin/users/${user.userId}/deactivate`);
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("activates a user with no body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ...user, status: "active" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(activateUser(user.userId)).resolves.toMatchObject({
+      status: "active",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/v1/admin/users/${user.userId}/activate`);
     expect(init.method).toBe("POST");
     expect(init.body).toBeUndefined();
   });

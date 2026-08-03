@@ -114,7 +114,7 @@ export function SocietyDetailPage() {
                   <AvatarImage
                     src={avatarUrl.data.url}
                     alt={`${society.name} profile picture`}
-                    className="rounded-md"
+                    className="rounded-full"
                   />
                 ) : null}
                 <AvatarFallback className="text-lg">

@@ -27,12 +27,12 @@ function SocietyRow({ society }: { readonly society: MySociety }) {
         className="group flex items-center gap-3 rounded-none py-2 pr-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={`Open ${society.name}`}
       >
-        <Avatar className="!size-8 shrink-0 rounded-md">
+        <Avatar className="!size-8 shrink-0">
           {avatarUrl.data ? (
             <AvatarImage
               src={avatarUrl.data.url}
               alt={`${society.name} profile picture`}
-              className="rounded-md"
+              className=""
             />
           ) : null}
           <AvatarFallback className="text-xs">

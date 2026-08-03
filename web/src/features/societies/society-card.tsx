@@ -42,10 +42,10 @@ export function SocietyCard({ society }: SocietyCardProps) {
               <AvatarImage
                 src={avatarUrl.data.url}
                 alt={`${society.name} profile picture`}
-                className="rounded-md"
+                className="rounded-full"
               />
             ) : null}
-            <AvatarFallback className="rounded-full">
+            <AvatarFallback className="">
               {slugLabel(society.slug)}
             </AvatarFallback>
           </Avatar>

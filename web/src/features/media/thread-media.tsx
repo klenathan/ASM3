@@ -106,7 +106,7 @@ export function ThreadMedia({
         <DialogOverlay className="bg-black/80" />
         <DialogContent
           showCloseButton={false}
-          className="max-w-none gap-0 overflow-hidden rounded-none border-0 bg-black p-0 ring-0 sm:max-w-none"
+          className="max-w-none h-full gap-0 overflow-hidden rounded-none border-0 bg-black/10 p-0 ring-0 sm:max-w-none"
         >
           <div className="relative flex size-full min-h-[80vh] items-center justify-center">
             <Carousel setApi={setLightboxApi} className="w-full">
@@ -194,7 +194,10 @@ function ThreadImage({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       data-state={url ? "done" : loading ? "processing" : "error"}
       className={cn(
         "relative flex cursor-zoom-in items-center justify-center overflow-hidden rounded-sm border border-foreground/20 bg-muted text-muted-foreground transition-transform hover:brightness-95 [&_svg]:size-5",

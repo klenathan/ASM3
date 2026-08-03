@@ -57,7 +57,57 @@ describe("AdminUserService.listUsers", () => {
   });
 });
 
-function account(userId: string, platformRole: "student" | "system_admin"): IdentityAccountRecord {
+describe("AdminUserService.activateUser", () => {
+  it("re-activates a deactivated user as a system admin", async () => {
+    const repository = new FakeIdentityRepository();
+    repository.add(account("u1", "student", "deactivated"));
+    repository.add(account(admin.userId, "system_admin"));
+    const service = new AdminUserService({
+      repository,
+      transactions: immediateTransaction(repository),
+      clock,
+    });
+
+    const result = await service.activateUser(admin, "u1");
+
+    expect(result).toMatchObject({ userId: "u1", status: "active", suspendedUntil: null });
+  });
+
+  it("rejects a non-system-admin actor with ADMIN_REQUIRED", async () => {
+    const repository = new FakeIdentityRepository();
+    repository.add(account("u1", "student", "deactivated"));
+    repository.add(account(student.userId, "student"));
+    const service = new AdminUserService({
+      repository,
+      transactions: immediateTransaction(repository),
+      clock,
+    });
+
+    await expect(service.activateUser(student, "u1")).rejects.toMatchObject({
+      code: "ADMIN_REQUIRED",
+    });
+  });
+
+  it("rejects activating your own account with SELF_ADMIN_ACTION_FORBIDDEN", async () => {
+    const repository = new FakeIdentityRepository();
+    repository.add(account(admin.userId, "system_admin"));
+    const service = new AdminUserService({
+      repository,
+      transactions: immediateTransaction(repository),
+      clock,
+    });
+
+    await expect(service.activateUser(admin, admin.userId)).rejects.toMatchObject({
+      code: "SELF_ADMIN_ACTION_FORBIDDEN",
+    });
+  });
+});
+
+function account(
+  userId: string,
+  platformRole: "student" | "system_admin",
+  status: "active" | "suspended" | "deactivated" = "active",
+): IdentityAccountRecord {
   return {
     user: { id: userId, email: `${userId}@rmit.edu.au`, createdAt: now },
     profile: {
@@ -66,7 +116,7 @@ function account(userId: string, platformRole: "student" | "system_admin"): Iden
       bio: null,
       avatarMediaId: null,
       platformRole,
-      status: "active",
+      status,
       isPublic: true,
       suspendedUntil: null,
       createdAt: now,
@@ -127,8 +177,18 @@ class FakeIdentityRepository implements IdentityRepository {
     throw new Error("Not implemented");
   }
 
-  async updateUserAccess(_userId: string, _input: UpdateUserAccessInput): Promise<UserProfileRecord> {
-    throw new Error("Not implemented");
+  async updateUserAccess(userId: string, input: UpdateUserAccessInput): Promise<UserProfileRecord> {
+    const account = this.accounts.get(userId);
+    if (account === undefined) throw new Error("Not found");
+    const profile: UserProfileRecord = {
+      ...account.profile,
+      updatedAt: input.updatedAt,
+      ...(input.platformRole === undefined ? {} : { platformRole: input.platformRole }),
+      ...(input.status === undefined ? {} : { status: input.status }),
+      ...(input.suspendedUntil === undefined ? {} : { suspendedUntil: input.suspendedUntil }),
+    };
+    this.accounts.set(userId, { ...account, profile });
+    return profile;
   }
 
   async createSession(_input: CreateSessionInput): Promise<AuthSessionRecord> {

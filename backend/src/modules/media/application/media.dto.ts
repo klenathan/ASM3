@@ -6,8 +6,33 @@ export interface RequestUploadCommand {
   readonly byteSize: number;
 }
 
+export interface RequestUploadFile {
+  readonly contentType: string;
+  readonly byteSize: number;
+}
+
+export interface RequestUploadBatchCommand {
+  readonly purpose: string;
+  readonly files: readonly RequestUploadFile[];
+}
+
 export interface CompleteUploadCommand {
   readonly checksum?: string;
+}
+
+export interface CompleteUploadBatchCommand {
+  readonly mediaIds: readonly string[];
+}
+
+export interface MediaBatchResultDto {
+  readonly items: readonly MediaBatchResultItemDto[];
+}
+
+export interface MediaBatchResultItemDto {
+  readonly mediaId: string;
+  readonly status: "ready" | "failed";
+  readonly code?: string;
+  readonly message?: string;
 }
 
 export interface AttachMediaCommand {

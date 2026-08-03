@@ -5,12 +5,17 @@ import { ApplicationError } from "../../../shared/domain/errors";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import type {
   AttachMediaCommand,
+  CompleteUploadBatchCommand,
   CompleteUploadCommand,
   MediaAssetDto,
   MediaAttachmentDto,
+  MediaBatchResultDto,
+  MediaBatchResultItemDto,
   MediaUploadDto,
   MediaUrlDto,
+  RequestUploadBatchCommand,
   RequestUploadCommand,
+  RequestUploadFile,
 } from "./media.dto";
 import type { ThreadAttachmentPort } from "./media.attachment";
 import type { MediaRepository } from "./media.repository";
@@ -21,6 +26,7 @@ import {
   type MediaAssetRecord,
   type MediaPolicy,
   type MediaPurpose,
+  type MediaPurposePolicy,
 } from "../domain/media";
 
 export interface MediaServiceDependencies {
@@ -88,6 +94,112 @@ export class MediaService {
     return toUploadDto(asset, instructions.uploadUrl, instructions.expiresAt);
   }
 
+  async requestUploadBatch(
+    principal: RequestPrincipal,
+    command: RequestUploadBatchCommand,
+  ): Promise<MediaUploadDto[]> {
+    const purpose = this.assertPurpose(command.purpose);
+    const purposePolicy = this.policy[purpose];
+    if (purposePolicy === undefined) {
+      throw new ApplicationError("MEDIA_PURPOSE_NOT_ALLOWED", "The media purpose is not allowed");
+    }
+
+    const files = assertUploadManifest(command.files, purposePolicy);
+
+    return Promise.all(files.map(async (file) => {
+      const contentType = normalizeContentType(file.contentType);
+      const id = this.idGenerator();
+      const objectKey = `media/${purpose}/${id}`;
+      const instructions = await this.storage.requestUpload({
+        objectKey,
+        contentType,
+        byteSize: file.byteSize,
+      });
+      const asset = await this.repository.createAsset({
+        id,
+        ownerId: principal.userId,
+        objectKey,
+        purpose,
+        contentType,
+        byteSize: file.byteSize,
+        createdAt: this.clock.now(),
+      });
+      return toUploadDto(asset, instructions.uploadUrl, instructions.expiresAt);
+    }));
+  }
+
+  async completeUploadBatch(
+    principal: RequestPrincipal,
+    command: CompleteUploadBatchCommand,
+  ): Promise<MediaBatchResultDto> {
+    const mediaIds = assertBatchMediaIds(command.mediaIds);
+    const assets = await this.repository.findAssets(mediaIds);
+    const byId = new Map(assets.map((asset) => [asset.id, asset]));
+
+    const items: MediaBatchResultItemDto[] = [];
+    const candidates: Array<{ mediaId: string; asset: MediaAssetRecord }> = [];
+
+    for (const mediaId of mediaIds) {
+      const asset = byId.get(mediaId);
+      if (asset === undefined || asset.status === "deleted") {
+        items.push(failed(mediaId, "NOT_FOUND", "The media asset was not found"));
+        continue;
+      }
+      if (asset.ownerId !== principal.userId) {
+        items.push(failed(mediaId, "MEDIA_NOT_OWNER", "You do not own this media asset"));
+        continue;
+      }
+      if (asset.status === "ready") {
+        items.push({ mediaId, status: "ready" });
+        continue;
+      }
+      if (asset.status === "quarantined") {
+        items.push(failed(mediaId, "MEDIA_NOT_READY", "The media asset cannot be verified"));
+        continue;
+      }
+      candidates.push({ mediaId, asset });
+    }
+
+    if (candidates.length > 0) {
+      await this.repository.markUploading(candidates.map((candidate) => candidate.mediaId));
+    }
+
+    for (const { mediaId, asset } of candidates) {
+      const metadata = await this.storage.headObject(asset.objectKey);
+      if (metadata === null) {
+        await this.repository.markFailed(mediaId);
+        items.push(failed(mediaId, "MEDIA_OBJECT_NOT_FOUND", "The uploaded object was not found"));
+        continue;
+      }
+
+      let metadatumMatches: boolean;
+      try {
+        this.assertObjectMetadata(asset, metadata, undefined);
+        metadatumMatches = true;
+      } catch {
+        metadatumMatches = false;
+      }
+
+      if (!metadatumMatches) {
+        await this.repository.markFailed(mediaId);
+        items.push(failed(mediaId, "MEDIA_METADATA_MISMATCH", "Uploaded object metadata does not match the request"));
+        continue;
+      }
+
+      const completed = await this.repository.completeAsset(mediaId, {
+        checksum: metadata.checksum ?? null,
+        completedAt: this.clock.now(),
+      });
+      items.push({
+        mediaId,
+        status: completed === null ? "failed" : "ready",
+        ...(completed === null ? { code: "CONFLICT", message: "The media asset could not be completed" } : {}),
+      });
+    }
+
+    return { items };
+  }
+
   async completeUpload(
     principal: RequestPrincipal,
     mediaId: string,
@@ -97,16 +209,21 @@ export class MediaService {
     if (asset.status === "deleted") {
       throw new ApplicationError("NOT_FOUND", "The media asset was not found");
     }
+    if (asset.status === "ready") return toAssetDto(asset);
+    if (asset.status !== "pending" && asset.status !== "uploading") {
+      throw new ApplicationError("MEDIA_NOT_READY", "The media asset cannot be completed");
+    }
 
     const metadata = await this.storage.headObject(asset.objectKey);
     if (metadata === null) {
+      await this.repository.markFailed(mediaId);
       throw new ApplicationError("MEDIA_OBJECT_NOT_FOUND", "The uploaded object was not found");
     }
-    this.assertObjectMetadata(asset, metadata, command.checksum);
-
-    if (asset.status === "ready") return toAssetDto(asset);
-    if (asset.status !== "pending") {
-      throw new ApplicationError("MEDIA_NOT_READY", "The media asset cannot be completed");
+    try {
+      this.assertObjectMetadata(asset, metadata, command.checksum);
+    } catch (error) {
+      await this.repository.markFailed(mediaId);
+      throw error;
     }
 
     const completed = await this.repository.completeAsset(mediaId, {
@@ -253,6 +370,50 @@ function assertByteSize(byteSize: number, maxBytes: number): void {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || byteSize > maxBytes) {
     throw new ApplicationError("MEDIA_SIZE_EXCEEDED", "Media byte size exceeds the allowed limit");
   }
+}
+
+function assertUploadManifest(
+  files: readonly RequestUploadFile[],
+  policy: MediaPurposePolicy,
+): RequestUploadFile[] {
+  if (files.length === 0 || files.length > 20) {
+    throw new ApplicationError(
+      "MEDIA_BATCH_SIZE_INVALID",
+      "A manifest must contain between 1 and 20 files",
+    );
+  }
+  return files.map((file) => {
+    const contentType = normalizeContentType(file.contentType);
+    if (!policy.allowedMimeTypes.includes(contentType)) {
+      throw new ApplicationError("MEDIA_TYPE_NOT_ALLOWED", "The media content type is not allowed");
+    }
+    assertByteSize(file.byteSize, policy.maxBytes);
+    return { contentType, byteSize: file.byteSize };
+  });
+}
+
+function assertBatchMediaIds(mediaIds: readonly string[]): string[] {
+  if (mediaIds.length === 0 || mediaIds.length > 20) {
+    throw new ApplicationError(
+      "MEDIA_BATCH_SIZE_INVALID",
+      "A completion batch must contain between 1 and 20 media ids",
+    );
+  }
+  if (new Set(mediaIds).size !== mediaIds.length) {
+    throw new ApplicationError(
+      "MEDIA_BATCH_SIZE_INVALID",
+      "The completion batch contains duplicate media ids",
+    );
+  }
+  return [...mediaIds];
+}
+
+function failed(
+  mediaId: string,
+  code: string,
+  message: string,
+): MediaBatchResultItemDto {
+  return { mediaId, status: "failed", code, message };
 }
 
 function normalizeContentType(contentType: string): string {

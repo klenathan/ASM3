@@ -1,5 +1,5 @@
 import { request } from "../../lib/http";
-import { deleteMediaUpload, uploadThreadImage } from "../media/api";
+import { deleteMediaUpload, uploadThreadImages } from "../media/api";
 import type {
   CreateThreadDraft,
   CreateThreadInput,
@@ -56,12 +56,9 @@ export async function createSocietyThreadFromDraft(
   slug: string,
   draft: CreateThreadDraft,
 ): Promise<Thread> {
-  const uploadedIds: string[] = []
+  let uploadedIds: string[] = []
   try {
-    for (const image of draft.images) {
-      const uploaded = await uploadThreadImage(image)
-      uploadedIds.push(uploaded.id)
-    }
+    uploadedIds = await uploadThreadImages(draft.images)
     return await createSocietyThread(slug, {
       title: draft.title,
       body: draft.body,

@@ -140,7 +140,7 @@ export function ThreadPage() {
                       <span>edited</span>
                     )}
                   </div>
-                  <h1 className="mt-3 text-balance font-heading text-[clamp(2.3rem,7vw,4.75rem)] leading-[0.93] font-semibold tracking-[-0.02em] uppercase">
+                  <h1 className="mt-3 text-balance font-heading text-[clamp(1rem,2vw,3rem)] leading-[0.93] font-semibold tracking-[-0.02em] uppercase">
                     {thread.title}
                   </h1>
                   {thread.body !== null && (
@@ -300,7 +300,7 @@ export function ThreadPage() {
                 variant="outline"
                 className="mt-5 w-full rounded-none"
               >
-                <Link to={`/s/${slug}`}>Visit {society.name}</Link>
+                <Link to={`/s/${slug}`}>Visit S/{society.name}</Link>
               </Button>
               {interactionNotice !== null && (
                 <p className="mt-6 border-t border-foreground/15 pt-4 text-sm leading-6 text-muted-foreground">

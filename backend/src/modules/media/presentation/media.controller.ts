@@ -5,8 +5,10 @@ import { errorResponse } from "../../../shared/presentation/error-response";
 import type { MediaService } from "../application/media.service";
 import type {
   AttachMediaCommand,
+  CompleteUploadBatchCommand,
   CompleteUploadCommand,
   MediaUrlDto,
+  RequestUploadBatchCommand,
   RequestUploadCommand,
 } from "../application/media.dto";
 import { getPrincipal, validated } from "./media.http.helpers";
@@ -29,6 +31,18 @@ export function createMediaController(dependencies: MediaControllerDependencies)
       }
     },
 
+    async requestUploadBatch(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const result = await dependencies.mediaService.requestUploadBatch(
+          getPrincipal(context),
+          validated<RequestUploadBatchCommand>(context, "json"),
+        );
+        return context.json({ uploads: result }, 201);
+      } catch (error) {
+        return errorResponse(context, error);
+      }
+    },
+
     async completeUpload(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const { mediaId } = validated<{ mediaId: string }>(context, "param");
@@ -36,6 +50,18 @@ export function createMediaController(dependencies: MediaControllerDependencies)
           getPrincipal(context),
           mediaId,
           validated<CompleteUploadCommand>(context, "json"),
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return errorResponse(context, error);
+      }
+    },
+
+    async completeUploadBatch(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const result = await dependencies.mediaService.completeUploadBatch(
+          getPrincipal(context),
+          validated<CompleteUploadBatchCommand>(context, "json"),
         );
         return context.json(result, 200);
       } catch (error) {

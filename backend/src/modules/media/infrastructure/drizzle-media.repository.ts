@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import { ApplicationError } from "../../../shared/domain/errors";
@@ -33,6 +33,15 @@ export class DrizzleMediaRepository implements MediaRepository {
     return row === undefined ? null : toMediaAsset(row);
   }
 
+  async findAssets(mediaIds: readonly string[]): Promise<MediaAssetRecord[]> {
+    if (mediaIds.length === 0) return [];
+    const rows = await this.executor
+      .select()
+      .from(mediaAssets)
+      .where(inArray(mediaAssets.id, [...mediaIds]));
+    return rows.map(toMediaAsset);
+  }
+
   async createAsset(input: CreateMediaAssetInput): Promise<MediaAssetRecord> {
     const rows = await this.executor
       .insert(mediaAssets)
@@ -49,6 +58,20 @@ export class DrizzleMediaRepository implements MediaRepository {
     return toMediaAsset(row);
   }
 
+  async markUploading(mediaIds: readonly string[]): Promise<number> {
+    if (mediaIds.length === 0) return 0;
+    const rows = await this.executor
+      .update(mediaAssets)
+      .set({ status: "uploading" })
+      .where(and(
+        inArray(mediaAssets.id, [...mediaIds]),
+        sql`${mediaAssets.status} in ('pending', 'failed')`,
+        isNull(mediaAssets.deletedAt),
+      ))
+      .returning();
+    return rows.length;
+  }
+
   async completeAsset(
     mediaId: string,
     input: CompleteMediaAssetInput,
@@ -58,7 +81,21 @@ export class DrizzleMediaRepository implements MediaRepository {
       .set({ status: "ready", checksum: input.checksum, completedAt: input.completedAt })
       .where(and(
         eq(mediaAssets.id, mediaId),
-        eq(mediaAssets.status, "pending"),
+        sql`${mediaAssets.status} in ('pending', 'uploading')`,
+        isNull(mediaAssets.deletedAt),
+      ))
+      .returning();
+    const row = rows[0];
+    return row === undefined ? null : toMediaAsset(row);
+  }
+
+  async markFailed(mediaId: string): Promise<MediaAssetRecord | null> {
+    const rows = await this.executor
+      .update(mediaAssets)
+      .set({ status: "failed" })
+      .where(and(
+        eq(mediaAssets.id, mediaId),
+        sql`${mediaAssets.status} in ('pending', 'uploading')`,
         isNull(mediaAssets.deletedAt),
       ))
       .returning();
