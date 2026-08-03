@@ -1,7 +1,14 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, lt, or } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import type { TransactionManager } from "../../../shared/application/transaction";
+import {
+  cursorFor,
+  decodeCursor,
+  encodeCursor,
+  type PageRequest,
+  type PageResult,
+} from "../../../shared/application/pagination";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type {
   AuthSessionRecord,
@@ -15,6 +22,7 @@ import type {
   CreateAuthUserInput,
   CreateSessionInput,
   CreateUserProfileInput,
+  FindUsersFilter,
   IdentityRepository,
   UpdateUserAccessInput,
   UpdateUserProfileInput,

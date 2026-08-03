@@ -18,3 +18,4 @@ export {
   societyMemberships,
   societyRules,
 } from "../modules/societies/infrastructure/society.tables";
+export { platformConfig } from "../modules/platform/infrastructure/platform.tables";

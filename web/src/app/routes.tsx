@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
+import { AdminGuard } from "./AdminGuard";
 import { ProtectedLayout } from "./ProtectedLayout";
 import { HomeRoute } from "../pages/home/HomeRoute";
+import { AdminPage } from "../pages/admin/AdminPage";
 import { RegisterPage } from "../pages/register/RegisterPage";
 import { SignInPage } from "../pages/sign-in/SignInPage";
 import { ForumPage } from "../pages/forum/ForumPage";
@@ -24,6 +26,7 @@ export function AppRoutes() {
           <Route path="s/:slug/t/:id" element={<ThreadPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
           <Route path="u/:sid" element={<UserProfilePage />} />
         </Route>
       </Route>

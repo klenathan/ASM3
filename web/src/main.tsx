@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes'
 import { BrowserRouter } from 'react-router-dom'
 
 import App from './App.tsx'
+import { Toaster } from './components/ui/sonner.tsx'
 import { TooltipProvider } from './components/ui/tooltip.tsx'
 import './index.css'
 
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <TooltipProvider>
             <App />
+            <Toaster />
           </TooltipProvider>
         </BrowserRouter>
       </QueryClientProvider>

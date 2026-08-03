@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut, Search, Settings, UserRound, type LucideIcon } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Search, Settings, Shield, UserRound, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
@@ -20,6 +20,11 @@ export function TopBar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const currentAvatar = useMediaUrl(user?.avatarMediaId);
+  const adminItem: {
+    label: string;
+    icon: LucideIcon;
+    onClick?: () => void;
+  } = { label: "Admin", icon: Shield, onClick: () => navigate("/admin") };
   const menuItems: {
     label: string;
     icon: LucideIcon;
@@ -27,6 +32,7 @@ export function TopBar() {
   }[] = [
     { label: "Profile", icon: UserRound, onClick: () => navigate("/profile") },
     { label: "Settings", icon: Settings, onClick: () => navigate("/settings") },
+    ...(user?.platformRole === "system_admin" ? [adminItem] : []),
   ];
   const initials = (user?.displayName ?? "?")
     .split(" ")

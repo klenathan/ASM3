@@ -6,6 +6,7 @@ import type {
   UserProfileRecord,
   UserStatus,
 } from "../domain/identity.types";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 
 export interface CreateAuthUserInput {
   readonly id: string;
@@ -40,10 +41,16 @@ export interface CreateSessionInput {
   readonly expiresAt: Date;
 }
 
+export interface FindUsersFilter {
+  readonly search?: string;
+  readonly status?: UserStatus;
+}
+
 export interface IdentityRepository {
   findUserByEmail(email: string): Promise<AuthUserRecord | null>;
   findAccountByUserId(userId: string): Promise<IdentityAccountRecord | null>;
   findAccountsByUserIds(userIds: readonly string[]): Promise<readonly IdentityAccountRecord[]>;
+  findUsers(page: PageRequest, filter?: FindUsersFilter): Promise<PageResult<IdentityAccountRecord>>;
   createUser(input: CreateAuthUserInput): Promise<AuthUserRecord>;
   createProfile(input: CreateUserProfileInput): Promise<UserProfileRecord>;
   updateProfile(userId: string, input: UpdateUserProfileInput): Promise<UserProfileRecord>;
