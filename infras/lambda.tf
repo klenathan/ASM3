@@ -44,7 +44,7 @@ resource "aws_lambda_function" "content_analysis" {
 
   environment {
     variables = {
-      AWS_REGION                    = var.aws_region
+      # AWS_REGION is injected by Lambda runtime and is reserved by AWS.
       OPENROUTER_BASE_URL           = "https://openrouter.ai/api/v1"
       OPENROUTER_MODEL              = var.content_analysis_openrouter_model
       OPENROUTER_API_KEY_SECRET_ARN = aws_secretsmanager_secret.openrouter_api_key[0].arn
