@@ -57,6 +57,8 @@ export interface DiscussionRepository {
     authorId: string,
     page: PageRequest,
   ): Promise<PageResult<ThreadRecord>>;
+  /** List published threads across all societies, newest first. */
+  listAllThreads(page: PageRequest): Promise<PageResult<ThreadRecord>>;
   findThreadsByIds(ids: readonly string[]): Promise<readonly ThreadRecord[]>;
   listThreadMediaBatch(threadIds: readonly string[]): Promise<readonly ThreadMediaRecord[]>;
   findThreadVotes(

@@ -131,6 +131,33 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     };
   }
 
+  async listAllThreads(
+    page: PageRequest,
+  ): Promise<PageResult<ThreadRecord>> {
+    const after = page.cursor === undefined ? undefined : threadAfter(page.cursor);
+    const statusFilter = eq(threads.status, "published");
+    const where = after === undefined
+      ? statusFilter
+      : and(statusFilter, after);
+    const rows = await this.executor
+      .select()
+      .from(threads)
+      .where(where)
+      .orderBy(desc(threads.createdAt), desc(threads.id))
+      .limit(page.limit + 1);
+    const items = rows.slice(0, page.limit).map(toThread);
+    const last = items.at(-1);
+    const hasMore = rows.length > page.limit;
+
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last !== undefined
+        ? encodeCursor(cursorFor(last.createdAt, last.id))
+        : null,
+    };
+  }
+
   async findThreadsByIds(ids: readonly string[]): Promise<readonly ThreadRecord[]> {
     if (ids.length === 0) return [];
     const rows = await this.executor

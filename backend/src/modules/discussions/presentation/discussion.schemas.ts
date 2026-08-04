@@ -42,6 +42,21 @@ export const threadPageSchema = z
   })
   .openapi("ThreadPage");
 
+export const analysisQueueThreadSchema = threadSchema
+  .extend({
+    societySlug: z.string(),
+    societyName: z.string(),
+  })
+  .openapi("AnalysisQueueThread");
+
+export const analysisQueuePageSchema = z
+  .object({
+    items: z.array(analysisQueueThreadSchema),
+    nextCursor: z.string().nullable(),
+    hasMore: z.boolean(),
+  })
+  .openapi("AnalysisQueuePage");
+
 export const homeFeedThreadSchema = z
   .object({
     id: z.string().uuid(),
@@ -202,3 +217,11 @@ export const discussionPageQuerySchema = z
     cursor: z.string().min(1).optional(),
   })
   .openapi("DiscussionPageQuery");
+
+export const analysisQueueQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().min(1).optional(),
+    status: z.enum(["all", "none", "review"]).optional(),
+  })
+  .openapi("AnalysisQueueQuery");

@@ -22,6 +22,20 @@ export interface ThreadDto {
 
 export type ThreadPageDto = PageResult<ThreadDto>;
 
+export type AnalysisQueueFilter = "all" | "none" | "review";
+
+/**
+ * Thread surfaced in the content-analysis review queue (moderator/admin).
+ * Carries the additional society identity needed to deep-link from the
+ * admin-wide view.
+ */
+export interface AnalysisQueueThreadDto extends ThreadDto {
+  readonly societySlug: string;
+  readonly societyName: string;
+}
+
+export type AnalysisQueuePageDto = PageResult<AnalysisQueueThreadDto>;
+
 export interface HomeFeedThreadDto extends ThreadDto {
   readonly societySlug: string;
   readonly societyName: string;

@@ -9,6 +9,7 @@ import { PendingSection } from "../../features/admin/pending-section";
 
 import { UsersSection } from "../../features/admin/users-section";
 import { ModerationSection } from "../../features/admin/moderation-section";
+import { ContentReviewSection } from "../../features/admin/content-review-section";
 import { HealthSection } from "../../features/admin/health-section";
 import { AuditSection } from "../../features/admin/audit-section";
 import { ConfigSection } from "../../features/admin/config-section";
@@ -20,6 +21,7 @@ export function AdminPage() {
   const sectionContent: Record<AdminSectionId, () => React.ReactNode> = {
     users: () => <UsersSection />,
     moderation: () => <ModerationSection />,
+    content: () => <ContentReviewSection />,
     health: () => <HealthSection />,
     audit: () => <AuditSection />,
     config: () => <ConfigSection />,

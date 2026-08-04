@@ -43,6 +43,10 @@ interface PageQuery {
   readonly cursor?: string;
 }
 
+interface AnalysisQueueQuery extends PageQuery {
+  readonly status?: "all" | "none" | "review";
+}
+
 interface PublicUserIdParams {
   readonly userId: string;
 }
@@ -68,6 +72,36 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
         const result = await dependencies.feedService.listHomeFeed(
           requireInjectedPrincipal(context),
           pageFrom(validated<PageQuery>(context, "query")),
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async listSocietyAnalysisQueue(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { societySlug } = validated<SocietyPathParams>(context, "param");
+        const query = validated<AnalysisQueueQuery>(context, "query");
+        const result = await dependencies.feedService.listSocietyAnalysisQueue(
+          requireInjectedPrincipal(context),
+          societySlug,
+          pageFrom(query),
+          query.status,
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async listGlobalAnalysisQueue(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const query = validated<AnalysisQueueQuery>(context, "query");
+        const result = await dependencies.feedService.listGlobalAnalysisQueue(
+          requireInjectedPrincipal(context),
+          pageFrom(query),
+          query.status,
         );
         return context.json(result, 200);
       } catch (error) {
