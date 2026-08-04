@@ -9,6 +9,9 @@ OpenTofu provisions a low-cost demo environment in AWS:
 - Secrets Manager injects `DATABASE_URL`; ECR stores backend images.
 - Optional content analysis runs in AWS Lambda and calls the configured DeepSeek
   model through OpenRouter over HTTPS. Its API key is read from Secrets Manager.
+- Moderator-triggered re-analysis is accepted by the API, placed on a dedicated
+  SQS queue, and processed by a long-polling worker in the existing ECS backend
+  task before it invokes Lambda.
 - CloudWatch keeps application logs for 7 days and SSM provides shell access without SSH.
 - An ad hoc ECS task applies committed migrations and idempotently seeds initial data before the API service starts.
 

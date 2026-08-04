@@ -12,7 +12,7 @@
 #
 # Lambda stays OUTSIDE the VPC (no NAT, no VPC endpoints) and never connects
 # to RDS. It only reads approved S3 objects and calls the OpenRouter HTTPS API.
-# No SQS event-source mapping; the ECS backend invokes it synchronously.
+# No SQS event-source mapping; the ECS backend API/worker invokes it synchronously.
 # ---------------------------------------------------------------------------
 
 # Lambda execution role. LabRole already grants the ECS task s3:GetObject on

@@ -23,6 +23,9 @@ import {
   ContentAnalysisService,
   DrizzleContentAnalysisRepository,
   LambdaContentAnalyzer,
+  ReanalysisWorker,
+  SqsReanalysisJobPublisher,
+  SqsReanalysisMessageSource,
   ThreadAnalysisContextAdapter,
 } from "./modules/content-analysis/index";
 import { systemClock } from "./shared/application/clock";
@@ -59,6 +62,18 @@ async function main(): Promise<void> {
         logger,
       })
     : new NoopThreadEventPublisher();
+  const reanalysisQueueOptions =
+    config.contentAnalysisMode !== "off" &&
+    config.awsRegion !== null &&
+    config.contentAnalysisQueueUrl !== null
+      ? {
+          region: config.awsRegion,
+          queueUrl: config.contentAnalysisQueueUrl,
+        }
+      : undefined;
+  const reanalysisJobPublisher = reanalysisQueueOptions === undefined
+    ? undefined
+    : new SqsReanalysisJobPublisher(reanalysisQueueOptions);
   const identity = createIdentityModule({
     database: database.db,
     allowedEmailDomains: config.allowedEmailDomains,
@@ -85,12 +100,12 @@ async function main(): Promise<void> {
               new Error("Automated content analysis is not configured"),
             )
           : contentAnalysisService.overrideThread(threadId, decision, actorId, reason),
-      reanalyze: (threadId) =>
-        contentAnalysisService === undefined
-          ? Promise.reject(
-              new Error("Automated content analysis is not configured"),
-            )
-          : contentAnalysisService.reanalyzeThread(threadId),
+      ...(reanalysisJobPublisher === undefined
+        ? {}
+        : {
+            reanalyze: (threadId: string) =>
+              reanalysisJobPublisher.enqueueReanalysis(threadId),
+          }),
     },
     profile: {
       findPublicIdentity: async (userId) => {
@@ -168,6 +183,16 @@ async function main(): Promise<void> {
     logger,
     clock: systemClock,
   });
+  let reanalysisWorker: ReanalysisWorker | undefined;
+  if (reanalysisQueueOptions !== undefined) {
+    reanalysisWorker = new ReanalysisWorker({
+      source: new SqsReanalysisMessageSource(reanalysisQueueOptions),
+      runner: contentAnalysisService,
+      logger,
+    });
+    reanalysisWorker.start();
+    logger.info("content-analysis reanalysis worker started");
+  }
   // Recurring scheduler that settles content-analysis runs stuck in a pending
   // state (queued/running) past the stale threshold, e.g. when a previous
   // synchronous Lambda invocation hung or was aborted. Runs not settled by a
@@ -271,6 +296,7 @@ async function main(): Promise<void> {
         });
       });
       await audit.stop();
+      await reanalysisWorker?.stop();
       await database.close();
       if (analysisRetryTimer !== undefined) {
         clearInterval(analysisRetryTimer);

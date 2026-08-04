@@ -20,6 +20,7 @@ import {
   threadPageSchema,
   threadSchema,
   threadAnalysisResponseSchema,
+  reanalysisAcceptedSchema,
   updateCommentRequestSchema,
   updateThreadRequestSchema,
   userCommentActivityPageSchema,
@@ -344,7 +345,7 @@ const reanalyzeGlobalAnalysisRoute = createRoute({
   summary: "Re-run automated analysis for a thread as system admin",
   request: { params: threadIdParams },
   responses: {
-    204: { description: "Analysis re-run scheduled/completed" },
+    202: { description: "Analysis re-run queued", content: { "application/json": { schema: reanalysisAcceptedSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
@@ -376,7 +377,7 @@ const reanalyzeSocietyAnalysisRoute = createRoute({
   summary: "Re-run automated analysis for a thread as society moderator",
   request: { params: societySlugAndThreadParams },
   responses: {
-    204: { description: "Analysis re-run scheduled/completed" },
+    202: { description: "Analysis re-run queued", content: { "application/json": { schema: reanalysisAcceptedSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
     403: { description: "Society moderator access is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Thread or society was not found", content: { "application/json": { schema: errorSchema } } },

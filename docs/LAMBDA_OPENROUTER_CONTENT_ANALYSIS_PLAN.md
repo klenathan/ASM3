@@ -6,7 +6,7 @@ AWS region: `us-east-1`
 
 ## 1. Objective
 
-Use an on-demand AWS Lambda function and the OpenRouter API to evaluate thread text and attached images with a configurable DeepSeek model. Analyze reported content with additional context from comments and vote aggregates. Preserve an auditable, asynchronous workflow through the existing `thread-events` Amazon SQS queue.
+Use an on-demand AWS Lambda function and the OpenRouter API to evaluate thread text and attached images with a configurable DeepSeek model. Analyze reported content with additional context from comments and vote aggregates. Preserve an auditable, asynchronous workflow through Amazon SQS. The existing `thread-events` queue remains the thread-event/audit channel; moderator-triggered re-analysis uses the dedicated queue described in [Queued Thread Re-analysis](./SQS_REANALYSIS_GUIDE.md).
 
 Lambda provides short-lived compute only when analysis is requested. OpenRouter provides the external model gateway and the configured DeepSeek model performs text and image analysis. This avoids AWS-hosted model-access requirements, a managed agent runtime, dedicated worker, NAT Gateway, and paid VPC endpoints.
 

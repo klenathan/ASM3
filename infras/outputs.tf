@@ -43,6 +43,16 @@ output "thread_events_dlq_url" {
   value       = aws_sqs_queue.thread_events_dlq.url
 }
 
+output "content_analysis_reanalysis_queue_url" {
+  description = "Standard SQS queue receiving moderator-triggered thread reanalysis jobs."
+  value       = aws_sqs_queue.content_analysis_reanalysis.url
+}
+
+output "content_analysis_reanalysis_dlq_url" {
+  description = "SQS dead-letter queue for repeatedly failing reanalysis jobs."
+  value       = aws_sqs_queue.content_analysis_reanalysis_dlq.url
+}
+
 output "backend_ecr_repository_url" {
   description = "ECR repository URL for the backend image."
   value       = aws_ecr_repository.backend.repository_url

@@ -39,6 +39,19 @@ export type {
 } from "./application/report-analysis-context.port";
 
 export {
+  ReanalysisWorker,
+  type ReanalysisRunner,
+  type ReanalysisWorkerDependencies,
+} from "./application/reanalysis.worker";
+
+export type {
+  ReanalysisJob,
+  ReanalysisJobPublisher,
+  ReanalysisMessage,
+  ReanalysisMessageSource,
+} from "./application/reanalysis-queue.port";
+
+export {
   DrizzleContentAnalysisRepository,
 } from "./infrastructure/drizzle-content-analysis.repository";
 
@@ -59,3 +72,9 @@ export {
   type ThreadAnalysisContextAsset,
   type ThreadAnalysisContextRule,
 } from "./infrastructure/thread-analysis-context";
+
+export {
+  SqsReanalysisJobPublisher,
+  SqsReanalysisMessageSource,
+  type SqsReanalysisQueueOptions,
+} from "./infrastructure/reanalysis.sqs";

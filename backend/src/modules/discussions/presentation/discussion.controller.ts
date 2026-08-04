@@ -147,7 +147,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
           threadId,
           { kind: "reanalyze" },
         );
-        return context.body(null, 204);
+        return context.json({ status: "queued" }, 202);
       } catch (error) {
         return discussionErrorResponse(context, error);
       }
@@ -182,7 +182,7 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
           { kind: "reanalyze" },
           societySlug,
         );
-        return context.body(null, 204);
+        return context.json({ status: "queued" }, 202);
       } catch (error) {
         return discussionErrorResponse(context, error);
       }

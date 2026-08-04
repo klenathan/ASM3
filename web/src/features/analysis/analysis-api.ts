@@ -70,7 +70,7 @@ export function setAnalysisDecision(
   });
 }
 
-/** Re-run automated content analysis for a thread. 204 on success. */
+/** Queue an automated content-analysis re-run for a thread. */
 export function reanalyzeThread(
   params: AnalysisActionScope & { readonly threadId: string },
 ): Promise<void> {
@@ -78,5 +78,5 @@ export function reanalyzeThread(
     params.scope === "admin"
       ? `/api/v1/admin/analysis/${encodeURIComponent(params.threadId)}/reanalyze`
       : `/api/v1/mod/societies/${encodeURIComponent(params.slug)}/analysis/${encodeURIComponent(params.threadId)}/reanalyze`;
-  return request<void>(path, { method: "POST" });
+  return request<{ status: "queued" }>(path, { method: "POST" }).then(() => undefined);
 }

@@ -53,6 +53,14 @@ const environmentSchema = z
         message: "must be an HTTPS SQS queue URL",
       })
       .optional(),
+    CONTENT_ANALYSIS_QUEUE_URL: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => value.startsWith("https://"), {
+        message: "must be an HTTPS SQS queue URL",
+      })
+      .optional(),
     CONTENT_ANALYSIS_MODE: z
       .enum(["off", "shadow", "enforce"])
       .default("off"),
@@ -89,6 +97,17 @@ const environmentSchema = z
           "AWS_REGION is required when THREAD_EVENTS_QUEUE_URL is configured",
       });
     }
+    if (
+      value.CONTENT_ANALYSIS_QUEUE_URL !== undefined &&
+      value.AWS_REGION === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CONTENT_ANALYSIS_QUEUE_URL"],
+        message:
+          "AWS_REGION is required when CONTENT_ANALYSIS_QUEUE_URL is configured",
+      });
+    }
     if (value.NODE_ENV === "production" && value.MEDIA_BUCKET === undefined) {
       context.addIssue({
         code: "custom",
@@ -121,6 +140,16 @@ const environmentSchema = z
           message: "is required when content analysis is enabled",
         });
       }
+      if (
+        value.NODE_ENV === "production" &&
+        value.CONTENT_ANALYSIS_QUEUE_URL === undefined
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["CONTENT_ANALYSIS_QUEUE_URL"],
+          message: "is required when content analysis is enabled",
+        });
+      }
     }
   });
 
@@ -144,6 +173,7 @@ export interface AppConfig {
   readonly awsRegion: string | null;
   readonly mediaBucket: string | null;
   readonly threadEventsQueueUrl: string | null;
+  readonly contentAnalysisQueueUrl: string | null;
   readonly contentAnalysisMode: "off" | "shadow" | "enforce";
   readonly contentAnalysisLambdaFunction: string | null;
   readonly contentAnalysisLambdaQualifier: string;
@@ -185,6 +215,7 @@ export function loadConfig(
     awsRegion: result.data.AWS_REGION ?? null,
     mediaBucket: result.data.MEDIA_BUCKET ?? null,
     threadEventsQueueUrl: result.data.THREAD_EVENTS_QUEUE_URL ?? null,
+    contentAnalysisQueueUrl: result.data.CONTENT_ANALYSIS_QUEUE_URL ?? null,
     contentAnalysisMode: result.data.CONTENT_ANALYSIS_MODE,
     contentAnalysisLambdaFunction:
       result.data.CONTENT_ANALYSIS_LAMBDA_FUNCTION ?? null,

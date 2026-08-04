@@ -98,6 +98,10 @@ export const analysisModerationRequestSchema = z
   })
   .openapi("AnalysisModerationRequest");
 
+export const reanalysisAcceptedSchema = z
+  .object({ status: z.literal("queued") })
+  .openapi("ReanalysisAccepted");
+
 export const homeFeedThreadSchema = z
   .object({
     id: z.string().uuid(),

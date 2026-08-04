@@ -334,10 +334,10 @@ describe("ContentAnalysisService.reanalyzeThread", () => {
     expect(second?.decision).toBe("allow");
 
     expect(repository.created).toHaveLength(2);
-    expect(repository.created[0].runNumber).toBe(1);
-    expect(repository.created[0].triggerType).toBe("thread_created");
-    expect(repository.created[1].runNumber).toBe(2);
-    expect(repository.created[1].triggerType).toBe("reanalysis");
+    expect(repository.created[0]!.runNumber).toBe(1);
+    expect(repository.created[0]!.triggerType).toBe("thread_created");
+    expect(repository.created[1]!.runNumber).toBe(2);
+    expect(repository.created[1]!.triggerType).toBe("reanalysis");
     expect(repository.succeeded).toHaveLength(2);
   });
 
@@ -345,6 +345,21 @@ describe("ContentAnalysisService.reanalyzeThread", () => {
     const { service, repository } = makeService({ mode: "off" });
     expect(await service.reanalyzeThread("t1")).toBeNull();
     expect(repository.created).toHaveLength(0);
+  });
+
+  it("marks the Lambda request as a reanalysis", async () => {
+    let capturedTrigger: string | undefined;
+    const analyzer: ContentAnalyzerPort = {
+      analyze: vi.fn(async (request) => {
+        capturedTrigger = request.triggerType;
+        return successInvocation();
+      }),
+    };
+    const { service } = makeService({ analyzer });
+
+    await service.reanalyzeThread("t1");
+
+    expect(capturedTrigger).toBe("reanalysis");
   });
 });
 
@@ -366,6 +381,6 @@ describe("ContentAnalysisService.overrideThread", () => {
     const { service, repository } = makeService();
     await service.overrideThread("t1", "reject", "admin-1", "   ");
 
-    expect(repository.overrides[0].reason).toBeNull();
+    expect(repository.overrides[0]!.reason).toBeNull();
   });
 });

@@ -161,7 +161,7 @@ export class ContentAnalysisService {
     const startedAt = this.deps.clock.now();
     try {
       const context = await this.deps.threadContext.loadThreadContext(threadId);
-      const request = this.buildThreadRequest(context);
+      const request = this.buildThreadRequest(context, run.triggerType);
       await this.deps.repository.markStarted(run.id, startedAt);
 
       const invocation = await this.deps.analyzer!.analyze(request);
@@ -254,10 +254,10 @@ export class ContentAnalysisService {
       contentType: string;
       byteSize: number;
     }>;
-  }): ContentAnalysisRequest {
+  }, triggerType: ContentAnalysisRun["triggerType"]): ContentAnalysisRequest {
     const request: ContentAnalysisRequest = {
       analysisId: randomUUID(),
-      triggerType: "thread_created",
+      triggerType,
       policyVersion: this.deps.policyVersion,
       promptVersion: this.deps.promptVersion,
       globalPolicy: context.globalPolicy,

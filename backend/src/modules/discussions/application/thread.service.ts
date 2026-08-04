@@ -46,7 +46,7 @@ export interface AnalysisModerationPort {
     actorId: string,
     reason: string | null,
   ): Promise<void>;
-  reanalyze(threadId: string): Promise<unknown>;
+  reanalyze?(threadId: string): Promise<unknown>;
 }
 
 export interface ThreadServiceDependencies extends DiscussionAuthorizationDependencies {
@@ -300,7 +300,7 @@ export class ThreadService {
     );
 
     if (action.kind === "reanalyze") {
-      if (this.analysisModeration === undefined) {
+      if (this.analysisModeration?.reanalyze === undefined) {
         throw new ApplicationError(
           "ANALYSIS_UNAVAILABLE",
           "Automated content analysis is not configured",
