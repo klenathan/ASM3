@@ -18,6 +18,7 @@ import {
   homeFeedPageSchema,
   threadPageSchema,
   threadSchema,
+  threadAnalysisResponseSchema,
   updateCommentRequestSchema,
   updateThreadRequestSchema,
   userCommentActivityPageSchema,
@@ -86,6 +87,20 @@ const getThreadRoute = createRoute({
   responses: {
     200: { description: "Thread", content: { "application/json": { schema: threadSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const threadAnalysisRoute = createRoute({
+  method: "get",
+  path: "/api/v1/threads/{threadId}/analysis",
+  tags: ["Discussions"],
+  summary: "Get full content-analysis details for a thread (moderator/system-admin)",
+  request: { params: threadIdParams },
+  responses: {
+    200: { description: "Thread analysis details (null when none yet)", content: { "application/json": { schema: threadAnalysisResponseSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "Moderator or system-admin access is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });
@@ -311,6 +326,7 @@ export function registerDiscussionRoutes(
   app.openapi(homeFeedRoute, (context) => controller.homeFeed(context) as never);
   app.openapi(createThreadRoute, (context) => controller.createThread(context) as never);
   app.openapi(getThreadRoute, (context) => controller.getThread(context) as never);
+  app.openapi(threadAnalysisRoute, (context) => controller.getThreadAnalysis(context) as never);
   app.openapi(updateThreadRoute, (context) => controller.updateThread(context) as never);
   app.openapi(deleteThreadRoute, (context) => controller.deleteThread(context) as never);
   app.openapi(listCommentsRoute, (context) => controller.listComments(context) as never);

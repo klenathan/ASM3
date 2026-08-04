@@ -8,7 +8,9 @@ import type { RequestPrincipal } from "../../../shared/presentation/request-prin
 import {
   assertMutationAuthority,
   canReadRetained,
+  hasSocietyModeratorAuthority,
   requireActiveMember,
+  requireSociety,
   requireSocietyBySlug,
   type DiscussionAuthorizationDependencies,
 } from "./discussion.authorization";
@@ -22,6 +24,8 @@ import type { DiscussionProfilePort } from "./discussion.profile";
 import type { ThreadEventPublisher } from "./thread-events.port";
 import type { ThreadMediaPort } from "./thread-media.port";
 import type { AnalysisDecisionReader } from "./analysis-decision.reader";
+import type { ThreadAnalysisDetailsReader } from "./analysis-details.reader";
+import type { ThreadAnalysisDetails } from "../../content-analysis";
 import type {
   CreateThreadInput,
   DiscussionRepository,
@@ -45,6 +49,11 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
    */
   readonly analysisDecisionReader?: AnalysisDecisionReader;
   /**
+   * Optional read-only source of the full analysis outcome for a single
+   * thread, surfaced only to privileged moderators/system admins.
+   */
+  readonly threadAnalysisReader?: ThreadAnalysisDetailsReader;
+  /**
    * Optional fire-and-forget hook invoked after a thread is committed and its
    * event published. Used to trigger downstream async work (e.g. content
    * analysis) without blocking thread creation.
@@ -62,6 +71,7 @@ export class ThreadService {
   private readonly events: ThreadEventPublisher;
   private readonly onThreadCreated: ((threadId: string) => void) | undefined;
   private readonly analysisDecisionReader: AnalysisDecisionReader | undefined;
+  private readonly threadAnalysisReader: ThreadAnalysisDetailsReader | undefined;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
@@ -73,6 +83,7 @@ export class ThreadService {
     this.events = dependencies.events;
     this.onThreadCreated = dependencies.onThreadCreated;
     this.analysisDecisionReader = dependencies.analysisDecisionReader;
+    this.threadAnalysisReader = dependencies.threadAnalysisReader;
   }
 
   async createThread(
@@ -212,6 +223,34 @@ export class ThreadService {
     });
 
     return toThreadDto(deleted, await this.repository.listThreadMedia(threadId));
+  }
+
+  /**
+   * Return the full persisted content-analysis outcome for a thread.
+   * Accessible only to system admins or the thread's society moderators.
+   * Returns null when no successful analysis run exists yet.
+   */
+  async getThreadAnalysis(
+    principal: RequestPrincipal,
+    threadId: string,
+  ): Promise<ThreadAnalysisDetails | null> {
+    const thread = await this.threadOrThrow(threadId);
+    await requireSociety(this.authorization, thread.societyId);
+
+    if (
+      !(await hasSocietyModeratorAuthority(
+        this.authorization,
+        principal,
+        thread.societyId,
+      ))
+    ) {
+      throw new ApplicationError(
+        "SOCIETY_FORBIDDEN",
+        "Only a society moderator or system admin can view analysis details",
+      );
+    }
+    if (this.threadAnalysisReader === undefined) return null;
+    return this.threadAnalysisReader.findLatestSucceededAnalysis(threadId);
   }
 
   private async threadOrThrow(threadId: string) {

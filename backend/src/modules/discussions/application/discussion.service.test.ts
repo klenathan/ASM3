@@ -24,6 +24,8 @@ import type {
   ThreadVoteRecord,
 } from "../domain/discussion";
 import { ThreadService } from "./thread.service";
+import type { ThreadAnalysisDetailsReader } from "./analysis-details.reader";
+import type { ThreadAnalysisDetails } from "../../content-analysis";
 import { VoteService } from "./vote.service";
 import type { DiscussionProfilePort } from "./discussion.profile";
 import type { ThreadMediaPort } from "./thread-media.port";
@@ -562,6 +564,91 @@ class FakeSocietyRepository implements SocietyRepository {
   async deleteRule(): Promise<boolean> { return false; }
 }
 
+describe("ThreadService.getThreadAnalysis", () => {
+  const details: ThreadAnalysisDetails = {
+    runId: "run-1",
+    decision: "review",
+    sentiment: null,
+    findings: null,
+    summary: "Flagged for review",
+    rationale: "The title may violate community policy.",
+    modelId: "deepseek/test",
+    promptVersion: "2",
+    completedAt: now.toISOString(),
+  };
+
+  function withReader(repository: FakeDiscussionRepository, reader: ThreadAnalysisDetailsReader): ThreadService {
+    return new ThreadService({
+      repository,
+      transactions: immediateTransaction(repository),
+      clock,
+      profile: fakeProfile,
+      media: readyMedia,
+      events: { publishThreadCreated: async () => undefined },
+      membershipRepository: new FakeMembershipRepository(),
+      societyRepository: new FakeSocietyRepository(),
+      threadAnalysisReader: reader,
+    });
+  }
+
+  it("returns full analysis for a society moderator", async () => {
+    const repository = new FakeDiscussionRepository();
+    const service = createThreadService(repository);
+    const thread = await service.createThread(moderator, society.id, {
+      title: "Moderated",
+      body: "Body",
+    });
+    const reader: ThreadAnalysisDetailsReader = {
+      findLatestSucceededAnalysis: async (id) => (id === thread.id ? details : null),
+    };
+
+    await expect(withReader(repository, reader).getThreadAnalysis(moderator, thread.id))
+      .resolves.toEqual(details);
+  });
+
+  it("allows any system admin across societies", async () => {
+    const systemAdmin: RequestPrincipal = { userId: "admin-id", platformRole: "system_admin" };
+    const repository = new FakeDiscussionRepository();
+    const service = createThreadService(repository);
+    const thread = await service.createThread(moderator, society.id, {
+      title: "Any society",
+      body: "Body",
+    });
+    const reader: ThreadAnalysisDetailsReader = {
+      findLatestSucceededAnalysis: async () => null,
+    };
+
+    await expect(withReader(repository, reader).getThreadAnalysis(systemAdmin, thread.id))
+      .resolves.toBeNull();
+  });
+
+  it("denies a plain member (no mod authority)", async () => {
+    const repository = new FakeDiscussionRepository();
+    const service = createThreadService(repository);
+    const thread = await service.createThread(member, society.id, {
+      title: "Private analysis",
+      body: "Body",
+    });
+    const reader: ThreadAnalysisDetailsReader = {
+      findLatestSucceededAnalysis: async () => details,
+    };
+
+    await expect(withReader(repository, reader).getThreadAnalysis(member, thread.id))
+      .rejects.toMatchObject({ code: "SOCIETY_FORBIDDEN" });
+  });
+
+  it("rejects a thread that does not exist", async () => {
+    const repository = new FakeDiscussionRepository();
+    const reader: ThreadAnalysisDetailsReader = {
+      findLatestSucceededAnalysis: async () => details,
+    };
+
+    await expect(withReader(repository, reader).getThreadAnalysis(moderator, "missing-id"))
+      .rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
 function immediateTransaction<T>(repository: T): TransactionManager<T> {
   return { withTransaction: async (work) => work(repository) };
 }
+

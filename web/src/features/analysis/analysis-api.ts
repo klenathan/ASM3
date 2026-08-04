@@ -1,5 +1,5 @@
 import { request } from "../../lib/http";
-import type { AnalysisQueueFilter, AnalysisQueuePage } from "./types";
+import type { AnalysisQueueFilter, AnalysisQueuePage, ThreadAnalysis } from "./types";
 
 export interface FetchAnalysisQueueParams {
   /** Admin lists globally; moderator is scoped to a society slug. */
@@ -26,4 +26,17 @@ export function fetchAnalysisQueue(
   const query = search.toString();
 
   return request<AnalysisQueuePage>(`${path}${query === "" ? "" : `?${query}`}`);
+}
+
+/**
+ * Full automated content-analysis details for a thread.
+ * Privileged only: system admin or the thread's society moderator.
+ * Resolves to null when no successful analysis run exists yet.
+ */
+export function fetchThreadAnalysis(
+  threadId: string,
+): Promise<ThreadAnalysis | null> {
+  return request<ThreadAnalysis | null>(
+    `/api/v1/threads/${encodeURIComponent(threadId)}/analysis`,
+  );
 }

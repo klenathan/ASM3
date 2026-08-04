@@ -134,6 +134,19 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
       }
     },
 
+    async getThreadAnalysis(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { threadId } = validated<ThreadPathParams>(context, "param");
+        const result = await dependencies.threadService.getThreadAnalysis(
+          requireInjectedPrincipal(context),
+          threadId,
+        );
+        return context.json(result, 200);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
     async updateThread(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);

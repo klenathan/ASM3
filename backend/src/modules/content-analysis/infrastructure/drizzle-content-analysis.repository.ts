@@ -5,6 +5,11 @@ import type {
   RecordRunFailureInput,
   RecordRunResultInput,
 } from "../application/content-analysis.repository";
+import type {
+  ContentAnalysisFinding,
+  SentimentLabel,
+  ThreadAnalysisDetails,
+} from "../application/content-analysis.dto";
 import type { ContentAnalysisRun } from "../domain/content-analysis";
 import { contentAnalysisRuns } from "./content-analysis.tables";
 
@@ -129,6 +134,44 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
     }
     return decisions;
   }
+
+  async findLatestSucceededAnalysis(
+    threadId: string,
+  ): Promise<ThreadAnalysisDetails | null> {
+    const [row] = await this.db
+      .select()
+      .from(contentAnalysisRuns)
+      .where(
+        and(
+          eq(contentAnalysisRuns.threadId, threadId),
+          eq(contentAnalysisRuns.status, "succeeded"),
+          isNotNull(contentAnalysisRuns.decision),
+        ),
+      )
+      .orderBy(desc(contentAnalysisRuns.createdAt))
+      .limit(1);
+    return row === undefined ? null : toAnalysisDetails(row);
+  }
+}
+
+function toAnalysisDetails(row: RunRow): ThreadAnalysisDetails {
+  return {
+    runId: row.id,
+    decision: row.decision as ThreadAnalysisDetails["decision"],
+    sentiment:
+      row.sentimentLabel !== null && row.confidence !== null
+        ? {
+            label: row.sentimentLabel as SentimentLabel,
+            confidence: row.confidence,
+          }
+        : null,
+    findings: row.findings as ContentAnalysisFinding[] | null,
+    summary: row.summary,
+    rationale: row.rationale,
+    modelId: row.modelId,
+    promptVersion: row.promptVersion,
+    completedAt: row.completedAt === null ? null : row.completedAt.toISOString(),
+  };
 }
 
 type RunRow = typeof contentAnalysisRuns.$inferSelect;

@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     media: media.mediaService,
     events: threadEventPublisher,
     analysisDecisionReader: contentAnalysisRepository,
+    threadAnalysisReader: contentAnalysisRepository,
     onThreadCreated: (threadId) => {
       void contentAnalysisService?.analyzeNewThread(threadId);
     },

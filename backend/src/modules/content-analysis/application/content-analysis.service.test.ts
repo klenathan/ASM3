@@ -5,7 +5,10 @@ import type { Logger } from "pino";
 import type { Clock } from "../../../shared/application/clock";
 import { ContentAnalysisService } from "./content-analysis.service";
 import type { ContentAnalyzerPort } from "./content-analyzer.port";
-import type { AnalysisInvocationResult } from "./content-analysis.dto";
+import type {
+  AnalysisInvocationResult,
+  ThreadAnalysisDetails,
+} from "./content-analysis.dto";
 import type {
   ContentAnalysisRepository,
   RecordRunFailureInput,
@@ -80,6 +83,9 @@ class StubRepository implements ContentAnalysisRepository {
     }
     void threadIds;
     return map;
+  }
+  async findLatestSucceededAnalysis(): Promise<ThreadAnalysisDetails | null> {
+    return null;
   }
 }
 

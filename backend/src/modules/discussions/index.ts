@@ -13,6 +13,7 @@ import { DrizzleDiscussionRepository, DrizzleDiscussionTransactionManager } from
 import type { MembershipRepository, SocietyRepository } from "../societies/index";
 
 import type { AnalysisDecisionReader } from "./application/analysis-decision.reader";
+import type { ThreadAnalysisDetailsReader } from "./application/analysis-details.reader";
 
 export interface DiscussionsModuleDependencies {
   readonly database: Database;
@@ -24,6 +25,7 @@ export interface DiscussionsModuleDependencies {
   readonly clock?: Clock;
   readonly onThreadCreated?: (threadId: string) => void;
   readonly analysisDecisionReader?: AnalysisDecisionReader;
+  readonly threadAnalysisReader?: ThreadAnalysisDetailsReader;
 }
 
 export function createDiscussionsModule(dependencies: DiscussionsModuleDependencies) {
@@ -47,6 +49,9 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
       : {}),
     ...(dependencies.analysisDecisionReader !== undefined
       ? { analysisDecisionReader: dependencies.analysisDecisionReader }
+      : {}),
+    ...(dependencies.threadAnalysisReader !== undefined
+      ? { threadAnalysisReader: dependencies.threadAnalysisReader }
       : {}),
     ...authorization,
   });

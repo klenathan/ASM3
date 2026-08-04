@@ -42,6 +42,40 @@ export const threadPageSchema = z
   })
   .openapi("ThreadPage");
 
+export const threadAnalysisSchema = z
+  .object({
+    runId: z.string().uuid(),
+    decision: z.enum(["allow", "review"]).nullable(),
+    sentiment: z
+      .object({
+        label: z.enum(["positive", "neutral", "negative", "mixed"]),
+        confidence: z.number().min(0).max(1),
+      })
+      .nullable(),
+    findings: z
+      .array(
+        z.object({
+          category: z.string(),
+          severity: z.enum(["low", "medium", "high"]),
+          confidence: z.number().min(0).max(1),
+          source: z.enum(["title", "body", "image", "comment"]),
+          sourceId: z.string().optional(),
+          evidence: z.string(),
+        }),
+      )
+      .nullable(),
+    summary: z.string().nullable(),
+    rationale: z.string().nullable(),
+    modelId: z.string().nullable(),
+    promptVersion: z.string().nullable(),
+    completedAt: isoDate.nullable(),
+  })
+  .openapi("ThreadAnalysis");
+
+export const threadAnalysisResponseSchema = threadAnalysisSchema
+  .nullable()
+  .openapi("ThreadAnalysisResponse");
+
 export const analysisQueueThreadSchema = threadSchema
   .extend({
     societySlug: z.string(),

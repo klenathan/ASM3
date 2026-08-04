@@ -15,6 +15,8 @@ import { Button } from "../../components/ui/button";
 import { Spinner } from "../../components/ui/spinner";
 import { useAuth } from "../../features/auth/auth-context";
 import { CommentComposer } from "../../features/discussions/comment-composer";
+import { ThreadAnalysisCard } from "../../features/analysis/thread-analysis-card";
+import { useThreadAnalysis } from "../../features/analysis/use-thread-analysis";
 import { AnalysisBadge } from "../../features/discussions/analysis-badge";
 import {
   CommentTree,
@@ -39,10 +41,14 @@ import {
 
 export function ThreadPage() {
   const { slug = "", id = "" } = useParams();
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const isAuthenticated = status === "authenticated";
-  const societyQuery = useSociety(slug);
   const membershipQuery = useSocietyMembership(slug, isAuthenticated);
+  const isPrivileged =
+    user?.platformRole === "system_admin" ||
+    membershipQuery.data?.role === "moderator";
+  const analysisQuery = useThreadAnalysis(id, isPrivileged);
+  const societyQuery = useSociety(slug);
   const threadQuery = useThread(id);
   const commentsQuery = useThreadComments(id);
   const createComment = useCreateComment(id);
@@ -185,6 +191,19 @@ export function ThreadPage() {
                 </div>
               </div>
             </article>
+
+            {isPrivileged && (
+              <ThreadAnalysisCard
+                analysis={analysisQuery.data}
+                status={
+                  analysisQuery.isLoading
+                    ? "loading"
+                    : analysisQuery.isError
+                      ? "error"
+                      : "success"
+                }
+              />
+            )}
 
             <section aria-labelledby="discussion-title" className="mt-10">
               <div className="flex flex-wrap items-end justify-between gap-4 pb-4">

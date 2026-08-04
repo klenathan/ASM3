@@ -59,22 +59,41 @@ export type FindingSource =
   | "image"
   | "comment";
 
+export interface ContentAnalysisFinding {
+  category: string;
+  severity: Severity;
+  confidence: number;
+  source: FindingSource;
+  sourceId?: string;
+  evidence: string;
+}
+
 export interface ContentAnalysisResult {
   decision: AnalysisDecision;
   sentiment: {
     label: SentimentLabel;
     confidence: number;
   };
-  findings: Array<{
-    category: string;
-    severity: Severity;
-    confidence: number;
-    source: FindingSource;
-    sourceId?: string;
-    evidence: string;
-  }>;
+  findings: ContentAnalysisFinding[];
   summary: string;
   rationale: string;
+}
+
+/**
+ * The full, persisted outcome of the latest successful analysis run for a
+ * single thread. Surfaces the evaluator's findings, sentiment, rationale and
+ * provenance (model, prompt version) to a privileged reviewer.
+ */
+export interface ThreadAnalysisDetails {
+  readonly runId: string;
+  readonly decision: AnalysisDecision | null;
+  readonly sentiment: { label: SentimentLabel; confidence: number } | null;
+  readonly findings: ContentAnalysisFinding[] | null;
+  readonly summary: string | null;
+  readonly rationale: string | null;
+  readonly modelId: string | null;
+  readonly promptVersion: string | null;
+  readonly completedAt: string | null;
 }
 
 /**
