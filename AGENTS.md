@@ -25,6 +25,7 @@
 - Keep moderator authority society-scoped through membership. Only `system_admin` is a global elevated role.
 - Re-export module-owned Drizzle tables from `backend/src/db/schema.ts` for migration tooling. Generate and review migrations; do not hand-edit generated migration metadata.
 - Add focused domain/service/controller tests plus PostgreSQL integration tests for repository and constraint behavior.
+- **Known bug (fixed): session middleware path wildcard.** Every `sessionPrincipalMiddleware` registration in `backend/src/app.ts` must include BOTH the exact path AND a `/*` variant (e.g. `app.use("/api/v1/admin/analysis", ...)` AND `app.use("/api/v1/admin/analysis/*", ...)`). Without the `/*` variant, Hono does not run the middleware for sub-paths, so routes like `.../{id}/reanalyze` or `.../{id}/decision` resolve but get no injected `principal`, and the controller's `requireInjectedPrincipal` throws `AUTH_REQUIRED` (HTTP 401) instead of authenticating. When adding a new protected path, register both forms.
 
 ## Frontend stack and architecture
 

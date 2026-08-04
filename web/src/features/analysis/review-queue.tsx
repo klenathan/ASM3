@@ -1,11 +1,7 @@
 import { useState } from "react";
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Loader2, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -16,12 +12,9 @@ import {
   TabsTrigger,
 } from "../../components/ui/tabs";
 import { AnalysisBadge } from "../discussions/analysis-badge";
-import {
-  fetchAnalysisQueue,
-  reanalyzeThread,
-  setAnalysisDecision,
-  type AnalysisActionScope,
-} from "./analysis-api";
+import { AnalysisActions } from "./analysis-actions";
+import { fetchAnalysisQueue } from "./analysis-api";
+import type { AnalysisActionScope } from "./analysis-api";
 import type { AnalysisQueueFilter, AnalysisQueueThread } from "./types";
 
 const PAGE_LIMIT = 12;
@@ -39,91 +32,6 @@ function shortDate(value: string): string {
     : date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-function QueueActions({
-  item,
-  actionScope,
-}: {
-  readonly item: AnalysisQueueThread;
-  readonly actionScope: AnalysisActionScope;
-}) {
-  const queryClient = useQueryClient();
-
-  const invalidateQueue = () =>
-    queryClient.invalidateQueries({ queryKey: ["analysis", "queue"] });
-
-  const decisionMutation = useMutation({
-    mutationFn: (input: { decision: "accept" | "reject"; reason?: string }) =>
-      setAnalysisDecision({
-        ...actionScope,
-        threadId: item.id,
-        decision: input.decision,
-        ...(input.reason === undefined ? {} : { reason: input.reason }),
-      }),
-    onSuccess: invalidateQueue,
-  });
-
-  const reanalyzeMutation = useMutation({
-    mutationFn: () =>
-      reanalyzeThread({
-        ...actionScope,
-        threadId: item.id,
-      }),
-    onSuccess: invalidateQueue,
-  });
-
-  const busy =
-    decisionMutation.isPending || reanalyzeMutation.isPending;
-
-  const handleReject = () => {
-    if (!window.confirm("Reject this post? It will be hidden from the community."))
-      return;
-    const reason = window.prompt("Optional reason for rejecting (left blank if none):");
-    if (reason === null) return;
-    decisionMutation.mutate({
-      decision: "reject",
-      ...(reason.trim().length === 0 ? {} : { reason: reason.trim() }),
-    });
-  };
-
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() =>
-          decisionMutation.mutate({ decision: "accept" })
-        }
-        disabled={busy}
-      >
-        Accept
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="destructive"
-        onClick={handleReject}
-        disabled={busy}
-      >
-        Reject
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        onClick={() => reanalyzeMutation.mutate(undefined)}
-        disabled={busy}
-      >
-        {reanalyzeMutation.isPending ? (
-          <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-        ) : (
-          "Re-analyze"
-        )}
-      </Button>
-    </div>
-  );
-}
-
 
 function QueueCard({
   item,
@@ -132,6 +40,7 @@ function QueueCard({
   readonly item: AnalysisQueueThread;
   readonly actionScope?: AnalysisActionScope;
 }) {
+  const queryClient = useQueryClient();
   return (
     <article className="group flex flex-col border border-foreground/15 p-4 transition-colors hover:border-primary/50 hover:bg-muted/40">
       <div className="flex items-start justify-between gap-3">
@@ -166,7 +75,13 @@ function QueueCard({
         </span>
       </div>
       {actionScope !== undefined && (
-        <QueueActions item={item} actionScope={actionScope} />
+        <AnalysisActions
+          threadId={item.id}
+          actionScope={actionScope}
+          onResolved={() =>
+            queryClient.invalidateQueries({ queryKey: ["analysis", "queue"] })
+          }
+        />
       )}
     </article>
   );

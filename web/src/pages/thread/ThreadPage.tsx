@@ -194,6 +194,12 @@ export function ThreadPage() {
 
             {isPrivileged && (
               <ThreadAnalysisCard
+                threadId={id}
+                actionScope={
+                  user?.platformRole === "system_admin"
+                    ? { scope: "admin" }
+                    : { scope: "moderator", slug }
+                }
                 analysis={analysisQuery.data}
                 status={
                   analysisQuery.isLoading
@@ -202,6 +208,10 @@ export function ThreadPage() {
                       ? "error"
                       : "success"
                 }
+                onResolved={() => {
+                  void analysisQuery.refetch();
+                  void threadQuery.refetch();
+                }}
               />
             )}
 

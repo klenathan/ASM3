@@ -3,6 +3,8 @@ import { ShieldCheck } from "lucide-react";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 import { AnalysisBadge } from "../discussions/analysis-badge";
+import { AnalysisActions } from "./analysis-actions";
+import type { AnalysisActionScope } from "./analysis-api";
 import type { AnalysisFinding, ThreadAnalysis } from "./types";
 
 const SEVERITY_STYLES: Record<AnalysisFinding["severity"], string> = {
@@ -52,15 +54,22 @@ function FindingRow({ finding }: { readonly finding: AnalysisFinding }) {
 
 /**
  * Small privileged card surfacing the full automated content-analysis
- * outcome for a thread. Rendered only for system admins and the thread's
- * society moderators; authorization is enforced server-side.
+ * outcome for a thread, plus Accept / Reject / Re-analyze override actions.
+ * Rendered only for system admins and the thread's society moderators;
+ * authorization is enforced server-side.
  */
 export function ThreadAnalysisCard({
   analysis,
   status,
+  threadId,
+  actionScope,
+  onResolved,
 }: {
   readonly analysis: ThreadAnalysis | null | undefined;
   readonly status: "loading" | "success" | "error";
+  readonly threadId: string;
+  readonly actionScope: AnalysisActionScope;
+  readonly onResolved?: () => void;
 }) {
   return (
     <Card size="sm" className="mt-6">
@@ -111,15 +120,24 @@ export function ThreadAnalysisCard({
           </div>
         )}
       </CardContent>
-      {status === "success" && analysis != null && (
-        <CardFooter className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {analysis.modelId !== null && <span>Model: {analysis.modelId}</span>}
-          {analysis.promptVersion !== null && <span>Prompt v{analysis.promptVersion}</span>}
-          {shortDate(analysis.completedAt) !== null && (
-            <span>{shortDate(analysis.completedAt)}</span>
+      <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {status === "success" && analysis != null && (
+            <>
+              {analysis.modelId !== null && <span>Model: {analysis.modelId}</span>}
+              {analysis.promptVersion !== null && <span>Prompt v{analysis.promptVersion}</span>}
+              {shortDate(analysis.completedAt) !== null && (
+                <span>{shortDate(analysis.completedAt)}</span>
+              )}
+            </>
           )}
-        </CardFooter>
-      )}
+        </div>
+        <AnalysisActions
+          threadId={threadId}
+          actionScope={actionScope}
+          onResolved={onResolved}
+        />
+      </CardFooter>
     </Card>
   );
 }

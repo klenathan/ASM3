@@ -1,5 +1,7 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { ReactElement } from "react";
 
 import { ThreadAnalysisCard } from "./thread-analysis-card";
 import type { ThreadAnalysis } from "./types";
@@ -24,21 +26,39 @@ const fullAnalysis: ThreadAnalysis = {
   completedAt: "2026-08-02T10:00:00.000Z",
 };
 
+const actionScope = { scope: "admin" as const };
+
+function renderCard(el: ReactElement) {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      {el}
+    </QueryClientProvider>,
+  );
+}
+
+const props = {
+  threadId: "t1",
+  actionScope,
+};
+
 describe("ThreadAnalysisCard", () => {
   it("shows a loading skeleton while pending", () => {
-    render(<ThreadAnalysisCard analysis={undefined} status="loading" />);
+    renderCard(<ThreadAnalysisCard {...props} analysis={undefined} status="loading" />);
     expect(screen.getByLabelText("Loading analysis")).toBeInTheDocument();
   });
 
-  it("shows an empty state when no analysis exists", () => {
-    render(<ThreadAnalysisCard analysis={null} status="success" />);
+  it("shows an empty state but keeps override actions when no analysis exists", () => {
+    renderCard(<ThreadAnalysisCard {...props} analysis={null} status="success" />);
     expect(
       screen.getByText("No analysis has been recorded for this thread yet."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Re-analyze" })).toBeInTheDocument();
   });
 
   it("renders the full analysis outcome for privileged viewers", () => {
-    render(<ThreadAnalysisCard analysis={fullAnalysis} status="success" />);
+    renderCard(<ThreadAnalysisCard {...props} analysis={fullAnalysis} status="success" />);
     expect(screen.getByText("Automated analysis")).toBeInTheDocument();
     expect(screen.getByText("Flagged for review")).toBeInTheDocument();
     expect(screen.getByText("Flagged for a possible policy violation.")).toBeInTheDocument();
@@ -46,12 +66,14 @@ describe("ThreadAnalysisCard", () => {
     expect(screen.getByText("negative")).toBeInTheDocument();
     expect(screen.getByText(/Model: deepseek\/test/)).toBeInTheDocument();
     expect(screen.getByText(/Prompt v2/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
   });
 
   it("surfaces a load error", () => {
-    render(<ThreadAnalysisCard analysis={undefined} status="error" />);
+    renderCard(<ThreadAnalysisCard {...props} analysis={undefined} status="error" />);
     expect(
       screen.getByText("Could not load the analysis for this thread."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
   });
 });
