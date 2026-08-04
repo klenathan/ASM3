@@ -201,6 +201,7 @@ export function ThreadPage() {
                     : { scope: "moderator", slug }
                 }
                 analysis={analysisQuery.data}
+                threadUpdatedAt={thread.updatedAt}
                 status={
                   analysisQuery.isLoading
                     ? "loading"

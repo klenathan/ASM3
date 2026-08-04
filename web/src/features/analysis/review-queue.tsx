@@ -78,6 +78,8 @@ function QueueCard({
         <AnalysisActions
           threadId={item.id}
           actionScope={actionScope}
+          decision={item.analysisDecision}
+          threadUpdatedAt={item.updatedAt}
           onResolved={() =>
             queryClient.invalidateQueries({ queryKey: ["analysis", "queue"] })
           }
@@ -104,8 +106,8 @@ function QueueSkeleton() {
  * Grid of threads whose automated content-analysis outcome is "none" (no
  * decision yet) or "review" (flagged for review). Admin uses the global queue;
  * a moderator passes their society slug for the society-scoped queue. Each
- * card offers Accept / Reject (override the automated decision, publishing or
- * hiding the post) and Re-analyze actions.
+ * resolved or stale-pending card offers Accept / Reject (override the
+ * automated decision, publishing or hiding the post) and Re-analyze actions.
  */
 export function ReviewQueue({
   scope,

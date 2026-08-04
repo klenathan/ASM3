@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
@@ -7,20 +8,31 @@ import {
   setAnalysisDecision,
   type AnalysisActionScope,
 } from "./analysis-api";
+import {
+  ANALYSIS_STALE_AFTER_MS,
+  shouldShowAnalysisActions,
+  type AnalysisActionDecision,
+} from "./analysis-action-visibility";
 
 /**
  * Accept / Reject / Re-analyze controls for overriding a thread's automated
  * content-analysis outcome. Reject hides the post (published -> removed),
- * Accept confirms it, Re-analyze re-runs the analysis. `onResolved` fires
- * after any successful action so the caller can refetch its views.
+ * Accept confirms it, Re-analyze re-runs the analysis. Actions are hidden for
+ * fresh pending analysis runs and become available once the run is stale.
+ * `onResolved` fires after any successful action so the caller can refetch its
+ * views.
  */
 export function AnalysisActions({
   threadId,
   actionScope,
+  decision,
+  threadUpdatedAt,
   onResolved,
 }: {
   readonly threadId: string;
   readonly actionScope: AnalysisActionScope;
+  readonly decision: AnalysisActionDecision;
+  readonly threadUpdatedAt: string;
   readonly onResolved?: () => void;
 }) {
   const decisionMutation = useMutation({
@@ -40,6 +52,23 @@ export function AnalysisActions({
   });
 
   const busy = decisionMutation.isPending || reanalyzeMutation.isPending;
+  const hasDecision = decision === "allow" || decision === "review";
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (hasDecision) return;
+
+    const updatedAt = Date.parse(threadUpdatedAt);
+    if (!Number.isFinite(updatedAt)) return;
+
+    const delay = updatedAt + ANALYSIS_STALE_AFTER_MS - Date.now();
+    if (delay <= 0) return;
+
+    const timeout = window.setTimeout(() => setNow(Date.now()), delay);
+    return () => window.clearTimeout(timeout);
+  }, [hasDecision, threadUpdatedAt]);
+
+  if (!shouldShowAnalysisActions(decision, threadUpdatedAt, now)) return null;
 
   const handleReject = () => {
     if (!window.confirm("Reject this post? It will be hidden from the community."))

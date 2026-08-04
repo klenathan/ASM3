@@ -229,7 +229,16 @@ function auditNodeSpacing(nodes, errors) {
 }
 
 function isConnectable(element) {
-  return element && CONNECTABLE_TYPES.has(element.type) && !element.isDeleted;
+  return (
+    element &&
+    CONNECTABLE_TYPES.has(element.type) &&
+    !element.isDeleted &&
+    !isDecorative(element)
+  );
+}
+
+function isDecorative(element) {
+  return element?.customData?.bindingAudit === "decoration";
 }
 
 function isTextHeavy(text) {

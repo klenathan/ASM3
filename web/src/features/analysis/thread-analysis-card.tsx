@@ -63,12 +63,14 @@ export function ThreadAnalysisCard({
   status,
   threadId,
   actionScope,
+  threadUpdatedAt,
   onResolved,
 }: {
   readonly analysis: ThreadAnalysis | null | undefined;
   readonly status: "loading" | "success" | "error";
   readonly threadId: string;
   readonly actionScope: AnalysisActionScope;
+  readonly threadUpdatedAt: string;
   readonly onResolved?: () => void;
 }) {
   return (
@@ -135,6 +137,8 @@ export function ThreadAnalysisCard({
         <AnalysisActions
           threadId={threadId}
           actionScope={actionScope}
+          decision={analysis?.decision}
+          threadUpdatedAt={threadUpdatedAt}
           onResolved={onResolved}
         />
       </CardFooter>

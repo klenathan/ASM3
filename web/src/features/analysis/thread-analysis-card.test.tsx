@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { ReactElement } from "react";
 
+import { ANALYSIS_STALE_AFTER_MS } from "./analysis-action-visibility";
 import { ThreadAnalysisCard } from "./thread-analysis-card";
 import type { ThreadAnalysis } from "./types";
 
@@ -39,6 +40,7 @@ function renderCard(el: ReactElement) {
 const props = {
   threadId: "t1",
   actionScope,
+  threadUpdatedAt: new Date(Date.now() - 1_000).toISOString(),
 };
 
 describe("ThreadAnalysisCard", () => {
@@ -47,11 +49,25 @@ describe("ThreadAnalysisCard", () => {
     expect(screen.getByLabelText("Loading analysis")).toBeInTheDocument();
   });
 
-  it("shows an empty state but keeps override actions when no analysis exists", () => {
+  it("shows an empty state without override actions for fresh pending analysis", () => {
     renderCard(<ThreadAnalysisCard {...props} analysis={null} status="success" />);
     expect(
       screen.getByText("No analysis has been recorded for this thread yet."),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Re-analyze" })).not.toBeInTheDocument();
+  });
+
+  it("shows override actions when pending analysis is stale", () => {
+    renderCard(
+      <ThreadAnalysisCard
+        {...props}
+        threadUpdatedAt={new Date(Date.now() - ANALYSIS_STALE_AFTER_MS - 1_000).toISOString()}
+        analysis={null}
+        status="success"
+      />,
+    );
     expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Re-analyze" })).toBeInTheDocument();
@@ -74,6 +90,6 @@ describe("ThreadAnalysisCard", () => {
     expect(
       screen.getByText("Could not load the analysis for this thread."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
   });
 });
