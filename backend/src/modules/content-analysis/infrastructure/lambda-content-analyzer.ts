@@ -1,4 +1,5 @@
 import { InvokeCommand, Lambda } from "@aws-sdk/client-lambda";
+import type { Logger } from "pino";
 import type { ContentAnalyzerPort } from "../application/content-analyzer.port";
 import type {
   AnalysisInvocationResult,
@@ -20,6 +21,7 @@ export interface LambdaContentAnalyzerConfig {
   qualifier?: string;
   timeoutMs: number;
   region: string;
+  logger?: Logger;
 }
 
 export class LambdaContentAnalyzer implements ContentAnalyzerPort {
@@ -32,6 +34,10 @@ export class LambdaContentAnalyzer implements ContentAnalyzerPort {
   }
 
   async analyze(request: ContentAnalysisRequest): Promise<AnalysisInvocationResult> {
+    this.config.logger?.info(
+      { functionName: this.config.functionName, qualifier: this.config.qualifier },
+      "invoking content-analysis lambda",
+    );
     const response = await this.lambda.send(
       new InvokeCommand({
         FunctionName: this.config.functionName,
@@ -62,6 +68,14 @@ export class LambdaContentAnalyzer implements ContentAnalyzerPort {
     if (raw === null) {
       throw new Error("content-analysis lambda returned no payload");
     }
+
+    this.config.logger?.info(
+      {
+        lambdaFunctionVersion: response.ExecutedVersion ?? null,
+        lambdaRequestId: response.$metadata?.requestId ?? null,
+      },
+      "content-analysis lambda invoked successfully",
+    );
 
     let body: unknown;
     try {

@@ -21,6 +21,7 @@ import { toThreadDto } from "./discussion.mappers";
 import type { DiscussionProfilePort } from "./discussion.profile";
 import type { ThreadEventPublisher } from "./thread-events.port";
 import type { ThreadMediaPort } from "./thread-media.port";
+import type { AnalysisDecisionReader } from "./analysis-decision.reader";
 import type {
   CreateThreadInput,
   DiscussionRepository,
@@ -39,6 +40,11 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly media: ThreadMediaPort;
   readonly events: ThreadEventPublisher;
   /**
+   * Optional read-only source of the latest automated content-analysis outcome
+   * for a thread, used to surface a verification badge.
+   */
+  readonly analysisDecisionReader?: AnalysisDecisionReader;
+  /**
    * Optional fire-and-forget hook invoked after a thread is committed and its
    * event published. Used to trigger downstream async work (e.g. content
    * analysis) without blocking thread creation.
@@ -55,6 +61,7 @@ export class ThreadService {
   private readonly media: ThreadMediaPort;
   private readonly events: ThreadEventPublisher;
   private readonly onThreadCreated: ((threadId: string) => void) | undefined;
+  private readonly analysisDecisionReader: AnalysisDecisionReader | undefined;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
@@ -65,6 +72,7 @@ export class ThreadService {
     this.media = dependencies.media;
     this.events = dependencies.events;
     this.onThreadCreated = dependencies.onThreadCreated;
+    this.analysisDecisionReader = dependencies.analysisDecisionReader;
   }
 
   async createThread(
@@ -123,11 +131,13 @@ export class ThreadService {
     const vote = principal === undefined
       ? null
       : await this.repository.findThreadVote(thread.id, principal.userId);
+    const decision = await this.latestDecision(thread.id);
     return toThreadDto(
       thread,
       await this.repository.listThreadMedia(thread.id),
       undefined,
       vote?.value ?? 0,
+      decision,
     );
   }
 
@@ -210,6 +220,12 @@ export class ThreadService {
       throw new ApplicationError("NOT_FOUND", "Thread was not found");
     }
     return thread;
+  }
+
+  private async latestDecision(threadId: string): Promise<"allow" | "review" | null> {
+    if (this.analysisDecisionReader === undefined) return null;
+    const decisions = await this.analysisDecisionReader.findLatestDecisionsByThreads([threadId]);
+    return decisions.get(threadId) ?? null;
   }
 }
 

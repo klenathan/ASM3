@@ -49,6 +49,7 @@ export interface Thread {
   readonly createdAt: string
   readonly updatedAt: string
   readonly deletedAt: string | null
+  readonly analysisDecision?: 'allow' | 'review' | null
 }
 
 export interface ThreadPage {

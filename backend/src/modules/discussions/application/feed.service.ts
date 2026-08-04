@@ -30,21 +30,25 @@ import {
   type ProfileIdentity,
 } from "./discussion.mappers";
 import type { DiscussionRepository } from "./discussion.repository";
+import type { AnalysisDecisionReader } from "./analysis-decision.reader";
 
 export interface FeedServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;
   readonly profile: DiscussionProfilePort;
+  readonly analysisDecisionReader?: AnalysisDecisionReader;
 }
 
 export class FeedService {
   private readonly repository: DiscussionRepository;
   private readonly authorization: DiscussionAuthorizationDependencies;
   private readonly profile: DiscussionProfilePort;
+  private readonly analysisDecisionReader: AnalysisDecisionReader | undefined;
 
   constructor(dependencies: FeedServiceDependencies) {
     this.repository = dependencies.repository;
     this.authorization = dependencies;
     this.profile = dependencies.profile;
+    this.analysisDecisionReader = dependencies.analysisDecisionReader;
   }
 
   async listSocietyThreads(
@@ -69,7 +73,8 @@ export class FeedService {
       );
       for (const vote of votes) voteByThread.set(vote.threadId, vote.value);
     }
-    return toThreadPageDto(result, mediaByThread, authorById, voteByThread);
+    const decisions = await this.decisionsFor(result.items.map((thread) => thread.id));
+    return toThreadPageDto(result, mediaByThread, authorById, voteByThread, decisions);
   }
 
   async listThreadComments(
@@ -119,6 +124,7 @@ export class FeedService {
     const societyById = await this.societiesFor(result.items);
     const votes = await this.repository.findThreadVotes(threadIds, principal.userId);
     const voteById = new Map(votes.map((vote) => [vote.threadId, vote.value]));
+    const decisions = await this.decisionsFor(threadIds);
 
     const items: HomeFeedPageDto["items"] = result.items.flatMap((thread) => {
       const society = societyById.get(thread.societyId);
@@ -129,6 +135,7 @@ export class FeedService {
         mediaByThread.get(thread.id) ?? [],
         authorById.get(thread.authorId) ?? null,
         voteById.get(thread.id) ?? 0,
+        decisions.get(thread.id) ?? null,
       )];
     });
 
@@ -156,6 +163,7 @@ export class FeedService {
       );
       for (const vote of votes) voteByThread.set(vote.threadId, vote.value);
     }
+    const decisions = await this.decisionsFor(result.items.map((thread) => thread.id));
     const items: UserThreadActivityDto[] = result.items.flatMap((thread) => {
       const society = societyById.get(thread.societyId);
       return society === undefined
@@ -166,6 +174,7 @@ export class FeedService {
             identity,
             voteByThread.get(thread.id) ?? 0,
             mediaByThread.get(thread.id) ?? [],
+            decisions.get(thread.id) ?? null,
           )];
     });
     return {
@@ -173,6 +182,15 @@ export class FeedService {
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
     };
+  }
+
+  private async decisionsFor(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, "allow" | "review">> {
+    if (this.analysisDecisionReader === undefined || threadIds.length === 0) {
+      return new Map();
+    }
+    return this.analysisDecisionReader.findLatestDecisionsByThreads([...new Set(threadIds)]);
   }
 
   async listUserComments(

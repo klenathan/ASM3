@@ -66,12 +66,14 @@ async function main(): Promise<void> {
     avatarMedia: media.mediaService,
   });
   let contentAnalysisService: ContentAnalysisService | undefined;
+  const contentAnalysisRepository = new DrizzleContentAnalysisRepository(database.db);
   const discussions = createDiscussionsModule({
     database: database.db,
     membershipRepository: societies.membershipRepository,
     societyRepository: societies.societyRepository,
     media: media.mediaService,
     events: threadEventPublisher,
+    analysisDecisionReader: contentAnalysisRepository,
     onThreadCreated: (threadId) => {
       void contentAnalysisService?.analyzeNewThread(threadId);
     },
@@ -108,7 +110,6 @@ async function main(): Promise<void> {
       },
     },
   });
-  const contentAnalysisRepository = new DrizzleContentAnalysisRepository(database.db);
   const configReader = createPlatformConfigReader(database.db);
   const contentAnalyzer =
     config.contentAnalysisMode !== "off"
@@ -117,6 +118,7 @@ async function main(): Promise<void> {
           qualifier: config.contentAnalysisLambdaQualifier,
           timeoutMs: config.contentAnalysisTimeoutMs,
           region: config.awsRegion!,
+          logger,
         })
       : undefined;
   contentAnalysisService = new ContentAnalysisService({

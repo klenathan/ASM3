@@ -8,10 +8,11 @@ import type { DiscussionProfilePort } from "./application/discussion.profile";
 import type { ThreadEventPublisher } from "./application/thread-events.port";
 import { NoopThreadEventPublisher } from "./application/thread-events.port";
 import type { ThreadMediaPort } from "./application/thread-media.port";
-import { ThreadService } from "./application/thread.service";
-import { VoteService } from "./application/vote.service";
+import { ThreadService } from "./application/thread.service";import { VoteService } from "./application/vote.service";
 import { DrizzleDiscussionRepository, DrizzleDiscussionTransactionManager } from "./infrastructure/drizzle-discussion.repository";
 import type { MembershipRepository, SocietyRepository } from "../societies/index";
+
+import type { AnalysisDecisionReader } from "./application/analysis-decision.reader";
 
 export interface DiscussionsModuleDependencies {
   readonly database: Database;
@@ -22,6 +23,7 @@ export interface DiscussionsModuleDependencies {
   readonly events?: ThreadEventPublisher;
   readonly clock?: Clock;
   readonly onThreadCreated?: (threadId: string) => void;
+  readonly analysisDecisionReader?: AnalysisDecisionReader;
 }
 
 export function createDiscussionsModule(dependencies: DiscussionsModuleDependencies) {
@@ -43,11 +45,21 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
     ...(dependencies.onThreadCreated !== undefined
       ? { onThreadCreated: dependencies.onThreadCreated }
       : {}),
+    ...(dependencies.analysisDecisionReader !== undefined
+      ? { analysisDecisionReader: dependencies.analysisDecisionReader }
+      : {}),
     ...authorization,
   });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });
   const voteService = new VoteService({ repository, transactions, clock, ...authorization });
-  const feedService = new FeedService({ repository, profile: dependencies.profile, ...authorization });
+  const feedService = new FeedService({
+    repository,
+    profile: dependencies.profile,
+    ...(dependencies.analysisDecisionReader !== undefined
+      ? { analysisDecisionReader: dependencies.analysisDecisionReader }
+      : {}),
+    ...authorization,
+  });
 
   return {
     repository,

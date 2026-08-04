@@ -30,6 +30,7 @@ export const threadSchema = z
     createdAt: isoDate,
     updatedAt: isoDate,
     deletedAt: isoDate.nullable(),
+    analysisDecision: z.enum(["allow", "review"]).nullable(),
   })
   .openapi("Thread");
 
@@ -60,6 +61,7 @@ export const homeFeedThreadSchema = z
     createdAt: isoDate,
     updatedAt: isoDate,
     deletedAt: isoDate.nullable(),
+    analysisDecision: z.enum(["allow", "review"]).nullable(),
   })
   .openapi("HomeFeedThread");
 
@@ -157,6 +159,7 @@ export const userThreadActivitySchema = z
     authorDisplayName: z.string(),
     authorAvatarMediaId: z.string().uuid().nullable(),
     myVote: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
+    analysisDecision: z.enum(["allow", "review"]).nullable(),
   })
   .openapi("UserThreadActivity");
 

@@ -2,9 +2,7 @@ import type { ContentAnalysisRun } from "../domain/content-analysis";
 import type {
   AnalysisDecision,
   SentimentLabel,
-} from "./content-analysis.dto";
-
-/**
+} from "./content-analysis.dto";/**
  * Repository port for content-analysis runs. Lives on the
  * application/domain boundary; Drizzle implementation is in infrastructure.
  */
@@ -37,4 +35,7 @@ export interface ContentAnalysisRepository {
   markStarted(id: string, startedAt: Date): Promise<void>;
   recordSuccess(input: RecordRunResultInput): Promise<void>;
   recordFailure(input: RecordRunFailureInput): Promise<void>;
+  findLatestDecisionsByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, AnalysisDecision>>;
 }

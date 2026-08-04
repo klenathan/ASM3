@@ -54,7 +54,9 @@ export class ContentAnalysisService {
    * trigger it without blocking thread creation. Returns the result when the
    * run succeeded, or null when analysis was skipped or failed.
    */
-  async analyzeNewThread(threadId: string): Promise<ContentAnalysisResult | null> {
+  async analyzeNewThread(
+    threadId: string,
+  ): Promise<ContentAnalysisResult | null> {
     if (this.deps.mode === "off") {
       return null;
     }
@@ -86,7 +88,10 @@ export class ContentAnalysisService {
         completedAt: this.deps.clock.now(),
       });
 
-      if (this.deps.mode === "enforce" && invocation.result.decision === "review") {
+      if (
+        this.deps.mode === "enforce" &&
+        invocation.result.decision === "review"
+      ) {
         // TODO(phase 3): transition thread to `pending_review` and surface in
         // moderation. Requires extending the thread status schema.
         this.deps.logger.warn(
@@ -97,9 +102,10 @@ export class ContentAnalysisService {
 
       return invocation.result;
     } catch (error) {
-      const errorCode = this.deps.logger.level === "debug"
-        ? "ANALYSIS_INVOCATION_FAILED"
-        : classifyError(error);
+      const errorCode =
+        this.deps.logger.level === "debug"
+          ? "ANALYSIS_INVOCATION_FAILED"
+          : classifyError(error);
       try {
         await this.deps.repository.recordFailure({
           id: run.id,
@@ -146,7 +152,12 @@ export class ContentAnalysisService {
     body: string;
     globalPolicy: string;
     societyRules: Array<{ id: string; title: string; description: string }>;
-    images: Array<{ bucket: string; key: string; contentType: string; byteSize: number }>;
+    images: Array<{
+      bucket: string;
+      key: string;
+      contentType: string;
+      byteSize: number;
+    }>;
   }): ContentAnalysisRequest {
     const request: ContentAnalysisRequest = {
       analysisId: randomUUID(),

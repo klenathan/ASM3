@@ -10,6 +10,7 @@ import {
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { buildPrompt } from "./prompt";
 import type { ContentAnalysisRequest, ContentAnalysisResult } from "./contracts";
+import type { Logger } from "./logger";
 
 export interface OpenRouterConfig {
   modelId: string;
@@ -39,18 +40,23 @@ export class OpenRouterContentAnalyzer {
   readonly bounds: ImageBounds;
   private readonly secrets: SecretsManagerClient;
   private readonly s3: S3Client;
+  private readonly logger: Logger;
   private apiKeyPromise: Promise<string> | null = null;
 
-  constructor(config: OpenRouterConfig, bounds: ImageBounds) {
+  constructor(config: OpenRouterConfig, bounds: ImageBounds, logger: Logger) {
     this.config = config;
     this.bounds = bounds;
+    this.logger = logger;
     this.secrets = new SecretsManagerClient({ region: config.region });
     this.s3 = new S3Client({ region: config.region });
   }
 
   async analyze(request: ContentAnalysisRequest): Promise<ContentAnalysisResult> {
+    const startedAt = performance.now();
+    this.logger.info({ analysisId: request.analysisId, triggerType: request.triggerType }, "content analysis started");
     const apiKey = await this.loadApiKey();
     const imageBlocks = await this.loadImageBlocks(request);
+    this.logger.info({ analysisId: request.analysisId, imageCount: imageBlocks.length }, "image blocks loaded");
     const response = await fetch(
       `${this.config.baseUrl.replace(/\/$/, "")}/chat/completions`,
       {
@@ -83,6 +89,7 @@ export class OpenRouterContentAnalyzer {
 
     const responseText = await response.text();
     if (!response.ok) {
+      this.logger.error({ analysisId: request.analysisId, status: response.status }, "OpenRouter request failed");
       throw new Error(`OpenRouter request failed with HTTP ${response.status}`);
     }
 
@@ -92,7 +99,13 @@ export class OpenRouterContentAnalyzer {
     } catch {
       throw new Error("OpenRouter returned invalid JSON");
     }
-    return this.parseResult(payload);
+    const result = this.parseResult(payload);
+    const durationMs = Math.round(performance.now() - startedAt);
+    this.logger.info(
+      { analysisId: request.analysisId, decision: result.decision, durationMs },
+      "content analysis completed",
+    );
+    return result;
   }
 
   private async loadApiKey(): Promise<string> {
@@ -206,6 +219,7 @@ export class OpenRouterContentAnalyzer {
     try {
       result = JSON.parse(text.replace(/^```json\s*|```$/g, "").trim());
     } catch {
+      this.logger.error("OpenRouter returned malformed analysis JSON");
       throw new Error("OpenRouter returned malformed analysis JSON");
     }
     if (!isStrictResult(result)) throw new Error("OpenRouter returned schema-invalid analysis");

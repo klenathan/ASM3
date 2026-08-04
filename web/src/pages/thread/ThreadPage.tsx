@@ -15,6 +15,7 @@ import { Button } from "../../components/ui/button";
 import { Spinner } from "../../components/ui/spinner";
 import { useAuth } from "../../features/auth/auth-context";
 import { CommentComposer } from "../../features/discussions/comment-composer";
+import { AnalysisBadge } from "../../features/discussions/analysis-badge";
 import {
   CommentTree,
   type CommentSort,
@@ -140,9 +141,15 @@ export function ThreadPage() {
                       <span>edited</span>
                     )}
                   </div>
-                  <h1 className="mt-3 text-balance font-heading text-[clamp(1rem,2vw,3rem)] leading-[0.93] font-semibold tracking-[-0.02em] uppercase">
-                    {thread.title}
-                  </h1>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <h1 className="text-balance font-heading text-[clamp(1rem,2vw,3rem)] leading-[0.93] font-semibold tracking-[-0.02em] uppercase">
+                      {thread.title}
+                    </h1>
+                    <AnalysisBadge
+                      decision={thread.analysisDecision}
+                      className="h-6 px-2.5"
+                    />
+                  </div>
                   {thread.body !== null && (
                     <div className="mt-6">
                       <MarkdownContent>{thread.body}</MarkdownContent>

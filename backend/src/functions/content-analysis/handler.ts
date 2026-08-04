@@ -5,6 +5,7 @@
  */
 import { OpenRouterContentAnalyzer } from "./openrouter-content-analyzer";
 import type { LambdaEvent } from "./contracts";
+import { createLambdaLogger, type Logger } from "./logger";
 
 export interface HandlerConfig {
   modelId: string;
@@ -24,22 +25,22 @@ export interface HandlerConfig {
 
 function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
   const required = {
-    modelId: env.OPENROUTER_MODEL,
-    allowedMediaBucket: env.ALLOWED_MEDIA_BUCKET,
-    allowedMediaPrefix: env.ALLOWED_MEDIA_PREFIX,
+    OPENROUTER_MODEL: env.OPENROUTER_MODEL,
+    ALLOWED_MEDIA_BUCKET: env.ALLOWED_MEDIA_BUCKET,
+    ALLOWED_MEDIA_PREFIX: env.ALLOWED_MEDIA_PREFIX,
   };
   for (const [key, value] of Object.entries(required)) {
     if (!value) throw new Error(`missing required env: ${key}`);
   }
   return {
-    modelId: required.modelId!,
+    modelId: required.OPENROUTER_MODEL!,
     region: env.AWS_REGION ?? "us-east-1",
     baseUrl: env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
     apiKeySecretArn: env.OPENROUTER_API_KEY_SECRET_ARN,
     apiKey: env.OPENROUTER_API_KEY,
     requestTimeoutMs: Number(env.OPENROUTER_TIMEOUT_MS ?? 50_000),
-    allowedMediaBucket: required.allowedMediaBucket!,
-    allowedMediaPrefix: required.allowedMediaPrefix!,
+    allowedMediaBucket: required.ALLOWED_MEDIA_BUCKET!,
+    allowedMediaPrefix: required.ALLOWED_MEDIA_PREFIX!,
     maxModelTokens: Number(env.MAX_MODEL_TOKENS ?? 2048),
     maxImageBytes: Number(env.MAX_IMAGE_BYTES ?? 5 * 1024 * 1024),
     maxTotalBytes: Number(env.MAX_TOTAL_IMAGE_BYTES ?? 10 * 1024 * 1024),
@@ -51,38 +52,86 @@ function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
   };
 }
 
-let analyzer: OpenRouterContentAnalyzer | null = null;
+type Analyzer = Pick<OpenRouterContentAnalyzer, "analyze">;
+type AnalyzerFactory = (config: HandlerConfig, logger: Logger) => Analyzer;
 
-export function handler(
-  event: LambdaEvent,
-  _context: unknown,
-  env: Record<string, string | undefined> = process.env,
-): Promise<unknown> {
-  // Fail closed at startup if required settings are missing or invalid.
-  const config = loadConfig(env);
-  if (!config.apiKeySecretArn && !config.apiKey) {
-    throw new Error("missing required env: OPENROUTER_API_KEY_SECRET_ARN");
-  }
-  if (!analyzer) {
-    analyzer = new OpenRouterContentAnalyzer(
-      {
-        modelId: config.modelId,
-        region: config.region,
-        baseUrl: config.baseUrl,
-        apiKeySecretArn: config.apiKeySecretArn,
-        apiKey: config.apiKey,
-        maxModelTokens: config.maxModelTokens,
-        requestTimeoutMs: config.requestTimeoutMs,
-      },
-      {
-        allowedBucket: config.allowedMediaBucket,
-        allowedPrefix: config.allowedMediaPrefix,
-        maxImageBytes: config.maxImageBytes,
-        maxTotalBytes: config.maxTotalBytes,
-        maxImages: config.maxImages,
-        allowedMimeTypes: config.allowedMimeTypes,
-      },
-    );
-  }
-  return analyzer.analyze(event.request);
+function createAnalyzer(config: HandlerConfig, logger: Logger): Analyzer {
+  return new OpenRouterContentAnalyzer(
+    {
+      modelId: config.modelId,
+      region: config.region,
+      baseUrl: config.baseUrl,
+      apiKeySecretArn: config.apiKeySecretArn,
+      apiKey: config.apiKey,
+      maxModelTokens: config.maxModelTokens,
+      requestTimeoutMs: config.requestTimeoutMs,
+    },
+    {
+      allowedBucket: config.allowedMediaBucket,
+      allowedPrefix: config.allowedMediaPrefix,
+      maxImageBytes: config.maxImageBytes,
+      maxTotalBytes: config.maxTotalBytes,
+      maxImages: config.maxImages,
+      allowedMimeTypes: config.allowedMimeTypes,
+    },
+    logger,
+  );
 }
+
+type RuntimeHandler = (
+  event: LambdaEvent,
+  context: unknown,
+  callback?: unknown,
+) => Promise<unknown>;
+
+export function createHandler(
+  env: Record<string, string | undefined>,
+  analyzerFactory: AnalyzerFactory = createAnalyzer,
+  logger: Logger | undefined = undefined,
+): RuntimeHandler {
+  let analyzer: Analyzer | null = null;
+  const activeLogger = logger ?? createLambdaLogger(env);
+
+  return function handle(
+    event: LambdaEvent,
+    _context: unknown,
+    _callback?: unknown,
+  ): Promise<unknown> {
+    const startedAt = performance.now();
+    activeLogger.info(
+      { analysisId: event.request.analysisId, triggerType: event.request.triggerType },
+      "Lambda invocation received",
+    );
+    return Promise.resolve()
+      .then(() => {
+        // Lambda supplies callback as argument three. Environment comes only
+        // from this composition root, never from runtime handler arguments.
+        const config = loadConfig(env);
+        if (!config.apiKeySecretArn && !config.apiKey) {
+          throw new Error("missing required env: OPENROUTER_API_KEY_SECRET_ARN");
+        }
+        analyzer ??= analyzerFactory(config, activeLogger);
+        return analyzer.analyze(event.request);
+      })
+      .then((result) => {
+        activeLogger.info(
+          {
+            analysisId: event.request.analysisId,
+            decision: result.decision,
+            durationMs: Math.round(performance.now() - startedAt),
+          },
+          "Lambda invocation completed",
+        );
+        return result;
+      })
+      .catch((error: unknown) => {
+        activeLogger.error(
+          { analysisId: event.request.analysisId, err: error },
+          "Lambda invocation failed",
+        );
+        throw error;
+      });
+  };
+}
+
+export const handler = createHandler(process.env);

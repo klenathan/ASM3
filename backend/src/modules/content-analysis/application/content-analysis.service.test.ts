@@ -70,6 +70,16 @@ class StubRepository implements ContentAnalysisRepository {
   async recordFailure(input: RecordRunFailureInput): Promise<void> {
     this.failed.push(input);
   }
+  async findLatestDecisionsByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, "allow" | "review">> {
+    const map = new Map<string, "allow" | "review">();
+    for (const run of this.created) {
+      if (run.decision !== null) map.set(run.threadId, run.decision);
+    }
+    void threadIds;
+    return map;
+  }
 }
 
 function makeService(

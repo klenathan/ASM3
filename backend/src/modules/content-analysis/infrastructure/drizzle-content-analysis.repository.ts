@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type {
   ContentAnalysisRepository,
@@ -91,6 +91,40 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
         completedAt: input.completedAt,
       })
       .where(eq(contentAnalysisRuns.id, input.id));
+  }
+
+  async findLatestDecisionsByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, "allow" | "review">> {
+    if (threadIds.length === 0) return new Map();
+    const rows = await this.db
+      .selectDistinctOn(
+        [contentAnalysisRuns.threadId],
+        {
+          threadId: contentAnalysisRuns.threadId,
+          decision: contentAnalysisRuns.decision,
+          createdAt: contentAnalysisRuns.createdAt,
+        },
+      )
+      .from(contentAnalysisRuns)
+      .where(
+        and(
+          inArray(contentAnalysisRuns.threadId, [...threadIds]),
+          isNotNull(contentAnalysisRuns.decision),
+        ),
+      )
+      .orderBy(
+        contentAnalysisRuns.threadId,
+        desc(contentAnalysisRuns.createdAt),
+      );
+
+    const decisions = new Map<string, "allow" | "review">();
+    for (const row of rows) {
+      if (row.decision !== null) {
+        decisions.set(row.threadId, row.decision as "allow" | "review");
+      }
+    }
+    return decisions;
   }
 }
 

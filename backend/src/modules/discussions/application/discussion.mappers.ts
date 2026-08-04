@@ -22,6 +22,7 @@ export function toThreadDto(
   media: readonly ThreadMediaRecord[] = [],
   author?: ProfileIdentity | null,
   myVote: -1 | 0 | 1 = 0,
+  analysisDecision: "allow" | "review" | null = null,
 ): ThreadDto {
   return {
     id: record.id,
@@ -36,6 +37,7 @@ export function toThreadDto(
     authorDisplayName: author?.displayName ?? null,
     authorAvatarMediaId: author?.avatarMediaId ?? null,
     myVote,
+    analysisDecision,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     deletedAt: record.deletedAt?.toISOString() ?? null,
@@ -47,6 +49,7 @@ export function toThreadPageDto(
   mediaByThread: ReadonlyMap<string, readonly ThreadMediaRecord[]>,
   authorById: ReadonlyMap<string, ProfileIdentity> = new Map(),
   voteByThread: ReadonlyMap<string, -1 | 0 | 1> = new Map(),
+  decisions: ReadonlyMap<string, "allow" | "review"> = new Map(),
 ): ThreadPageDto {
   return {
     items: page.items.map((record) =>
@@ -55,6 +58,7 @@ export function toThreadPageDto(
         mediaByThread.get(record.id) ?? [],
         authorById.get(record.authorId),
         voteByThread.get(record.id) ?? 0,
+        decisions.get(record.id) ?? null,
       ),
     ),
     nextCursor: page.nextCursor,
@@ -68,9 +72,10 @@ export function toHomeFeedThreadDto(
   media: readonly ThreadMediaRecord[] = [],
   author?: ProfileIdentity | null,
   myVote: -1 | 0 | 1 = 0,
+  analysisDecision: "allow" | "review" | null = null,
 ): HomeFeedThreadDto {
   return {
-    ...toThreadDto(record, media, author),
+    ...toThreadDto(record, media, author, myVote, analysisDecision),
     societySlug: society.slug,
     societyName: society.name,
     myVote,
@@ -121,6 +126,7 @@ export function toUserThreadActivityDto(
   identity: ProfileIdentity,
   myVote: -1 | 0 | 1 = 0,
   media: readonly ThreadMediaRecord[] = [],
+  analysisDecision: "allow" | "review" | null = null,
 ): UserThreadActivityDto {
   return {
     id: record.id,
@@ -138,6 +144,7 @@ export function toUserThreadActivityDto(
     authorDisplayName: identity.displayName,
     authorAvatarMediaId: identity.avatarMediaId,
     myVote,
+    analysisDecision,
   };
 }
 

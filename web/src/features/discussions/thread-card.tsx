@@ -11,6 +11,7 @@ import {
 import { cn } from "../../lib/utils";
 import { ThreadMedia } from "../media/thread-media";
 import { timeAgo } from "./use-thread-vote";
+import { AnalysisBadge } from "./analysis-badge";
 import type { DiscussionItem } from "./types";
 
 export function DiscussionCard({
@@ -82,9 +83,12 @@ export function DiscussionCard({
       </CardHeader>
 
       <CardContent className="space-y-2">
-        <CardTitle className="text-lg font-semibold leading-snug">
-          {item.title}
-        </CardTitle>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <CardTitle className="text-lg font-semibold leading-snug">
+            {item.title}
+          </CardTitle>
+          <AnalysisBadge decision={item.analysisDecision} />
+        </div>
         {item.body !== null && item.body.length > 0 && (
           <p className="line-clamp-3 leading-7 text-muted-foreground">
             {item.body}

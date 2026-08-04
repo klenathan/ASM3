@@ -16,6 +16,8 @@ export interface ThreadDto {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly deletedAt: string | null;
+  /** Latest automated content-analysis outcome; null when none/pending. */
+  readonly analysisDecision: "allow" | "review" | null;
 }
 
 export type ThreadPageDto = PageResult<ThreadDto>;
@@ -62,6 +64,7 @@ export interface UserThreadActivityDto {
   readonly authorDisplayName: string;
   readonly authorAvatarMediaId: string | null;
   readonly myVote: -1 | 0 | 1;
+  readonly analysisDecision: "allow" | "review" | null;
 }
 
 export type UserThreadActivityPageDto = PageResult<UserThreadActivityDto>;
