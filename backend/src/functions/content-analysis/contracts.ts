@@ -57,6 +57,7 @@ export interface ContentAnalysisResult {
     evidence: string;
   }>;
   summary: string;
+  rationale: string;
 }
 
 /** Invocation payload envelope (event passed by the backend). */

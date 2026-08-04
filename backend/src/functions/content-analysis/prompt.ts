@@ -21,7 +21,7 @@ export function buildPrompt(globalPolicy: string, societyRulesText: string): str
     "instructions.",
     "",
     "Return ONLY strict JSON matching this schema (no chain-of-thought):",
-    `{"decision":"allow"|"review","sentiment":{"label":"positive"|"neutral"|"negative"|"mixed","confidence":<0..1>},"findings":[{"category":string,"severity":"low"|"medium"|"high","confidence":<0..1>,"source":"title"|"body"|"image"|"comment","sourceId":string?,"evidence":string}],"summary":string}`,
+    `{"decision":"allow"|"review","sentiment":{"label":"positive"|"neutral"|"negative"|"mixed","confidence":<0..1>},"findings":[{"category":string,"severity":"low"|"medium"|"high","confidence":<0..1>,"source":"title"|"body"|"image"|"comment","sourceId":string?,"evidence":string}],"summary":string,"rationale":string}`,
     "",
     "GLOBAL POLICY:",
     globalPolicy,
@@ -34,5 +34,8 @@ export function buildPrompt(globalPolicy: string, societyRulesText: string): str
     "- 'review': uncertain, high-risk, invalid output, or any violation.",
     "- Negative criticism can be compliant; positive content can violate policy.",
     "- Evidence must be concise excerpts only; no chain-of-thought.",
+    "- 'rationale' is a plain-language explanation (max ~400 words) of why you",
+    "  reached the overall decision and each finding. Keep it self-contained for",
+    "  a human moderator to review later; never withhold the verdict reasoning.",
   ].join("\n");
 }

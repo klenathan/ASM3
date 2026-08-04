@@ -209,14 +209,16 @@ interface ContentAnalysisResult {
     evidence: string;
   }>;
   summary: string;
+  rationale: string;
 }
 ```
 
-Do not request or store chain-of-thought. Evidence contains only concise excerpts needed by moderators.
+Do not request or store raw chain-of-thought. `evidence` contains only concise excerpts needed by moderators; `rationale` is a bounded, plain-language explanation (max ~400 words) of the overall decision and each finding, persisted for human moderation review.
 
 Persist:
 
 - decision, sentiment, and structured findings;
+- summary and rationale;
 - OpenRouter model ID and provider;
 - Lambda function version or alias;
 - policy and prompt versions;
@@ -330,6 +332,8 @@ The relay publishes unpublished rows and then marks them published. Direct post-
 | `sentiment_label`         | Nullable sentiment result                      |
 | `confidence`              | Nullable bounded confidence                    |
 | `findings`                | Structured JSON result                         |
+| `summary`                 | Concise result summary                         |
+| `rationale`               | Plain-language decision rationale for moderators |
 | `input_snapshot`          | Restricted analysis evidence/context           |
 | `input_hash`              | Reproducibility and stale detection            |
 | `model_id`                | Invoked OpenRouter DeepSeek model             |

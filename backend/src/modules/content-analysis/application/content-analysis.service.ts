@@ -79,6 +79,7 @@ export class ContentAnalysisService {
         confidence: invocation.result.sentiment.confidence,
         findings: invocation.result.findings,
         summary: invocation.result.summary,
+        rationale: invocation.result.rationale,
         modelId: invocation.modelId,
         lambdaFunctionVersion: invocation.lambdaFunctionVersion,
         lambdaRequestId: invocation.lambdaRequestId,

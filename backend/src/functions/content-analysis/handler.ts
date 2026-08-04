@@ -42,10 +42,14 @@ function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
     allowedMediaBucket: required.ALLOWED_MEDIA_BUCKET!,
     allowedMediaPrefix: required.ALLOWED_MEDIA_PREFIX!,
     maxModelTokens: Number(env.MAX_MODEL_TOKENS ?? 2048),
-    maxImageBytes: Number(env.MAX_IMAGE_BYTES ?? 5 * 1024 * 1024),
-    maxTotalBytes: Number(env.MAX_TOTAL_IMAGE_BYTES ?? 10 * 1024 * 1024),
+    // 10 MB matches the FE upload and backend media policy limits; keep in
+    // sync with web society-thread-composer.tsx and media domain policy.
+    maxImageBytes: Number(env.MAX_IMAGE_BYTES ?? 10 * 1024 * 1024),
+    maxTotalBytes: Number(env.MAX_TOTAL_IMAGE_BYTES ?? 40 * 1024 * 1024),
     maxImages: Number(env.MAX_IMAGES ?? 4),
-    allowedMimeTypes: (env.ALLOWED_MIME_TYPES ?? "image/jpeg,image/png,image/webp")
+    allowedMimeTypes: (
+      env.ALLOWED_MIME_TYPES ?? "image/jpeg,image/png,image/webp"
+    )
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
@@ -99,7 +103,10 @@ export function createHandler(
   ): Promise<unknown> {
     const startedAt = performance.now();
     activeLogger.info(
-      { analysisId: event.request.analysisId, triggerType: event.request.triggerType },
+      {
+        analysisId: event.request.analysisId,
+        triggerType: event.request.triggerType,
+      },
       "Lambda invocation received",
     );
     return Promise.resolve()
@@ -108,7 +115,9 @@ export function createHandler(
         // from this composition root, never from runtime handler arguments.
         const config = loadConfig(env);
         if (!config.apiKeySecretArn && !config.apiKey) {
-          throw new Error("missing required env: OPENROUTER_API_KEY_SECRET_ARN");
+          throw new Error(
+            "missing required env: OPENROUTER_API_KEY_SECRET_ARN",
+          );
         }
         analyzer ??= analyzerFactory(config, activeLogger);
         return analyzer.analyze(event.request);
@@ -119,6 +128,7 @@ export function createHandler(
             analysisId: event.request.analysisId,
             decision: result.decision,
             durationMs: Math.round(performance.now() - startedAt),
+            rawResult: result,
           },
           "Lambda invocation completed",
         );

@@ -62,8 +62,8 @@ const environmentSchema = z
     CONTENT_ANALYSIS_PROMPT_VERSION: z.string().trim().min(1).default("1"),
     ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(55_000),
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
-    ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(5 * 1024 * 1024),
-    ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
+    ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
+    ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
   })
   .superRefine((value, context) => {
     if (

@@ -209,15 +209,15 @@ variable "content_analysis_max_images" {
 }
 
 variable "content_analysis_max_image_bytes" {
-  description = "Max bytes for a single analyzed image."
+  description = "Max bytes for a single analyzed image. Matches the FE upload / backend media limit (10 MB)."
   type        = number
-  default     = 5242880
+  default     = 10485760
 }
 
 variable "content_analysis_max_total_image_bytes" {
-  description = "Max total bytes across all analyzed images."
+  description = "Max total bytes across all analyzed images (max_images x per-image limit)."
   type        = number
-  default     = 10485760
+  default     = 41943040
 }
 
 variable "content_analysis_allowed_mime_types" {

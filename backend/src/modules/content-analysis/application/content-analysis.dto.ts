@@ -74,6 +74,7 @@ export interface ContentAnalysisResult {
     evidence: string;
   }>;
   summary: string;
+  rationale: string;
 }
 
 /**

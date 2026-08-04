@@ -20,39 +20,83 @@ import type {
 /**
  * Strict structural validation of a content-analysis result. The backend
  * treats this as authoritative before persisting any result or state
- * transition. Both the Lambda adapter and the function bundle reuse it so the
- * two sides agree on the contract.
+ * transition. The Lambda function bundle keeps an identical copy
+ * (backend/src/functions/content-analysis/openrouter-content-analyzer.ts);
+ * keep the two in sync so both sides agree on the contract.
  *
  * Invariants enforced here:
  *  - decision is a known value;
  *  - sentiment label is known and confidence is bounded [0, 1];
  *  - every finding carries a category, bounded severity/confidence, a known
  *    source, and non-empty evidence;
- *  - a non-empty summary is always present.
+ *  - a non-empty summary is always present;
+ *  - a non-empty rationale is always present (for human moderation review);
  */
-export function isStrictResult(value: unknown): value is ContentAnalysisResult {
-  if (typeof value !== "object" || value === null) return false;
+
+/**
+ * Return a human-readable reason describing the first schema invariant that
+ * fails, or null when the value is a valid {@link ContentAnalysisResult}. Used
+ * to surface the failing field in logs/errors instead of a generic message.
+ */
+export function strictResultIssue(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) {
+    return "result is not an object";
+  }
   const r = value as Record<string, unknown>;
 
-  if (r.decision !== "allow" && r.decision !== "review") return false;
-  if (typeof r.summary !== "string" || r.summary.length === 0) return false;
+  if (r.decision !== "allow" && r.decision !== "review") {
+    return `invalid decision ${JSON.stringify(r.decision)} (expected "allow"|"review")`;
+  }
+  if (typeof r.summary !== "string" || r.summary.length === 0) {
+    return "summary is missing or empty";
+  }
+  if (typeof r.rationale !== "string" || r.rationale.length === 0) {
+    return "rationale is missing or empty";
+  }
 
   const s = r.sentiment as Record<string, unknown> | undefined;
-  if (!s || !["positive", "neutral", "negative", "mixed"].includes(s.label as string)) {
-    return false;
+  if (!s) {
+    return "sentiment is missing";
   }
-  if (typeof s.confidence !== "number" || s.confidence < 0 || s.confidence > 1) return false;
-
-  if (!Array.isArray(r.findings)) return false;
-  for (const f of r.findings as Array<Record<string, unknown>>) {
-    if (typeof f.category !== "string" || f.category.length === 0) return false;
-    if (!["low", "medium", "high"].includes(f.severity as Severity)) return false;
-    if (typeof f.confidence !== "number" || f.confidence < 0 || f.confidence > 1) return false;
-    if (!["title", "body", "image", "comment"].includes(f.source as FindingSource)) return false;
-    if (typeof f.evidence !== "string" || f.evidence.length === 0) return false;
+  if (!["positive", "neutral", "negative", "mixed"].includes(s.label as string)) {
+    return `invalid sentiment label ${JSON.stringify(s.label)}`;
+  }
+  if (typeof s.confidence !== "number" || s.confidence < 0 || s.confidence > 1) {
+    return `sentiment confidence out of range [0,1] (${JSON.stringify(s.confidence)})`;
   }
 
-  return true;
+  if (!Array.isArray(r.findings)) {
+    return "findings is not an array";
+  }
+  const findings = r.findings as Array<Record<string, unknown>>;
+  for (let i = 0; i < findings.length; i += 1) {
+    const f = findings[i];
+    if (typeof f !== "object" || f === null) {
+      return `findings[${i}] is not an object`;
+    }
+    if (typeof f.category !== "string" || f.category.length === 0) {
+      return `findings[${i}].category is missing or empty`;
+    }
+    if (!["low", "medium", "high"].includes(f.severity as Severity)) {
+      return `findings[${i}] has invalid severity ${JSON.stringify(f.severity)}`;
+    }
+    if (typeof f.confidence !== "number" || f.confidence < 0 || f.confidence > 1) {
+      return `findings[${i}].confidence out of range [0,1] (${JSON.stringify(f.confidence)})`;
+    }
+    if (!["title", "body", "image", "comment"].includes(f.source as FindingSource)) {
+      return `findings[${i}] has invalid source ${JSON.stringify(f.source)}`;
+    }
+    if (typeof f.evidence !== "string" || f.evidence.length === 0) {
+      return `findings[${i}].evidence is missing or empty`;
+    }
+  }
+
+  return null;
+}
+
+/** Strict type-guard wrapper over {@link strictResultIssue}. */
+export function isStrictResult(value: unknown): value is ContentAnalysisResult {
+  return strictResultIssue(value) === null;
 }
 
 // ---------------------------------------------------------------------------

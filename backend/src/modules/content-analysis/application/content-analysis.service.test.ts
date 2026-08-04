@@ -37,6 +37,7 @@ function successInvocation(): AnalysisInvocationResult {
       sentiment: { label: "positive", confidence: 0.9 },
       findings: [],
       summary: "ok",
+      rationale: "reasoning",
     },
     modelId: "deepseek/test",
     lambdaFunctionVersion: "42",

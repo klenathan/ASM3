@@ -13,6 +13,7 @@ export interface RecordRunResultInput {
   readonly confidence: number | null;
   readonly findings: unknown[] | null;
   readonly summary: string | null;
+  readonly rationale: string | null;
   readonly modelId: string | null;
   readonly lambdaFunctionVersion: string | null;
   readonly lambdaRequestId: string | null;

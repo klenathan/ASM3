@@ -5,7 +5,7 @@ import type {
   AnalysisInvocationResult,
   ContentAnalysisRequest,
 } from "../application/content-analysis.dto";
-import { isStrictResult } from "../domain/content-analysis.policy";
+import { isStrictResult, strictResultIssue } from "../domain/content-analysis.policy";
 
 /**
  * Infrastructure adapter invoking the analysis Lambda synchronously
@@ -86,7 +86,9 @@ export class LambdaContentAnalyzer implements ContentAnalyzerPort {
 
     // The function returns the strict ContentAnalysisResult directly.
     if (!isStrictResult(body)) {
-      throw new Error("content-analysis lambda returned schema-invalid analysis");
+      throw new Error(
+        `content-analysis lambda returned schema-invalid analysis: ${strictResultIssue(body)}`,
+      );
     }
 
     return {

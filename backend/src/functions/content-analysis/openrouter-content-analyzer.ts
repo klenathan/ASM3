@@ -222,39 +222,75 @@ export class OpenRouterContentAnalyzer {
       this.logger.error("OpenRouter returned malformed analysis JSON");
       throw new Error("OpenRouter returned malformed analysis JSON");
     }
-    if (!isStrictResult(result)) throw new Error("OpenRouter returned schema-invalid analysis");
+    if (!isStrictResult(result)) {
+      throw new Error(`OpenRouter returned schema-invalid analysis: ${strictResultIssue(result)}`);
+    }
     return result;
   }
 }
 
-function isStrictResult(value: unknown): value is ContentAnalysisResult {
-  if (typeof value !== "object" || value === null) return false;
-  const result = value as Record<string, unknown>;
-  const sentiment = result.sentiment as Record<string, unknown> | undefined;
-  if (result.decision !== "allow" && result.decision !== "review") return false;
-  if (
-    !sentiment ||
-    !["positive", "neutral", "negative", "mixed"].includes(sentiment.label as string) ||
-    typeof sentiment.confidence !== "number" ||
-    sentiment.confidence < 0 ||
-    sentiment.confidence > 1
-  ) {
-    return false;
+export function strictResultIssue(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) {
+    return "result is not an object";
   }
-  if (!Array.isArray(result.findings) || typeof result.summary !== "string") return false;
-  return result.findings.every((finding) => {
-    if (typeof finding !== "object" || finding === null) return false;
-    const item = finding as Record<string, unknown>;
-    return (
-      typeof item.category === "string" &&
-      ["low", "medium", "high"].includes(item.severity as string) &&
-      typeof item.confidence === "number" &&
-      item.confidence >= 0 &&
-      item.confidence <= 1 &&
-      ["title", "body", "image", "comment"].includes(item.source as string) &&
-      typeof item.evidence === "string"
-    );
-  });
+  const r = value as Record<string, unknown>;
+
+  if (r.decision !== "allow" && r.decision !== "review") {
+    return `invalid decision ${JSON.stringify(r.decision)} (expected "allow"|"review")`;
+  }
+  if (typeof r.summary !== "string" || r.summary.length === 0) {
+    return "summary is missing or empty";
+  }
+  if (typeof r.rationale !== "string" || r.rationale.length === 0) {
+    return "rationale is missing or empty";
+  }
+
+  const s = r.sentiment as Record<string, unknown> | undefined;
+  if (!s) {
+    return "sentiment is missing";
+  }
+  if (!["positive", "neutral", "negative", "mixed"].includes(s.label as string)) {
+    return `invalid sentiment label ${JSON.stringify(s.label)}`;
+  }
+  if (typeof s.confidence !== "number" || s.confidence < 0 || s.confidence > 1) {
+    return `sentiment confidence out of range [0,1] (${JSON.stringify(s.confidence)})`;
+  }
+
+  if (!Array.isArray(r.findings)) {
+    return "findings is not an array";
+  }
+  const findings = r.findings as Array<Record<string, unknown>>;
+  for (let i = 0; i < findings.length; i += 1) {
+    const f = findings[i];
+    if (typeof f !== "object" || f === null) {
+      return `findings[${i}] is not an object`;
+    }
+    if (typeof f.category !== "string" || f.category.length === 0) {
+      return `findings[${i}].category is missing or empty`;
+    }
+    if (!["low", "medium", "high"].includes(f.severity as string)) {
+      return `findings[${i}] has invalid severity ${JSON.stringify(f.severity)}`;
+    }
+    if (typeof f.confidence !== "number" || f.confidence < 0 || f.confidence > 1) {
+      return `findings[${i}].confidence out of range [0,1] (${JSON.stringify(f.confidence)})`;
+    }
+    if (!["title", "body", "image", "comment"].includes(f.source as string)) {
+      return `findings[${i}] has invalid source ${JSON.stringify(f.source)}`;
+    }
+    if (typeof f.evidence !== "string" || f.evidence.length === 0) {
+      return `findings[${i}].evidence is missing or empty`;
+    }
+  }
+
+  return null;
+}
+
+// Must stay identical to the backend's strict validator so the Lambda cannot
+// emit output that the backend (modules/content-analysis/domain/
+// content-analysis.policy.ts) later rejects. Mirror it here because the
+// function bundle is self-contained and cannot import backend source.
+export function isStrictResult(value: unknown): value is ContentAnalysisResult {
+  return strictResultIssue(value) === null;
 }
 
 function societyRulesText(request: ContentAnalysisRequest): string {

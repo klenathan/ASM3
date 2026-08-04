@@ -7,6 +7,7 @@ import {
   outcomeForDecision,
   outcomeForFailure,
   selectAnalysisComments,
+  strictResultIssue,
   truncateUntrusted,
   UNTRUSTED_CONTENT_FENCE,
 } from "./content-analysis.policy";
@@ -16,6 +17,7 @@ const validResult = {
   sentiment: { label: "positive", confidence: 0.9 },
   findings: [],
   summary: "ok",
+  rationale: "reasoning",
 };
 
 describe("assertRunStatusTransition", () => {
@@ -79,6 +81,26 @@ describe("isStrictResult", () => {
 
   it("rejects a result without a summary", () => {
     expect(isStrictResult({ ...validResult, summary: "" })).toBe(false);
+  });
+
+  it("rejects a result without a rationale", () => {
+    expect(isStrictResult({ ...validResult, rationale: "" })).toBe(false);
+  });
+});
+
+describe("strictResultIssue", () => {
+  it("returns null for a valid result and names the failing field otherwise", () => {
+    expect(strictResultIssue(validResult)).toBeNull();
+    expect(strictResultIssue(null)).toBe("result is not an object");
+    expect(strictResultIssue({ ...validResult, rationale: "" })).toBe("rationale is missing or empty");
+    expect(strictResultIssue({ ...validResult, summary: "" })).toBe("summary is missing or empty");
+    expect(strictResultIssue({ ...validResult, decision: "delete" })).toContain("invalid decision");
+    expect(
+      strictResultIssue({
+        ...validResult,
+        findings: [{ category: "", severity: "high", confidence: 0.8, source: "body", evidence: "e" }],
+      }),
+    ).toContain("category is missing or empty");
   });
 });
 
