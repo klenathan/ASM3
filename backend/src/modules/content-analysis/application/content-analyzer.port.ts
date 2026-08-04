@@ -1,6 +1,6 @@
 import type {
+  AnalysisInvocationResult,
   ContentAnalysisRequest,
-  ContentAnalysisResult,
 } from "./content-analysis.dto";
 
 /**
@@ -11,5 +11,11 @@ import type {
  * interface so it stays framework-agnostic and testable.
  */
 export interface ContentAnalyzerPort {
-  analyze(request: ContentAnalysisRequest): Promise<ContentAnalysisResult>;
+  /**
+   * Invoke the analyzer synchronously with a bounded request. Returns the
+   * validated result together with correlation metadata for audit evidence.
+   * Implementations MUST validate the response shape before returning; the
+   * service treats any thrown error as a failed run.
+   */
+  analyze(request: ContentAnalysisRequest): Promise<AnalysisInvocationResult>;
 }

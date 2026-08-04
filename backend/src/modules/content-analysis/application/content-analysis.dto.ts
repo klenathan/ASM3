@@ -75,3 +75,15 @@ export interface ContentAnalysisResult {
   }>;
   summary: string;
 }
+
+/**
+ * Result of a synchronous analyzer invocation, including correlation metadata
+ * surfaced from the AWS Lambda response for audit evidence.
+ */
+export interface AnalysisInvocationResult {
+  readonly result: ContentAnalysisResult;
+  readonly modelId: string | null;
+  readonly lambdaFunctionVersion: string | null;
+  readonly lambdaRequestId: string | null;
+  readonly providerRequestId: string | null;
+}

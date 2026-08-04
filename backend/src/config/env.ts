@@ -53,6 +53,17 @@ const environmentSchema = z
         message: "must be an HTTPS SQS queue URL",
       })
       .optional(),
+    CONTENT_ANALYSIS_MODE: z
+      .enum(["off", "shadow", "enforce"])
+      .default("off"),
+    CONTENT_ANALYSIS_LAMBDA_FUNCTION: z.string().trim().min(1).optional(),
+    CONTENT_ANALYSIS_LAMBDA_QUALIFIER: z.string().trim().min(1).default("prod"),
+    CONTENT_ANALYSIS_POLICY_VERSION: z.string().trim().min(1).default("1"),
+    CONTENT_ANALYSIS_PROMPT_VERSION: z.string().trim().min(1).default("1"),
+    CONTENT_ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(55_000),
+    ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
+    ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(5 * 1024 * 1024),
+    ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
   })
   .superRefine((value, context) => {
     if (
@@ -93,6 +104,22 @@ const environmentSchema = z
         message: "is required in production",
       });
     }
+    if (value.CONTENT_ANALYSIS_MODE !== "off") {
+      if (value.AWS_REGION === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["AWS_REGION"],
+          message: "is required when content analysis is enabled",
+        });
+      }
+      if (value.CONTENT_ANALYSIS_LAMBDA_FUNCTION === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["CONTENT_ANALYSIS_LAMBDA_FUNCTION"],
+          message: "is required when content analysis is enabled",
+        });
+      }
+    }
   });
 
 export interface AppConfig {
@@ -115,6 +142,15 @@ export interface AppConfig {
   readonly awsRegion: string | null;
   readonly mediaBucket: string | null;
   readonly threadEventsQueueUrl: string | null;
+  readonly contentAnalysisMode: "off" | "shadow" | "enforce";
+  readonly contentAnalysisLambdaFunction: string | null;
+  readonly contentAnalysisLambdaQualifier: string;
+  readonly contentAnalysisPolicyVersion: string;
+  readonly contentAnalysisPromptVersion: string;
+  readonly contentAnalysisTimeoutMs: number;
+  readonly analysisMaxImages: number;
+  readonly analysisMaxImageBytes: number;
+  readonly analysisMaxTotalImageBytes: number;
 }
 
 export function loadConfig(
@@ -145,5 +181,15 @@ export function loadConfig(
     awsRegion: result.data.AWS_REGION ?? null,
     mediaBucket: result.data.MEDIA_BUCKET ?? null,
     threadEventsQueueUrl: result.data.THREAD_EVENTS_QUEUE_URL ?? null,
+    contentAnalysisMode: result.data.CONTENT_ANALYSIS_MODE,
+    contentAnalysisLambdaFunction:
+      result.data.CONTENT_ANALYSIS_LAMBDA_FUNCTION ?? null,
+    contentAnalysisLambdaQualifier: result.data.CONTENT_ANALYSIS_LAMBDA_QUALIFIER,
+    contentAnalysisPolicyVersion: result.data.CONTENT_ANALYSIS_POLICY_VERSION,
+    contentAnalysisPromptVersion: result.data.CONTENT_ANALYSIS_PROMPT_VERSION,
+    contentAnalysisTimeoutMs: result.data.CONTENT_ANALYSIS_TIMEOUT_MS,
+    analysisMaxImages: result.data.ANALYSIS_MAX_IMAGES,
+    analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
+    analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,
   };
 }

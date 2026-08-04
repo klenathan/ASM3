@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Image as ImageIcon, RefreshCw, XIcon } from "lucide-react";
 
 import {
@@ -17,11 +17,11 @@ import {
 } from "../../components/ui/dialog";
 import { cn } from "../../lib/utils";
 import { useMediaUrls } from "./use-media-url";
+import type { MediaUrl } from "./api";
 
 export function ThreadMedia({
   mediaIds,
   className,
-  size = "md",
 }: {
   readonly mediaIds: readonly string[];
   readonly className?: string;
@@ -58,49 +58,15 @@ export function ThreadMedia({
     setOpen(true);
   };
 
-  // Multiple images render in a carousel; a single image renders directly.
-  const carousel = (
-    <Carousel
-      className={cn("group/carousel", className)}
-      opts={{ align: "start" }}
-    >
-      <CarouselContent>
-        {mediaIds.map((id, index) => {
-          const match = urls.find((media) => media.mediaId === id);
-          return (
-            <CarouselItem key={id} className="w-full">
-              <ThreadImage
-                url={match?.url}
-                loading={pending}
-                index={index}
-                size={size}
-                onClick={() => openLightbox(index)}
-              />
-            </CarouselItem>
-          );
-        })}
-      </CarouselContent>
-      <CarouselPrevious />
-      <CarouselNext />
-    </Carousel>
-  );
-
-  const single = (() => {
-    const match = urls.find((media) => media.mediaId === mediaIds[0]);
-    return (
-      <ThreadImage
-        url={match?.url}
-        loading={pending}
-        index={0}
-        size={size}
-        onClick={() => openLightbox(0)}
-      />
-    );
-  })();
-
   return (
     <>
-      {mediaIds.length > 1 ? carousel : single}
+      <MediaGrid
+        mediaIds={mediaIds}
+        urls={urls}
+        pending={pending}
+        onOpen={openLightbox}
+        className={className}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogOverlay className="bg-black/80" />
@@ -176,20 +142,87 @@ export function ThreadMedia({
   );
 }
 
-function ThreadImage({
+/**
+ * Facebook-style responsive preview grid. Renders up to four tiles in the
+ * card; larger sets keep only the first four until the '+N' overflow tile
+ * (US-002) is added.
+ */
+function MediaGrid({
+  mediaIds,
+  urls,
+  pending,
+  onOpen,
+  className,
+}: {
+  readonly mediaIds: readonly string[];
+  readonly urls: readonly MediaUrl[];
+  readonly pending: boolean;
+  readonly onOpen: (index: number) => void;
+  readonly className?: string;
+}) {
+  const count = mediaIds.length;
+  const visibleCount = Math.min(count, 4);
+  const layout = gridLayout(visibleCount);
+
+  return (
+    <div className={cn(layout.container, className)}>
+      {mediaIds.slice(0, visibleCount).map((id, index) => {
+        const match = urls.find((media) => media.mediaId === id);
+        return (
+          <GridTile
+            key={id}
+            url={match?.url}
+            loading={pending}
+            index={index}
+            aspect={layout.tile(index)}
+            onClick={() => onOpen(index)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function gridLayout(count: number) {
+  if (count === 1) {
+    return {
+      container: "grid grid-cols-1 gap-[2px]",
+      tile: () => "aspect-[16/10]",
+    };
+  }
+  if (count === 2) {
+    return {
+      container: "grid grid-cols-2 gap-[2px]",
+      tile: () => "aspect-square",
+    };
+  }
+  if (count === 3) {
+    return {
+      container: "grid grid-cols-3 grid-rows-2 gap-[2px]",
+      tile: (index: number) =>
+        index === 0 ? "col-span-2 row-span-2 h-full" : "aspect-square",
+    };
+  }
+  return {
+    container: "grid grid-cols-2 grid-rows-2 gap-[2px]",
+    tile: () => "aspect-square",
+  };
+}
+
+function GridTile({
   url,
   loading,
   index,
-  size = "md",
-  className,
+  aspect,
   onClick,
+  children,
 }: {
   readonly url: string | undefined;
   readonly loading: boolean;
   readonly index: number;
-  readonly size: "sm" | "md" | "lg";
-  readonly className?: string;
+  readonly aspect: string;
   readonly onClick: () => void;
+  readonly children?: ReactNode;
 }) {
   return (
     <button
@@ -200,16 +233,15 @@ function ThreadImage({
       }}
       data-state={url ? "done" : loading ? "processing" : "error"}
       className={cn(
-        "relative flex cursor-zoom-in items-center justify-center overflow-hidden rounded-sm border border-foreground/20 bg-muted text-muted-foreground transition-transform hover:brightness-95 [&_svg]:size-5",
-        size === "sm" ? "size-16" : size === "md" ? "size-64" : "w-full",
-        className,
+        "relative flex cursor-zoom-in items-center justify-center overflow-hidden rounded-[6px] border border-foreground/20 bg-muted text-muted-foreground transition-transform hover:brightness-95 [&_svg]:size-5",
+        aspect,
       )}
     >
       {url ? (
         <img
           src={url}
           alt={`Image ${index + 1} attached to this thread`}
-          className="size-full object-cover"
+          className="absolute inset-0 size-full object-cover"
           loading="lazy"
         />
       ) : loading ? (
@@ -217,6 +249,7 @@ function ThreadImage({
       ) : (
         <ImageIcon aria-hidden="true" className="size-5" />
       )}
+      {children}
     </button>
   );
 }
