@@ -41,6 +41,30 @@ aws lambda update-function-code \
   --function-name "$FUNCTION" \
   --zip-file "fileb://$ZIP" >/dev/null
 
+# update-function-code returns before $LATEST's LastUpdateStatus is 'Successful';
+# publish-version raced against the still-running update raises
+# ResourceConflictException ("An update is in progress for resource").
+# Poll until the update settles before trying to publish a version.
+for _ in $(seq 1 60); do
+  STATUS=$(aws lambda get-function \
+    --region "$AWS_REGION" \
+    --function-name "$FUNCTION" \
+    --qualifier '$LATEST' \
+    --query 'Configuration.LastUpdateStatus' --output text 2>/dev/null || true)
+  if [[ "$STATUS" == "Successful" ]]; then
+    break
+  fi
+  if [[ "$STATUS" == "Failed" ]]; then
+    echo "Lambda code update failed (LastUpdateStatus=Failed)." >&2
+    exit 1
+  fi
+  sleep 2
+done
+if [[ "$STATUS" != "Successful" ]]; then
+  echo "Timed out waiting for Lambda code update to finish (LastUpdateStatus=$STATUS)." >&2
+  exit 1
+fi
+
 VERSION=$(aws lambda publish-version \
   --region "$AWS_REGION" \
   --function-name "$FUNCTION" \

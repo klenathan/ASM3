@@ -29,6 +29,7 @@ function toDiscussionItem(thread: HomeFeedThread): DiscussionItem {
     societyName: thread.societyName,
     myVote: thread.myVote,
     mediaIds: thread.mediaIds,
+    analysisDecision: thread.analysisDecision,
   }
 }
 
