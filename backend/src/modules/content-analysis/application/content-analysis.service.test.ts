@@ -13,12 +13,14 @@ import type {
   ContentAnalysisRepository,
   RecordRunFailureInput,
   RecordRunResultInput,
+  SaveOverrideInput,
 } from "./content-analysis.repository";
 import type {
   ThreadAnalysisContext,
   ThreadAnalysisContextPort,
 } from "./thread-analysis-context.port";
 import type { ContentAnalysisRun } from "../domain/content-analysis";
+import type { ContentAnalysisOverride } from "../domain/content-analysis";
 
 const logger: Logger = pino({ level: "silent" });
 
@@ -54,6 +56,7 @@ class StubRepository implements ContentAnalysisRepository {
   readonly succeeded: RecordRunResultInput[] = [];
   readonly failed: RecordRunFailureInput[] = [];
   readonly pending: ContentAnalysisRun[] = [];
+  readonly overrides: SaveOverrideInput[] = [];
   started: number = 0;
 
   async create(run: ContentAnalysisRun): Promise<ContentAnalysisRun> {
@@ -99,6 +102,23 @@ class StubRepository implements ContentAnalysisRepository {
   }
   async findLatestSucceededAnalysis(): Promise<ThreadAnalysisDetails | null> {
     return null;
+  }
+  async saveOverride(input: SaveOverrideInput): Promise<ContentAnalysisOverride> {
+    this.overrides.push(input);
+    return { ...input, updatedAt: input.createdAt };
+  }
+  async findOverriddenThreadIds(threadIds: readonly string[]): Promise<Set<string>> {
+    void threadIds;
+    return new Set();
+  }
+  async findLatestOverridesByThreads(): Promise<ReadonlyMap<string, "accept" | "reject">> {
+    return new Map();
+  }
+  async findNextRunNumber(sourceEventId: string): Promise<number> {
+    const used = this.created
+      .filter((run) => run.sourceEventId === sourceEventId)
+      .map((run) => run.runNumber);
+    return used.length === 0 ? 1 : Math.max(...used) + 1;
   }
 }
 
@@ -301,5 +321,51 @@ describe("ContentAnalysisService.retryStaleRuns", () => {
       id: "run-1",
       errorCode: "ANALYSIS_INVOCATION_FAILED",
     });
+  });
+});
+
+describe("ContentAnalysisService.reanalyzeThread", () => {
+  it("creates a new run with the next run number and returns the result", async () => {
+    const { service, repository } = makeService();
+    const first = await service.analyzeNewThread("t1");
+    expect(first?.decision).toBe("allow");
+
+    const second = await service.reanalyzeThread("t1");
+    expect(second?.decision).toBe("allow");
+
+    expect(repository.created).toHaveLength(2);
+    expect(repository.created[0].runNumber).toBe(1);
+    expect(repository.created[0].triggerType).toBe("thread_created");
+    expect(repository.created[1].runNumber).toBe(2);
+    expect(repository.created[1].triggerType).toBe("reanalysis");
+    expect(repository.succeeded).toHaveLength(2);
+  });
+
+  it("does nothing when mode is off", async () => {
+    const { service, repository } = makeService({ mode: "off" });
+    expect(await service.reanalyzeThread("t1")).toBeNull();
+    expect(repository.created).toHaveLength(0);
+  });
+});
+
+describe("ContentAnalysisService.overrideThread", () => {
+  it("persists an accept override with the actor and reason", async () => {
+    const { service, repository } = makeService();
+    await service.overrideThread("t1", "accept", "admin-1", "Looks fine.");
+
+    expect(repository.overrides).toHaveLength(1);
+    expect(repository.overrides[0]).toMatchObject({
+      threadId: "t1",
+      decision: "accept",
+      actorId: "admin-1",
+      reason: "Looks fine.",
+    });
+  });
+
+  it("stores an empty/blank reason as null", async () => {
+    const { service, repository } = makeService();
+    await service.overrideThread("t1", "reject", "admin-1", "   ");
+
+    expect(repository.overrides[0].reason).toBeNull();
   });
 });

@@ -36,6 +36,16 @@ export interface AnalysisQueueThreadDto extends ThreadDto {
 
 export type AnalysisQueuePageDto = PageResult<AnalysisQueueThreadDto>;
 
+/**
+ * Moderator/system-admin action on a thread's automated analysis outcome.
+ * `accept` and `reject` record a human override and change visibility;
+ * `reanalyze` re-runs automated analysis without changing visibility.
+ */
+export type AnalysisModerationAction =
+  | { readonly kind: "accept"; readonly reason?: string }
+  | { readonly kind: "reject"; readonly reason?: string }
+  | { readonly kind: "reanalyze" };
+
 export interface HomeFeedThreadDto extends ThreadDto {
   readonly societySlug: string;
   readonly societyName: string;

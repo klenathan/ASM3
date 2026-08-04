@@ -10,4 +10,9 @@ export interface AnalysisDecisionReader {
   findLatestDecisionsByThreads(
     threadIds: readonly string[],
   ): Promise<ReadonlyMap<string, AnalysisDecision>>;
+  /**
+   * Return the set of thread IDs that have a recorded human override, so the
+   * review queue can drop already-resolved threads.
+   */
+  findOverriddenThreadIds(threadIds: readonly string[]): Promise<Set<string>>;
 }

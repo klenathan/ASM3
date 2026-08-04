@@ -8,6 +8,7 @@ import type {
   UpdateCommentCommand,
   UpdateThreadCommand,
   VoteCommand,
+  AnalysisModerationAction,
 } from "../application/discussion.dto";
 import type { CommentService } from "../application/comment.service";
 import type { FeedService } from "../application/feed.service";
@@ -45,6 +46,16 @@ interface PageQuery {
 
 interface AnalysisQueueQuery extends PageQuery {
   readonly status?: "all" | "none" | "review";
+}
+
+interface AnalysisModerationBody {
+  readonly decision: "accept" | "reject";
+  readonly reason?: string;
+}
+
+interface SocietyThreadPathParams {
+  readonly societySlug: string;
+  readonly threadId: string;
 }
 
 interface PublicUserIdParams {
@@ -104,6 +115,74 @@ export function createDiscussionController(dependencies: DiscussionControllerDep
           query.status,
         );
         return context.json(result, 200);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async overrideGlobalAnalysis(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { threadId } = validated<ThreadPathParams>(context, "param");
+        const body = validated<AnalysisModerationBody>(context, "json");
+        const action: AnalysisModerationAction =
+          body.reason === undefined
+            ? { kind: body.decision }
+            : { kind: body.decision, reason: body.reason };
+        await dependencies.threadService.moderateAnalysis(
+          requireInjectedPrincipal(context),
+          threadId,
+          action,
+        );
+        return context.body(null, 204);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async reanalyzeGlobalAnalysis(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { threadId } = validated<ThreadPathParams>(context, "param");
+        await dependencies.threadService.moderateAnalysis(
+          requireInjectedPrincipal(context),
+          threadId,
+          { kind: "reanalyze" },
+        );
+        return context.body(null, 204);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async overrideSocietyAnalysis(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { societySlug, threadId } = validated<SocietyThreadPathParams>(context, "param");
+        const body = validated<AnalysisModerationBody>(context, "json");
+        const action: AnalysisModerationAction =
+          body.reason === undefined
+            ? { kind: body.decision }
+            : { kind: body.decision, reason: body.reason };
+        await dependencies.threadService.moderateAnalysis(
+          requireInjectedPrincipal(context),
+          threadId,
+          action,
+          societySlug,
+        );
+        return context.body(null, 204);
+      } catch (error) {
+        return discussionErrorResponse(context, error);
+      }
+    },
+
+    async reanalyzeSocietyAnalysis(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const { societySlug, threadId } = validated<SocietyThreadPathParams>(context, "param");
+        await dependencies.threadService.moderateAnalysis(
+          requireInjectedPrincipal(context),
+          threadId,
+          { kind: "reanalyze" },
+          societySlug,
+        );
+        return context.body(null, 204);
       } catch (error) {
         return discussionErrorResponse(context, error);
       }

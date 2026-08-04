@@ -130,6 +130,39 @@ describe("ReviewQueue", () => {
     });
   });
 
+  it("accepts a thread via the global decision endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        items: [reviewThread],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderQueue();
+
+    await waitFor(() => {
+      expect(screen.getByText("Flagged thread")).toBeTruthy();
+    });
+    fetchMock.mockClear();
+
+    await userEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => {
+      const postCall = fetchMock.mock.calls.find(
+        (call) => String(call[1]?.method).toUpperCase() === "POST",
+      );
+      expect(postCall).toBeTruthy();
+      expect(String(postCall![0])).toContain(
+        `/api/v1/admin/analysis/${reviewThread.id}/decision`,
+      );
+      expect(JSON.parse(String(postCall![1]?.body))).toEqual({
+        decision: "accept",
+      });
+    });
+  });
+
   it("shows an empty state when nothing needs review", async () => {
     vi.stubGlobal(
       "fetch",

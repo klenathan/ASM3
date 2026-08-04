@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { Loader2, MessageCircle } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -12,7 +16,12 @@ import {
   TabsTrigger,
 } from "../../components/ui/tabs";
 import { AnalysisBadge } from "../discussions/analysis-badge";
-import { fetchAnalysisQueue } from "./analysis-api";
+import {
+  fetchAnalysisQueue,
+  reanalyzeThread,
+  setAnalysisDecision,
+  type AnalysisActionScope,
+} from "./analysis-api";
 import type { AnalysisQueueFilter, AnalysisQueueThread } from "./types";
 
 const PAGE_LIMIT = 12;
@@ -30,18 +39,112 @@ function shortDate(value: string): string {
     : date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-function QueueCard({ item }: { readonly item: AnalysisQueueThread }) {
+function QueueActions({
+  item,
+  actionScope,
+}: {
+  readonly item: AnalysisQueueThread;
+  readonly actionScope: AnalysisActionScope;
+}) {
+  const queryClient = useQueryClient();
+
+  const invalidateQueue = () =>
+    queryClient.invalidateQueries({ queryKey: ["analysis", "queue"] });
+
+  const decisionMutation = useMutation({
+    mutationFn: (input: { decision: "accept" | "reject"; reason?: string }) =>
+      setAnalysisDecision({
+        ...actionScope,
+        threadId: item.id,
+        decision: input.decision,
+        ...(input.reason === undefined ? {} : { reason: input.reason }),
+      }),
+    onSuccess: invalidateQueue,
+  });
+
+  const reanalyzeMutation = useMutation({
+    mutationFn: () =>
+      reanalyzeThread({
+        ...actionScope,
+        threadId: item.id,
+      }),
+    onSuccess: invalidateQueue,
+  });
+
+  const busy =
+    decisionMutation.isPending || reanalyzeMutation.isPending;
+
+  const handleReject = () => {
+    if (!window.confirm("Reject this post? It will be hidden from the community."))
+      return;
+    const reason = window.prompt("Optional reason for rejecting (left blank if none):");
+    if (reason === null) return;
+    decisionMutation.mutate({
+      decision: "reject",
+      ...(reason.trim().length === 0 ? {} : { reason: reason.trim() }),
+    });
+  };
+
   return (
-    <Link
-      to={`/s/${item.societySlug}/t/${item.id}`}
-      className="group flex flex-col border border-foreground/15 p-4 transition-colors hover:border-primary/50 hover:bg-muted/40"
-    >
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          decisionMutation.mutate({ decision: "accept" })
+        }
+        disabled={busy}
+      >
+        Accept
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="destructive"
+        onClick={handleReject}
+        disabled={busy}
+      >
+        Reject
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        onClick={() => reanalyzeMutation.mutate(undefined)}
+        disabled={busy}
+      >
+        {reanalyzeMutation.isPending ? (
+          <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+        ) : (
+          "Re-analyze"
+        )}
+      </Button>
+    </div>
+  );
+}
+
+
+function QueueCard({
+  item,
+  actionScope,
+}: {
+  readonly item: AnalysisQueueThread;
+  readonly actionScope?: AnalysisActionScope;
+}) {
+  return (
+    <article className="group flex flex-col border border-foreground/15 p-4 transition-colors hover:border-primary/50 hover:bg-muted/40">
       <div className="flex items-start justify-between gap-3">
         <AnalysisBadge decision={item.analysisDecision} />
         <span className="text-xs text-muted-foreground">{shortDate(item.createdAt)}</span>
       </div>
       <h3 className="mt-3 line-clamp-2 font-semibold leading-snug group-hover:text-primary">
-        {item.title}
+        <Link
+          to={`/s/${item.societySlug}/t/${item.id}`}
+          className="hover:text-primary"
+        >
+          {item.title}
+        </Link>
       </h3>
       {item.body !== null && item.body.length > 0 && (
         <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
@@ -62,7 +165,10 @@ function QueueCard({ item }: { readonly item: AnalysisQueueThread }) {
           {item.commentCount}
         </span>
       </div>
-    </Link>
+      {actionScope !== undefined && (
+        <QueueActions item={item} actionScope={actionScope} />
+      )}
+    </article>
   );
 }
 
@@ -82,8 +188,9 @@ function QueueSkeleton() {
 /**
  * Grid of threads whose automated content-analysis outcome is "none" (no
  * decision yet) or "review" (flagged for review). Admin uses the global queue;
- * a moderator passes their society slug for the society-scoped queue.
- * Debug/read-only build — no actions, just surfacing and deep-linking.
+ * a moderator passes their society slug for the society-scoped queue. Each
+ * card offers Accept / Reject (override the automated decision, publishing or
+ * hiding the post) and Re-analyze actions.
  */
 export function ReviewQueue({
   scope,
@@ -93,6 +200,11 @@ export function ReviewQueue({
   readonly slug?: string;
 }) {
   const [status, setStatus] = useState<AnalysisQueueFilter>("all");
+
+  const actionScope: AnalysisActionScope =
+    scope === "admin"
+      ? { scope: "admin" }
+      : { scope: "moderator", slug: slug ?? "" };
 
   const query = useInfiniteQuery({
     queryKey: ["analysis", "queue", scope, slug ?? "global", status],
@@ -149,7 +261,11 @@ export function ReviewQueue({
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((item) => (
-              <QueueCard key={item.id} item={item} />
+              <QueueCard
+                key={item.id}
+                item={item}
+                actionScope={actionScope}
+              />
             ))}
           </div>
         )}

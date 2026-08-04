@@ -239,11 +239,15 @@ export class FeedService {
   ): Promise<AnalysisQueuePageDto> {
     const threadIds = result.items.map((thread) => thread.id);
     const decisions = await this.decisionsFor(threadIds);
+    const overridden = this.analysisDecisionReader === undefined
+      ? new Set<string>()
+      : await this.analysisDecisionReader.findOverriddenThreadIds(threadIds);
     const mediaByThread = await this.mediaByThread(result.items);
     const authorById = await this.identitiesFor(result.items);
     const societyById = await this.societiesFor(result.items);
 
     const items = result.items.flatMap((thread) => {
+      if (overridden.has(thread.id)) return [];
       const decision = decisions.get(thread.id) ?? null;
       if (!matchesAnalysisFilter(decision, filter)) return [];
       const society = societyById.get(thread.societyId);

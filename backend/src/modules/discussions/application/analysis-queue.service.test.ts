@@ -140,6 +140,7 @@ function createService(
     societyRepository: new FakeSocietyRepository() as unknown as SocietyRepository,
     analysisDecisionReader: {
       findLatestDecisionsByThreads: async () => decisions,
+      findOverriddenThreadIds: async () => new Set(),
     },
   });
 }

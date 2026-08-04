@@ -40,3 +40,43 @@ export function fetchThreadAnalysis(
     `/api/v1/threads/${encodeURIComponent(threadId)}/analysis`,
   );
 }
+
+/** Scope describing which review-queue action endpoint to hit. */
+export type AnalysisActionScope =
+  | { readonly scope: "admin" }
+  | { readonly scope: "moderator"; readonly slug: string };
+
+/**
+ * Override a thread's automated analysis decision (accept or reject).
+ * `accept` publishes the thread; `reject` hides it. 204 on success.
+ */
+export function setAnalysisDecision(
+  params: AnalysisActionScope & {
+    readonly threadId: string;
+    readonly decision: "accept" | "reject";
+    readonly reason?: string;
+  },
+): Promise<void> {
+  const path =
+    params.scope === "admin"
+      ? `/api/v1/admin/analysis/${encodeURIComponent(params.threadId)}/decision`
+      : `/api/v1/mod/societies/${encodeURIComponent(params.slug)}/analysis/${encodeURIComponent(params.threadId)}/decision`;
+  return request<void>(path, {
+    method: "POST",
+    body: JSON.stringify({
+      decision: params.decision,
+      ...(params.reason === undefined ? {} : { reason: params.reason }),
+    }),
+  });
+}
+
+/** Re-run automated content analysis for a thread. 204 on success. */
+export function reanalyzeThread(
+  params: AnalysisActionScope & { readonly threadId: string },
+): Promise<void> {
+  const path =
+    params.scope === "admin"
+      ? `/api/v1/admin/analysis/${encodeURIComponent(params.threadId)}/reanalyze`
+      : `/api/v1/mod/societies/${encodeURIComponent(params.slug)}/analysis/${encodeURIComponent(params.threadId)}/reanalyze`;
+  return request<void>(path, { method: "POST" });
+}

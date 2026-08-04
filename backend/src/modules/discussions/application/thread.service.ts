@@ -19,6 +19,9 @@ import type {
   ThreadDto,
   UpdateThreadCommand,
 } from "./discussion.dto";
+import type {
+  AnalysisModerationAction,
+} from "./discussion.dto";
 import { toThreadDto } from "./discussion.mappers";
 import type { DiscussionProfilePort } from "./discussion.profile";
 import type { ThreadEventPublisher } from "./thread-events.port";
@@ -35,6 +38,16 @@ import {
   normalizeThreadBody,
   normalizeThreadTitle,
 } from "../domain/discussion";
+
+export interface AnalysisModerationPort {
+  override(
+    threadId: string,
+    decision: "accept" | "reject",
+    actorId: string,
+    reason: string | null,
+  ): Promise<void>;
+  reanalyze(threadId: string): Promise<unknown>;
+}
 
 export interface ThreadServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;
@@ -59,6 +72,12 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
    * analysis) without blocking thread creation.
    */
   readonly onThreadCreated?: (threadId: string) => void;
+  /**
+   * Optional content-analysis moderation actions (persist human override,
+   * re-run analysis). Supplied by the content-analysis service; absent when
+   * the backend runs without it configured.
+   */
+  readonly analysisModeration?: AnalysisModerationPort;
 }
 
 export class ThreadService {
@@ -70,6 +89,7 @@ export class ThreadService {
   private readonly media: ThreadMediaPort;
   private readonly events: ThreadEventPublisher;
   private readonly onThreadCreated: ((threadId: string) => void) | undefined;
+  private readonly analysisModeration: AnalysisModerationPort | undefined;
   private readonly analysisDecisionReader: AnalysisDecisionReader | undefined;
   private readonly threadAnalysisReader: ThreadAnalysisDetailsReader | undefined;
 
@@ -82,6 +102,7 @@ export class ThreadService {
     this.media = dependencies.media;
     this.events = dependencies.events;
     this.onThreadCreated = dependencies.onThreadCreated;
+    this.analysisModeration = dependencies.analysisModeration;
     this.analysisDecisionReader = dependencies.analysisDecisionReader;
     this.threadAnalysisReader = dependencies.threadAnalysisReader;
   }
@@ -251,6 +272,98 @@ export class ThreadService {
     }
     if (this.threadAnalysisReader === undefined) return null;
     return this.threadAnalysisReader.findLatestSucceededAnalysis(threadId);
+  }
+
+  /**
+   * Moderator/system-admin override of a thread's automated content-analysis
+   * outcome. `accept` publishes the thread and records an accepting override;
+   * `reject` hides it (status `removed`) and records a rejecting override;
+   * `reanalyze` re-runs analysis without changing visibility. When
+   * `societySlug` is provided the actor must be a moderator of that society
+   * and the thread must belong to it; otherwise the actor must be a system
+   * admin.
+   */
+  async moderateAnalysis(
+    principal: RequestPrincipal,
+    threadId: string,
+    action: AnalysisModerationAction,
+    societySlug?: string,
+  ): Promise<ThreadDto> {
+    const thread = await this.threadOrThrow(threadId);
+    if (thread.status === "deleted") {
+      throw new ApplicationError("NOT_FOUND", "Thread was not found");
+    }
+    await this.assertAnalysisModerationAuthority(
+      principal,
+      thread.societyId,
+      societySlug,
+    );
+
+    if (action.kind === "reanalyze") {
+      if (this.analysisModeration === undefined) {
+        throw new ApplicationError(
+          "ANALYSIS_UNAVAILABLE",
+          "Automated content analysis is not configured",
+        );
+      }
+      await this.analysisModeration.reanalyze(threadId);
+      return toThreadDto(
+        await this.threadOrThrow(threadId),
+        await this.repository.listThreadMedia(threadId),
+      );
+    }
+
+    const decision = action.kind;
+    await this.analysisModeration?.override(
+      threadId,
+      decision,
+      principal.userId,
+      action.reason ?? null,
+    );
+    const updated = await this.repository.setThreadStatus(
+      threadId,
+      decision === "accept" ? "published" : "removed",
+      this.clock.now(),
+    );
+    if (updated === null) {
+      throw new ApplicationError("NOT_FOUND", "Thread was not found");
+    }
+    return toThreadDto(
+      updated,
+      await this.repository.listThreadMedia(threadId),
+    );
+  }
+
+  private async assertAnalysisModerationAuthority(
+    principal: RequestPrincipal,
+    societyId: string,
+    societySlug: string | undefined,
+  ): Promise<void> {
+    if (societySlug !== undefined) {
+      const society = await requireSocietyBySlug(this.authorization, societySlug);
+      if (society.id !== societyId) {
+        throw new ApplicationError("NOT_FOUND", "Thread was not found");
+      }
+      if (
+        !(await hasSocietyModeratorAuthority(
+          this.authorization,
+          principal,
+          societyId,
+        ))
+      ) {
+        throw new ApplicationError(
+          "SOCIETY_FORBIDDEN",
+          "Society moderator access is required",
+        );
+      }
+      return;
+    }
+    if (principal.platformRole !== "system_admin") {
+      throw new ApplicationError(
+        "ADMIN_REQUIRED",
+        "System-admin access is required",
+      );
+    }
   }
 
   private async threadOrThrow(threadId: string) {

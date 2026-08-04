@@ -13,6 +13,10 @@ export function ContentReviewSection() {
         Threads across all societies whose automated content check returned{" "}
         <span className="font-medium text-foreground">none</span> or{" "}
         <span className="font-medium text-foreground">needs review</span>.
+        Override the automated decision to{" "}
+        <span className="font-medium text-foreground">accept</span> (publish) or{" "}
+        <span className="font-medium text-foreground">reject</span> (hide) a
+        post, or re-run the automated analysis.
       </p>
 
       <div className="mt-6">

@@ -14,6 +14,7 @@ import type { ThreadAnalysisContextPort } from "./thread-analysis-context.port";
 import {
   DEFAULT_STALE_PENDING_MS,
   DEFAULT_STALE_PENDING_LIMIT,
+  type AnalysisOverrideDecision,
   type ContentAnalysisRun,
 } from "../domain/content-analysis";
 
@@ -65,9 +66,51 @@ export class ContentAnalysisService {
       return null;
     }
 
-    const run = this.buildRun(threadId, "thread_created");
+    const run = this.buildRun(threadId, "thread_created", 1);
     await this.deps.repository.create(run);
     return this.executeAnalysis(run);
+  }
+
+  /**
+   * Explicitly re-run automated analysis on an existing thread. Creates a new
+   * run with the next run number and reuses the same pipeline as
+   * {@link analyzeNewThread}. Never throws on analysis failure. Returns the
+   * new result when the run succeeded, or null when skipped/failed.
+   */
+  async reanalyzeThread(
+    threadId: string,
+  ): Promise<ContentAnalysisResult | null> {
+    if (this.deps.mode === "off") {
+      return null;
+    }
+    const runNumber = await this.deps.repository.findNextRunNumber(threadId);
+    const run = this.buildRun(threadId, "reanalysis", runNumber);
+    await this.deps.repository.create(run);
+    return this.executeAnalysis(run);
+  }
+
+  /**
+   * Record a human override of the automated decision for a thread. The
+   * calling moderation use case has already authorized the actor and applied
+   * any thread-visibility transition; this persists the authoritative
+   * override so the thread leaves the pending review queue.
+   */
+  async overrideThread(
+    threadId: string,
+    decision: AnalysisOverrideDecision,
+    actorId: string,
+    reason: string | null,
+  ): Promise<void> {
+    await this.deps.repository.saveOverride({
+      id: randomUUID(),
+      threadId,
+      decision,
+      actorId,
+      reason: reason == null || reason.trim().length === 0
+        ? null
+        : reason.trim(),
+      createdAt: this.deps.clock.now(),
+    });
   }
 
   /**
@@ -181,11 +224,12 @@ export class ContentAnalysisService {
   private buildRun(
     threadId: string,
     triggerType: ContentAnalysisRun["triggerType"],
+    runNumber: number,
   ): ContentAnalysisRun {
     return {
       id: randomUUID(),
       sourceEventId: threadId,
-      runNumber: 1,
+      runNumber,
       triggerType,
       threadId,
       reportId: null,

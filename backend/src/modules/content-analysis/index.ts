@@ -42,6 +42,11 @@ export {
   DrizzleContentAnalysisRepository,
 } from "./infrastructure/drizzle-content-analysis.repository";
 
+export type {
+  AnalysisOverrideDecision,
+  ContentAnalysisOverride,
+} from "./domain/content-analysis";
+
 export {
   LambdaContentAnalyzer,
   type LambdaContentAnalyzerConfig,

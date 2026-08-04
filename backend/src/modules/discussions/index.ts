@@ -14,6 +14,7 @@ import type { MembershipRepository, SocietyRepository } from "../societies/index
 
 import type { AnalysisDecisionReader } from "./application/analysis-decision.reader";
 import type { ThreadAnalysisDetailsReader } from "./application/analysis-details.reader";
+import type { AnalysisModerationPort } from "./application/thread.service";
 
 export interface DiscussionsModuleDependencies {
   readonly database: Database;
@@ -26,6 +27,7 @@ export interface DiscussionsModuleDependencies {
   readonly onThreadCreated?: (threadId: string) => void;
   readonly analysisDecisionReader?: AnalysisDecisionReader;
   readonly threadAnalysisReader?: ThreadAnalysisDetailsReader;
+  readonly analysisModeration?: AnalysisModerationPort;
 }
 
 export function createDiscussionsModule(dependencies: DiscussionsModuleDependencies) {
@@ -52,6 +54,9 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
       : {}),
     ...(dependencies.threadAnalysisReader !== undefined
       ? { threadAnalysisReader: dependencies.threadAnalysisReader }
+      : {}),
+    ...(dependencies.analysisModeration !== undefined
+      ? { analysisModeration: dependencies.analysisModeration }
       : {}),
     ...authorization,
   });
@@ -87,6 +92,7 @@ export type {
 } from "./application/feed.service";
 export { ThreadService } from "./application/thread.service";
 export type { ThreadServiceDependencies } from "./application/thread.service";
+export type { AnalysisModerationPort } from "./application/thread.service";
 export type { ThreadMediaPort } from "./application/thread-media.port";
 export type { ThreadEventPublisher } from "./application/thread-events.port";
 export {
@@ -121,4 +127,5 @@ export type {
   UserThreadActivityPageDto,
   VoteCommand,
   VoteDto,
+  AnalysisModerationAction,
 } from "./application/discussion.dto";

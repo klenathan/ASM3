@@ -243,6 +243,20 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     return row === undefined ? null : toThread(row);
   }
 
+  async setThreadStatus(
+    threadId: string,
+    status: "published" | "removed",
+    updatedAt: Date,
+  ): Promise<ThreadRecord | null> {
+    const rows = await this.executor
+      .update(threads)
+      .set({ status, updatedAt })
+      .where(eq(threads.id, threadId))
+      .returning();
+    const row = rows[0];
+    return row === undefined ? null : toThread(row);
+  }
+
   async listThreadMedia(threadId: string): Promise<readonly ThreadMediaRecord[]> {
     const rows = await this.executor
       .select()

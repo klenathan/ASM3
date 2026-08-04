@@ -70,6 +70,15 @@ export interface DiscussionRepository {
   createThread(input: CreateThreadInput): Promise<ThreadRecord>;
   updateThread(threadId: string, input: UpdateThreadInput): Promise<ThreadRecord | null>;
   softDeleteThread(threadId: string, deletedAt: Date, updatedAt: Date): Promise<ThreadRecord | null>;
+  /**
+   * Set a thread's visibility status to `published` (accept) or `removed`
+   * (reject/hide). Used by moderation overrides; never used to delete.
+   */
+  setThreadStatus(
+    threadId: string,
+    status: "published" | "removed",
+    updatedAt: Date,
+  ): Promise<ThreadRecord | null>;
   listThreadMedia(threadId: string): Promise<readonly ThreadMediaRecord[]>;
   replaceThreadMedia(threadId: string, mediaIds: readonly string[]): Promise<readonly ThreadMediaRecord[]>;
 

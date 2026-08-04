@@ -91,6 +91,13 @@ export const analysisQueuePageSchema = z
   })
   .openapi("AnalysisQueuePage");
 
+export const analysisModerationRequestSchema = z
+  .object({
+    decision: z.enum(["accept", "reject"]),
+    reason: z.string().max(500).optional(),
+  })
+  .openapi("AnalysisModerationRequest");
+
 export const homeFeedThreadSchema = z
   .object({
     id: z.string().uuid(),

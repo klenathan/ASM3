@@ -361,6 +361,14 @@ class FakeDiscussionRepository implements DiscussionRepository {
     return deleted;
   }
 
+  async setThreadStatus(threadId: string, status: "published" | "removed", updatedAt: Date): Promise<ThreadRecord | null> {
+    const current = await this.findThread(threadId);
+    if (current === null) return null;
+    const updated: ThreadRecord = { ...current, status, updatedAt };
+    this.threads.set(threadId, updated);
+    return updated;
+  }
+
   async listThreadMedia(threadId: string): Promise<readonly ThreadMediaRecord[]> {
     return this.threadMedia.get(threadId) ?? [];
   }
@@ -645,6 +653,124 @@ describe("ThreadService.getThreadAnalysis", () => {
 
     await expect(withReader(repository, reader).getThreadAnalysis(moderator, "missing-id"))
       .rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+
+describe("ThreadService.moderateAnalysis", () => {
+  interface ModerationCalls {
+    overrides: Array<{ threadId: string; decision: "accept" | "reject"; actorId: string; reason: string | null }>;
+    reanalyzed: string[];
+  }
+  function withModeration(
+    repository: FakeDiscussionRepository,
+  ): { service: ThreadService; calls: ModerationCalls } {
+    const calls: ModerationCalls = { overrides: [], reanalyzed: [] };
+    const service = new ThreadService({
+      repository,
+      transactions: immediateTransaction(repository),
+      clock,
+      profile: fakeProfile,
+      media: readyMedia,
+      events: { publishThreadCreated: async () => undefined },
+      membershipRepository: new FakeMembershipRepository(),
+      societyRepository: new FakeSocietyRepository(),
+      analysisModeration: {
+        override: async (threadId, decision, actorId, reason) => {
+          calls.overrides.push({ threadId, decision, actorId, reason });
+        },
+        reanalyze: async (threadId) => {
+          calls.reanalyzed.push(threadId);
+        },
+      },
+    });
+    return { service, calls };
+  }
+
+  it("rejects a thread as a society moderator (hides the post)", async () => {
+    const repository = new FakeDiscussionRepository();
+    const creator = createThreadService(repository);
+    const thread = await creator.createThread(moderator, society.slug, {
+      title: "Moderated post",
+      body: "Body",
+    });
+    const { service, calls } = withModeration(repository);
+    const result = await service.moderateAnalysis(
+      moderator,
+      thread.id,
+      { kind: "reject", reason: "Spam" },
+      society.slug,
+    );
+    expect(result.status).toBe("removed");
+    expect(calls.overrides).toEqual([
+      { threadId: thread.id, decision: "reject", actorId: moderator.userId, reason: "Spam" },
+    ]);
+  });
+
+  it("accepts a thread as a system admin", async () => {
+    const systemAdmin: RequestPrincipal = { userId: "admin-id", platformRole: "system_admin" };
+    const repository = new FakeDiscussionRepository();
+    const creator = createThreadService(repository);
+    const thread = await creator.createThread(moderator, society.slug, {
+      title: "OK post",
+      body: "Body",
+    });
+    const { service, calls } = withModeration(repository);
+    const result = await service.moderateAnalysis(
+      systemAdmin,
+      thread.id,
+      { kind: "accept" },
+    );
+    expect(result.status).toBe("published");
+    expect(calls.overrides[0]).toMatchObject({
+      threadId: thread.id,
+      decision: "accept",
+    });
+  });
+
+  it("reanalyzes without changing visibility or recording an override", async () => {
+    const repository = new FakeDiscussionRepository();
+    const creator = createThreadService(repository);
+    const thread = await creator.createThread(moderator, society.slug, {
+      title: "Reanalyze me",
+      body: "Body",
+    });
+    const { service, calls } = withModeration(repository);
+    const result = await service.moderateAnalysis(
+      moderator,
+      thread.id,
+      { kind: "reanalyze" },
+      society.slug,
+    );
+    expect(result.status).toBe("published");
+    expect(calls.reanalyzed).toEqual([thread.id]);
+    expect(calls.overrides).toHaveLength(0);
+  });
+
+  it("denies a plain member from moderating analysis", async () => {
+    const repository = new FakeDiscussionRepository();
+    const creator = createThreadService(repository);
+    const thread = await creator.createThread(moderator, society.slug, {
+      title: "Member cannot override",
+      body: "Body",
+    });
+    const { service } = withModeration(repository);
+    await expect(
+      service.moderateAnalysis(member, thread.id, { kind: "reject" }, society.slug),
+    ).rejects.toMatchObject({ code: "SOCIETY_FORBIDDEN" });
+  });
+
+  it("fails reanalysis when content analysis is not configured", async () => {
+    const repository = new FakeDiscussionRepository();
+    const creator = createThreadService(repository);
+    const thread = await creator.createThread(moderator, society.slug, {
+      title: "No analysis",
+      body: "Body",
+    });
+    const service = createThreadService(repository);
+    await expect(
+      service.moderateAnalysis(moderator, thread.id, { kind: "reanalyze" }, society.slug),
+    ).rejects.toMatchObject({ code: "ANALYSIS_UNAVAILABLE" });
   });
 });
 

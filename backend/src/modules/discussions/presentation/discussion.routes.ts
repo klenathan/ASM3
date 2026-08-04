@@ -7,6 +7,7 @@ import type { ThreadService } from "../application/thread.service";
 import type { VoteService } from "../application/vote.service";
 import { createDiscussionController } from "./discussion.controller";
 import {
+  analysisModerationRequestSchema,
   analysisQueuePageSchema,
   analysisQueueQuerySchema,
   commentPageSchema,
@@ -29,6 +30,7 @@ import {
 
 const societySlugParams = z.object({ societySlug: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9_-]*$/) });
 const threadIdParams = z.object({ threadId: z.string().uuid() });
+const societySlugAndThreadParams = societySlugParams.extend({ threadId: z.string().uuid() });
 const commentIdParams = z.object({ commentId: z.string().uuid() });
 const publicUserIdParams = z.object({ userId: z.string().uuid() });
 
@@ -317,6 +319,70 @@ const listGlobalAnalysisQueueRoute = createRoute({
   },
 });
 
+const overrideGlobalAnalysisRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/analysis/{threadId}/decision",
+  tags: ["Discussions"],
+  summary: "Override a thread's automated analysis decision (accept or reject) as system admin",
+  request: {
+    params: threadIdParams,
+    body: { content: { "application/json": { schema: analysisModerationRequestSchema } } },
+  },
+  responses: {
+    204: { description: "Decision overridden" },
+    400: { description: "Invalid request", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const reanalyzeGlobalAnalysisRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/analysis/{threadId}/reanalyze",
+  tags: ["Discussions"],
+  summary: "Re-run automated analysis for a thread as system admin",
+  request: { params: threadIdParams },
+  responses: {
+    204: { description: "Analysis re-run scheduled/completed" },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const overrideSocietyAnalysisRoute = createRoute({
+  method: "post",
+  path: "/api/v1/mod/societies/{societySlug}/analysis/{threadId}/decision",
+  tags: ["Discussions"],
+  summary: "Override a thread's automated analysis decision (accept or reject) as society moderator",
+  request: {
+    params: societySlugAndThreadParams,
+    body: { content: { "application/json": { schema: analysisModerationRequestSchema } } },
+  },
+  responses: {
+    204: { description: "Decision overridden" },
+    400: { description: "Invalid request", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "Society moderator access is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "Thread or society was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const reanalyzeSocietyAnalysisRoute = createRoute({
+  method: "post",
+  path: "/api/v1/mod/societies/{societySlug}/analysis/{threadId}/reanalyze",
+  tags: ["Discussions"],
+  summary: "Re-run automated analysis for a thread as society moderator",
+  request: { params: societySlugAndThreadParams },
+  responses: {
+    204: { description: "Analysis re-run scheduled/completed" },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "Society moderator access is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "Thread or society was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
 export function registerDiscussionRoutes(
   app: OpenAPIHono<AppEnvironment>,
   dependencies: DiscussionRouteDependencies,
@@ -340,6 +406,10 @@ export function registerDiscussionRoutes(
   app.openapi(voteCommentRoute, (context) => controller.voteComment(context) as never);
   app.openapi(listSocietyAnalysisQueueRoute, (context) => controller.listSocietyAnalysisQueue(context) as never);
   app.openapi(listGlobalAnalysisQueueRoute, (context) => controller.listGlobalAnalysisQueue(context) as never);
+  app.openapi(overrideGlobalAnalysisRoute, (context) => controller.overrideGlobalAnalysis(context) as never);
+  app.openapi(reanalyzeGlobalAnalysisRoute, (context) => controller.reanalyzeGlobalAnalysis(context) as never);
+  app.openapi(overrideSocietyAnalysisRoute, (context) => controller.overrideSocietyAnalysis(context) as never);
+  app.openapi(reanalyzeSocietyAnalysisRoute, (context) => controller.reanalyzeSocietyAnalysis(context) as never);
 }
 
 export const registerDiscussionsRoutes = registerDiscussionRoutes;

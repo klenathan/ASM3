@@ -78,6 +78,20 @@ async function main(): Promise<void> {
     onThreadCreated: (threadId) => {
       void contentAnalysisService?.analyzeNewThread(threadId);
     },
+    analysisModeration: {
+      override: (threadId, decision, actorId, reason) =>
+        contentAnalysisService === undefined
+          ? Promise.reject(
+              new Error("Automated content analysis is not configured"),
+            )
+          : contentAnalysisService.overrideThread(threadId, decision, actorId, reason),
+      reanalyze: (threadId) =>
+        contentAnalysisService === undefined
+          ? Promise.reject(
+              new Error("Automated content analysis is not configured"),
+            )
+          : contentAnalysisService.reanalyzeThread(threadId),
+    },
     profile: {
       findPublicIdentity: async (userId) => {
         const account = await identity.repository.findAccountByUserId(userId);
