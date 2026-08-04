@@ -66,4 +66,5 @@ export interface MediaAttachmentDto {
 export interface MediaUrlDto {
   readonly mediaId: string;
   readonly url: string;
+  readonly contentType: string;
 }

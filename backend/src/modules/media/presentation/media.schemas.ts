@@ -103,5 +103,6 @@ export const mediaUrlSchema = z
   .object({
     mediaId: z.string().uuid(),
     url: z.string().url(),
+    contentType: z.string(),
   })
   .openapi("MediaUrl");

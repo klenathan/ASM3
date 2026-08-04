@@ -3,6 +3,7 @@ import { ApiError, request } from "../../lib/http"
 export interface MediaUrl {
   readonly mediaId: string
   readonly url: string
+  readonly contentType: string | null
 }
 
 export interface MediaAsset {

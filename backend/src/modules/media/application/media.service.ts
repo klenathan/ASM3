@@ -312,6 +312,7 @@ export class MediaService {
     return {
       mediaId: asset.id,
       url: await this.storage.getObjectUrl(asset.objectKey),
+      contentType: asset.contentType,
     };
   }
 

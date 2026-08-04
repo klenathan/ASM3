@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Image as ImageIcon, RefreshCw, XIcon } from "lucide-react";
+import { Image as ImageIcon, Play, RefreshCw, XIcon } from "lucide-react";
 
 import {
   Carousel,
@@ -85,11 +85,20 @@ export function ThreadMedia({
                       className="flex h-[80vh] items-center justify-center pl-0"
                     >
                       {match?.url ? (
-                        <img
-                          src={match.url}
-                          alt={`Image ${index + 1} attached to this thread`}
-                          className="max-h-full max-w-full object-contain"
-                        />
+                        isVideo(match.contentType) ? (
+                          <video
+                            src={match.url}
+                            controls
+                            preload="metadata"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        ) : (
+                          <img
+                            src={match.url}
+                            alt={`Image ${index + 1} attached to this thread`}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        )
                       ) : (
                         <div className="flex size-24 items-center justify-center text-white/70">
                           {pending ? (
@@ -180,6 +189,7 @@ function MediaGrid({
       {tiles.map(({ mediaIndex, overflow }) => {
         const id = mediaIds[mediaIndex];
         const match = urls.find((media) => media.mediaId === id);
+        const video = isVideo(match?.contentType);
         return (
           <GridTile
             key={`${id}-${mediaIndex}`}
@@ -187,6 +197,7 @@ function MediaGrid({
             loading={pending}
             index={mediaIndex}
             aspect={layout.tile(mediaIndex)}
+            video={video}
             onClick={() => onOpen(mediaIndex)}
           >
             {overflow ? (
@@ -232,6 +243,7 @@ function GridTile({
   loading,
   index,
   aspect,
+  video,
   onClick,
   children,
 }: {
@@ -239,6 +251,7 @@ function GridTile({
   readonly loading: boolean;
   readonly index: number;
   readonly aspect: string;
+  readonly video: boolean;
   readonly onClick: () => void;
   readonly children?: ReactNode;
 }) {
@@ -256,18 +269,41 @@ function GridTile({
       )}
     >
       {url ? (
-        <img
-          src={url}
-          alt={`Image ${index + 1} attached to this thread`}
-          className="absolute inset-0 size-full object-cover"
-          loading="lazy"
-        />
+        video ? (
+          <video
+            src={url}
+            muted
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <img
+            src={url}
+            alt={`Image ${index + 1} attached to this thread`}
+            className="absolute inset-0 size-full object-cover"
+            loading="lazy"
+          />
+        )
       ) : loading ? (
         <RefreshCw aria-hidden="true" className="size-5 animate-spin" />
       ) : (
         <ImageIcon aria-hidden="true" className="size-5" />
       )}
+      {video && (
+        <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+          <span className="flex size-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
+            <Play aria-hidden="true" className="fill-current" />
+          </span>
+        </span>
+      )}
       {children}
     </button>
   );
+}
+
+function isVideo(contentType: string | null | undefined): boolean {
+  return contentType !== null && contentType !== undefined
+    ? contentType.toLowerCase().startsWith("video/")
+    : false;
 }
