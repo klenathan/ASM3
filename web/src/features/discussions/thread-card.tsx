@@ -52,11 +52,12 @@ export function DiscussionCard({
         event.preventDefault();
         openThread();
       }}
-      className={
+      className={cn(
+        "max-w-5xl",
         threadUrl === null
           ? undefined
-          : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      }
+          : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+      )}
     >
       <CardHeader className="gap-1.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
