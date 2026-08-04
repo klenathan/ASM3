@@ -168,6 +168,8 @@ describe("society posting API", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ uploads: [upload] }), { status: 201 }))
       .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -177,9 +179,50 @@ describe("society posting API", () => {
       images: [new File(["image"], "campus.png", { type: "image/png" })],
     })).rejects.toMatchObject({ code: "MEDIA_UPLOAD_FAILED" });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    const [cleanupUrl, cleanupInit] = fetchMock.mock.calls[2] as [string, RequestInit];
+    // 1 manifest call + 3 S3 PUT retry attempts (500 is transient) + 1 cleanup.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    const [cleanupUrl, cleanupInit] = fetchMock.mock.calls[4] as [string, RequestInit];
     expect(cleanupUrl).toContain(`/api/v1/media/uploads/${mediaId}`);
     expect(cleanupInit.method).toBe("DELETE");
+  });
+
+  it("retries a transient S3 failure and uploads on a later attempt", async () => {
+    const mediaId = "44444444-4444-4444-8444-444444444444";
+    const upload = {
+      id: mediaId,
+      objectKey: `media/thread_attachment/${mediaId}`,
+      purpose: "thread_attachment",
+      contentType: "image/png",
+      byteSize: 5,
+      checksum: null,
+      status: "pending",
+      createdAt: "2026-08-02T00:00:00.000Z",
+      completedAt: null,
+      deletedAt: null,
+      uploadUrl: "https://bucket.s3.amazonaws.com/signed-upload",
+      uploadUrlExpiresAt: "2026-08-02T00:05:00.000Z",
+    };
+    const threadWithMedia = { ...thread, mediaIds: [mediaId] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ uploads: [upload] }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        items: [{ mediaId, status: "ready" }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(threadWithMedia), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createSocietyThreadFromDraft("cloud-club", {
+      title: thread.title,
+      body: thread.body ?? "",
+      images: [new File(["image"], "campus.png", { type: "image/png" })],
+    })).resolves.toEqual(threadWithMedia);
+
+    // 1 manifest call + 2 S3 PUT attempts (503 then success) + 1 complete + 1 thread.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    const [uploadUrl, uploadInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(uploadUrl).toBe(upload.uploadUrl);
+    expect(uploadInit).toMatchObject({ method: "PUT" });
   });
 });

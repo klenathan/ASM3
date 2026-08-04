@@ -40,6 +40,58 @@ interface MediaBatchResult {
 /** Upper bound on parallel direct S3 PUTs issued from the browser. */
 const UPLOAD_CONCURRENCY = 3
 
+/**
+ * Per-attempt timeout for a direct S3 PUT. Retries and the concurrency window
+ * must stay comfortably under the 5-minute presigned-upload expiry issued by
+ * the backend (see backend s3-media.storage.ts), so 3 attempts x 60s fits.
+ */
+const UPLOAD_TIMEOUT_MS = 60_000
+
+/** How many times a single object may be PUT to S3 before giving up. */
+const UPLOAD_MAX_ATTEMPTS = 3
+
+/** Delay between retries, scaled by the attempt number. */
+const UPLOAD_RETRY_DELAY_MS = 1_000
+
+/** Status codes worth retrying as transient S3/server hiccups. */
+function isRetryableUploadStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
+}
+
+/**
+ * PUTs a file to S3 with a per-attempt timeout and bounded retries. Retries
+ * happen on network failures, timeouts, and transient server responses; other
+ * client errors fail fast. Returns true once the object is accepted by S3.
+ */
+async function putToS3(uploadUrl: string, file: File): Promise<boolean> {
+  for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+      })
+      if (response.ok) return true
+      if (!isRetryableUploadStatus(response.status)) return false
+    } catch (error) {
+      // A timeout (AbortError) or network failure is retryable.
+      if (error instanceof Error && error.name === "AbortError") {
+        /* fall through to retry */
+      } else if (error instanceof ApiError) {
+        throw error
+      }
+    }
+
+    if (attempt < UPLOAD_MAX_ATTEMPTS) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, UPLOAD_RETRY_DELAY_MS * attempt),
+      )
+    }
+  }
+  return false
+}
+
 export function fetchMediaUrl(mediaId: string): Promise<MediaUrl> {
   return request<MediaUrl>(`/api/v1/media/${encodeURIComponent(mediaId)}/url`)
 }
@@ -120,16 +172,7 @@ async function putToS3WithConcurrency(
         if (index >= files.length) return
         const file = files[index]!
         const upload = uploads[index]!
-        try {
-          const response = await fetch(upload.uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": file.type },
-            body: file,
-          })
-          if (response.ok) successfulIds.push(upload.id)
-        } catch {
-          /* leave the upload incomplete; the caller cleans up and reports */
-        }
+        if (await putToS3(upload.uploadUrl, file)) successfulIds.push(upload.id)
       }
     },
   )
@@ -152,14 +195,10 @@ async function uploadSingle(
   })
 
   try {
-    const response = await fetch(upload.uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    })
-    if (!response.ok) {
+    const uploaded = await putToS3(upload.uploadUrl, file)
+    if (!uploaded) {
       throw new ApiError(
-        response.status,
+        0,
         "MEDIA_UPLOAD_FAILED",
         `S3 rejected ${file.name}. Try the upload again.`,
       )
