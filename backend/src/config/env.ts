@@ -61,6 +61,8 @@ const environmentSchema = z
     CONTENT_ANALYSIS_POLICY_VERSION: z.string().trim().min(1).default("1"),
     CONTENT_ANALYSIS_PROMPT_VERSION: z.string().trim().min(1).default("1"),
     ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(55_000),
+    ANALYSIS_STALE_AFTER_MS: z.coerce.number().int().min(1).default(15 * 60 * 1000),
+    ANALYSIS_RETRY_INTERVAL_MS: z.coerce.number().int().min(1).default(60_000),
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
@@ -148,6 +150,8 @@ export interface AppConfig {
   readonly contentAnalysisPolicyVersion: string;
   readonly contentAnalysisPromptVersion: string;
   readonly contentAnalysisTimeoutMs: number;
+  readonly analysisStaleAfterMs: number;
+  readonly analysisRetryIntervalMs: number;
   readonly analysisMaxImages: number;
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
@@ -188,6 +192,8 @@ export function loadConfig(
     contentAnalysisPolicyVersion: result.data.CONTENT_ANALYSIS_POLICY_VERSION,
     contentAnalysisPromptVersion: result.data.CONTENT_ANALYSIS_PROMPT_VERSION,
     contentAnalysisTimeoutMs: result.data.ANALYSIS_TIMEOUT_MS,
+    analysisStaleAfterMs: result.data.ANALYSIS_STALE_AFTER_MS,
+    analysisRetryIntervalMs: result.data.ANALYSIS_RETRY_INTERVAL_MS,
     analysisMaxImages: result.data.ANALYSIS_MAX_IMAGES,
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,

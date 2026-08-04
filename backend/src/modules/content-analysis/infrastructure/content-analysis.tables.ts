@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -8,6 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * One row per content-analysis run. Unique on (source_event_id, run_number)
@@ -53,5 +55,33 @@ export const contentAnalysisRuns = pgTable(
     index("content_analysis_runs_report_idx").on(table.reportId),
     index("content_analysis_runs_status_created_idx")
       .on(table.status, table.createdAt),
+  ],
+);
+
+/**
+ * One row per human override of the automated content-analysis decision for a
+ * thread. The latest override per thread is authoritative for moderation.
+ */
+export const contentAnalysisOverrides = pgTable(
+  "content_analysis_overrides",
+  {
+    id: uuid("id").primaryKey(),
+    threadId: uuid("thread_id").notNull(),
+    decision: text("decision").notNull(),
+    actorId: uuid("actor_id").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("content_analysis_overrides_thread_idx").on(table.threadId),
+    check(
+      "content_analysis_overrides_decision_check",
+      sql`${table.decision} in ('accept', 'reject')`,
+    ),
   ],
 );

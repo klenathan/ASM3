@@ -42,6 +42,22 @@ export function isTerminalRunStatus(status: AnalysisRunStatus): boolean {
   return status === "succeeded" || status === "failed";
 }
 
+/** True when the status is still in flight (not yet settled). */
+export function isPendingRunStatus(status: AnalysisRunStatus): boolean {
+  return status === "queued" || status === "running";
+}
+
+/**
+ * Default age after which a pending run is considered stale and eligible for
+ * automatic retry by the background scheduler. Picked to be well above the
+ * bounded synchronous Lambda invocation timeout, so only genuinely stuck
+ * runs (hangs/aborts) are retried, not in-flight ones.
+ */
+export const DEFAULT_STALE_PENDING_MS = 15 * 60 * 1000;
+
+/** Default cap on stale runs processed by a single scheduler tick. */
+export const DEFAULT_STALE_PENDING_LIMIT = 50;
+
 /**
  * Guard that throws unless `from -> to` is a permitted status transition.
  * Callers persist the new status only after this passes.
@@ -78,6 +94,26 @@ export type AnalysisTriggerType =
   | "thread_updated"
   | "report_created"
   | "reanalysis";
+
+/**
+ * A human override of the automated content-analysis decision for a thread.
+ * `accept` publishes/keeps the thread visible; `reject` hides it (removed).
+ */
+export type AnalysisOverrideDecision = "accept" | "reject";
+
+/**
+ * Persisted human override for a single thread. The latest override takes
+ * precedence over any automated decision for moderation/queue purposes.
+ */
+export interface ContentAnalysisOverride {
+  readonly id: string;
+  readonly threadId: string;
+  readonly decision: AnalysisOverrideDecision;
+  readonly actorId: string;
+  readonly reason: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
 
 export interface ContentAnalysisRun {
   id: string;

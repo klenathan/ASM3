@@ -1,17 +1,25 @@
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, max } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type {
   ContentAnalysisRepository,
   RecordRunFailureInput,
   RecordRunResultInput,
+  SaveOverrideInput,
 } from "../application/content-analysis.repository";
 import type {
   ContentAnalysisFinding,
   SentimentLabel,
   ThreadAnalysisDetails,
 } from "../application/content-analysis.dto";
-import type { ContentAnalysisRun } from "../domain/content-analysis";
-import { contentAnalysisRuns } from "./content-analysis.tables";
+import type {
+  AnalysisOverrideDecision,
+  ContentAnalysisOverride,
+  ContentAnalysisRun,
+} from "../domain/content-analysis";
+import {
+  contentAnalysisOverrides,
+  contentAnalysisRuns,
+} from "./content-analysis.tables";
 
 /**
  * Drizzle implementation of ContentAnalysisRepository. Never imported outside
@@ -65,6 +73,24 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
       .update(contentAnalysisRuns)
       .set({ status: "running", startedAt, attemptCount: 1 })
       .where(eq(contentAnalysisRuns.id, id));
+  }
+
+  async findStalePending(
+    olderThan: Date,
+    limit = 50,
+  ): Promise<ContentAnalysisRun[]> {
+    const rows = await this.db
+      .select()
+      .from(contentAnalysisRuns)
+      .where(
+        and(
+          inArray(contentAnalysisRuns.status, ["queued", "running"]),
+          lt(contentAnalysisRuns.createdAt, olderThan),
+        ),
+      )
+      .orderBy(asc(contentAnalysisRuns.createdAt))
+      .limit(limit);
+    return rows.map(toRun);
   }
 
   async recordSuccess(input: RecordRunResultInput): Promise<void> {
@@ -152,6 +178,71 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
       .limit(1);
     return row === undefined ? null : toAnalysisDetails(row);
   }
+
+  async saveOverride(input: SaveOverrideInput): Promise<ContentAnalysisOverride> {
+    const id = input.id;
+    const [row] = await this.db
+      .insert(contentAnalysisOverrides)
+      .values({
+        id,
+        threadId: input.threadId,
+        decision: input.decision,
+        actorId: input.actorId,
+        reason: input.reason,
+        createdAt: input.createdAt,
+        updatedAt: input.createdAt,
+      })
+      .returning();
+    if (row === undefined) {
+      throw new Error("failed to persist content-analysis override");
+    }
+    return toOverride(row);
+  }
+
+  async findOverriddenThreadIds(
+    threadIds: readonly string[],
+  ): Promise<Set<string>> {
+    if (threadIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ threadId: contentAnalysisOverrides.threadId })
+      .from(contentAnalysisOverrides)
+      .where(inArray(contentAnalysisOverrides.threadId, [...threadIds]));
+    return new Set(rows.map((row) => row.threadId));
+  }
+
+  async findLatestOverridesByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, AnalysisOverrideDecision>> {
+    if (threadIds.length === 0) return new Map();
+    const rows = await this.db
+      .selectDistinctOn(
+        [contentAnalysisOverrides.threadId],
+        {
+          threadId: contentAnalysisOverrides.threadId,
+          decision: contentAnalysisOverrides.decision,
+          createdAt: contentAnalysisOverrides.createdAt,
+        },
+      )
+      .from(contentAnalysisOverrides)
+      .where(inArray(contentAnalysisOverrides.threadId, [...threadIds]))
+      .orderBy(
+        contentAnalysisOverrides.threadId,
+        desc(contentAnalysisOverrides.createdAt),
+      );
+    const overrides = new Map<string, AnalysisOverrideDecision>();
+    for (const row of rows) {
+      overrides.set(row.threadId, row.decision as AnalysisOverrideDecision);
+    }
+    return overrides;
+  }
+
+  async findNextRunNumber(sourceEventId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ max: max(contentAnalysisRuns.runNumber) })
+      .from(contentAnalysisRuns)
+      .where(eq(contentAnalysisRuns.sourceEventId, sourceEventId));
+    return (row?.max ?? 0) + 1;
+  }
 }
 
 function toAnalysisDetails(row: RunRow): ThreadAnalysisDetails {
@@ -175,6 +266,20 @@ function toAnalysisDetails(row: RunRow): ThreadAnalysisDetails {
 }
 
 type RunRow = typeof contentAnalysisRuns.$inferSelect;
+
+type OverrideRow = typeof contentAnalysisOverrides.$inferSelect;
+
+function toOverride(row: OverrideRow): ContentAnalysisOverride {
+  return {
+    id: row.id,
+    threadId: row.threadId,
+    decision: row.decision as ContentAnalysisOverride["decision"],
+    actorId: row.actorId,
+    reason: row.reason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
 
 function toRun(row: RunRow): ContentAnalysisRun {
   return {

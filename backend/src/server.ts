@@ -154,6 +154,40 @@ async function main(): Promise<void> {
     logger,
     clock: systemClock,
   });
+  // Recurring scheduler that settles content-analysis runs stuck in a pending
+  // state (queued/running) past the stale threshold, e.g. when a previous
+  // synchronous Lambda invocation hung or was aborted. Runs not settled by a
+  // pass are picked up again next tick.
+  let analysisRetryTimer: NodeJS.Timeout | undefined;
+  if (
+    contentAnalysisService !== undefined &&
+    config.contentAnalysisMode !== "off"
+  ) {
+    const tick = async () => {
+      try {
+        const retried = await contentAnalysisService.retryStaleRuns({
+          staleAfterMs: config.analysisStaleAfterMs,
+        });
+        if (retried > 0) {
+          logger.info({ retried }, "retried stale content-analysis runs");
+        }
+      } catch (error) {
+        logger.error(
+          { err: error },
+          "content-analysis stale-run retry tick failed",
+        );
+      }
+    };
+    analysisRetryTimer = setInterval(tick, config.analysisRetryIntervalMs);
+    analysisRetryTimer.unref();
+    logger.info(
+      {
+        intervalMs: config.analysisRetryIntervalMs,
+        staleAfterMs: config.analysisStaleAfterMs,
+      },
+      "content-analysis staleness retry scheduler started",
+    );
+  }
   const moderation = createModerationModule({
     database: database.db,
     societyRepository: societies.societyRepository,
@@ -224,6 +258,9 @@ async function main(): Promise<void> {
       });
       await audit.stop();
       await database.close();
+      if (analysisRetryTimer !== undefined) {
+        clearInterval(analysisRetryTimer);
+      }
       clearTimeout(forceShutdown);
       logger.info("shutdown complete");
     } catch (error) {

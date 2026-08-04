@@ -53,6 +53,7 @@ class StubRepository implements ContentAnalysisRepository {
   readonly created: ContentAnalysisRun[] = [];
   readonly succeeded: RecordRunResultInput[] = [];
   readonly failed: RecordRunFailureInput[] = [];
+  readonly pending: ContentAnalysisRun[] = [];
   started: number = 0;
 
   async create(run: ContentAnalysisRun): Promise<ContentAnalysisRun> {
@@ -73,6 +74,18 @@ class StubRepository implements ContentAnalysisRepository {
   }
   async recordFailure(input: RecordRunFailureInput): Promise<void> {
     this.failed.push(input);
+  }
+  async findStalePending(
+    olderThan: Date,
+    limit = 50,
+  ): Promise<ContentAnalysisRun[]> {
+    return this.pending
+      .filter(
+        (run) =>
+          (run.status === "queued" || run.status === "running") &&
+          run.createdAt < olderThan,
+      )
+      .slice(0, limit);
   }
   async findLatestDecisionsByThreads(
     threadIds: readonly string[],
@@ -203,5 +216,90 @@ describe("ContentAnalysisService.analyzeNewThread", () => {
       promptVersion: "1",
     });
     expect(request.content.comments).toEqual([]);
+  });
+});
+
+describe("ContentAnalysisService.retryStaleRuns", () => {
+  function pendingRun(
+    overrides: Partial<ContentAnalysisRun> = {},
+  ): ContentAnalysisRun {
+    return {
+      id: "run-1",
+      sourceEventId: "t1",
+      runNumber: 1,
+      triggerType: "thread_created",
+      threadId: "t1",
+      reportId: null,
+      status: "queued",
+      decision: null,
+      inputHash: "",
+      modelId: null,
+      lambdaFunctionVersion: null,
+      createdAt: new Date("2026-08-03T00:00:00.000Z"),
+      ...overrides,
+    };
+  }
+
+  it("does nothing when mode is off", async () => {
+    const { service, repository } = makeService({ mode: "off" });
+    repository.pending.push(pendingRun());
+
+    const retried = await service.retryStaleRuns();
+    expect(retried).toBe(0);
+    expect(repository.started).toBe(0);
+    expect(repository.succeeded).toHaveLength(0);
+  });
+
+  it("re-invokes the analyzer and settles each stale pending run", async () => {
+    const analyze = vi.fn(async () => successInvocation());
+    const { service, repository } = makeService({ analyzer: { analyze } });
+    repository.pending.push(
+      pendingRun({ id: "run-1", threadId: "t1" }),
+      pendingRun({ id: "run-2", threadId: "t2", status: "running" }),
+    );
+
+    const retried = await service.retryStaleRuns();
+
+    expect(retried).toBe(2);
+    expect(analyze).toHaveBeenCalledTimes(2);
+    expect(repository.started).toBe(2);
+    expect(repository.succeeded).toHaveLength(2);
+    expect(repository.succeeded.map((s) => s.id).sort()).toEqual([
+      "run-1",
+      "run-2",
+    ]);
+  });
+
+  it("ignores pending runs younger than the stale threshold", async () => {
+    const analyze = vi.fn(async () => successInvocation());
+    const { service, repository } = makeService({ analyzer: { analyze } });
+    // createdAt is after the service clock (2026-08-04T00:00:00.000Z).
+    repository.pending.push(
+      pendingRun({ createdAt: new Date("2026-08-04T00:00:00.000Z") }),
+    );
+
+    const retried = await service.retryStaleRuns({
+      staleAfterMs: 15 * 60 * 1000,
+    });
+    expect(retried).toBe(0);
+    expect(analyze).not.toHaveBeenCalled();
+  });
+
+  it("settles a stale run as failed when the analyzer throws", async () => {
+    const failingAnalyzer: ContentAnalyzerPort = {
+      analyze: vi.fn(async () => {
+        throw new Error("openrouter 429");
+      }),
+    };
+    const { service, repository } = makeService({ analyzer: failingAnalyzer });
+    repository.pending.push(pendingRun({ id: "run-1" }));
+
+    const retried = await service.retryStaleRuns();
+    expect(retried).toBe(1);
+    expect(repository.failed).toHaveLength(1);
+    expect(repository.failed[0]).toMatchObject({
+      id: "run-1",
+      errorCode: "ANALYSIS_INVOCATION_FAILED",
+    });
   });
 });

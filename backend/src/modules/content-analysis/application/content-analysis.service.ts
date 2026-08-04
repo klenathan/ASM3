@@ -11,7 +11,11 @@ import type {
 import type { ContentAnalysisRepository } from "./content-analysis.repository";
 import type { ReportAnalysisContextPort } from "./report-analysis-context.port";
 import type { ThreadAnalysisContextPort } from "./thread-analysis-context.port";
-import type { ContentAnalysisRun } from "../domain/content-analysis";
+import {
+  DEFAULT_STALE_PENDING_MS,
+  DEFAULT_STALE_PENDING_LIMIT,
+  type ContentAnalysisRun,
+} from "../domain/content-analysis";
 
 export type ContentAnalysisMode = "off" | "shadow" | "enforce";
 
@@ -63,7 +67,54 @@ export class ContentAnalysisService {
 
     const run = this.buildRun(threadId, "thread_created");
     await this.deps.repository.create(run);
+    return this.executeAnalysis(run);
+  }
 
+  /**
+   * Retry pending runs that have been stuck (still queued/running) longer than
+   * the stale threshold, typically because a previous synchronous Lambda
+   * invocation hung or was aborted without settling the run. Re-invokes the
+   * analyzer for each stale run and settles it to succeeded/failed. Runs that
+   * remain non-terminal after this pass are picked up again on the next
+   * scheduler tick, which satisfies the "trigger the job again if still
+   * pending" requirement.
+   *
+   * Returns the number of stale runs re-triggered. No-op when analysis is off
+   * or no analyzer is configured.
+   */
+  async retryStaleRuns(options?: {
+    staleAfterMs?: number;
+    limit?: number;
+  }): Promise<number> {
+    if (this.deps.mode === "off" || this.deps.analyzer === undefined) {
+      return 0;
+    }
+    const staleAfterMs = options?.staleAfterMs ?? DEFAULT_STALE_PENDING_MS;
+    const olderThan = new Date(
+      this.deps.clock.now().getTime() - staleAfterMs,
+    );
+    const runs = await this.deps.repository.findStalePending(
+      olderThan,
+      options?.limit ?? DEFAULT_STALE_PENDING_LIMIT,
+    );
+    for (const run of runs) {
+      this.deps.logger.info(
+        { runId: run.id, threadId: run.threadId, status: run.status },
+        "retrying stale pending content-analysis run",
+      );
+      await this.executeAnalysis(run);
+    }
+    return runs.length;
+  }
+
+  /**
+   * Run analysis for an already-created run and settle it to succeeded or
+   * failed. Shared by fresh thread triggers and stale-run retries.
+   */
+  private async executeAnalysis(
+    run: ContentAnalysisRun,
+  ): Promise<ContentAnalysisResult | null> {
+    const { threadId } = run;
     const startedAt = this.deps.clock.now();
     try {
       const context = await this.deps.threadContext.loadThreadContext(threadId);
