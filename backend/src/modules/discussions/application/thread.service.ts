@@ -54,7 +54,7 @@ export class ThreadService {
   private readonly profile: DiscussionProfilePort;
   private readonly media: ThreadMediaPort;
   private readonly events: ThreadEventPublisher;
-  private readonly onThreadCreated?: (threadId: string) => void;
+  private readonly onThreadCreated: ((threadId: string) => void) | undefined;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;

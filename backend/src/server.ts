@@ -108,6 +108,49 @@ async function main(): Promise<void> {
       },
     },
   });
+  const contentAnalysisRepository = new DrizzleContentAnalysisRepository(database.db);
+  const configReader = createPlatformConfigReader(database.db);
+  const contentAnalyzer =
+    config.contentAnalysisMode !== "off"
+      ? new LambdaContentAnalyzer({
+          functionName: config.contentAnalysisLambdaFunction!,
+          qualifier: config.contentAnalysisLambdaQualifier,
+          timeoutMs: config.contentAnalysisTimeoutMs,
+          region: config.awsRegion!,
+        })
+      : undefined;
+  contentAnalysisService = new ContentAnalysisService({
+    repository: contentAnalysisRepository,
+    ...(contentAnalyzer !== undefined ? { analyzer: contentAnalyzer } : {}),
+    threadContext: new ThreadAnalysisContextAdapter({
+      findThread: (threadId) => discussions.repository.findThread(threadId),
+      listThreadMedia: (threadId) => discussions.repository.listThreadMedia(threadId),
+      findMediaAssets: async (mediaIds) => {
+        const assets = await media.repository.findAssets(mediaIds);
+        return assets
+          .filter(
+            (asset) => asset.status === "ready" && asset.purpose === "thread_attachment",
+          )
+          .map((asset) => ({
+            id: asset.id,
+            objectKey: asset.objectKey,
+            contentType: asset.contentType,
+            byteSize: asset.byteSize,
+          }));
+      },
+      listSocietyRules: (societyId) => societies.societyRepository.listRules(societyId),
+      readGlobalPolicy: async () =>
+        (await configReader("community_policy")) ?? DEFAULT_GLOBAL_POLICY,
+      mediaBucket: config.mediaBucket ?? "",
+      maxImages: config.analysisMaxImages,
+      clock: systemClock,
+    }),
+    mode: config.contentAnalysisMode,
+    policyVersion: config.contentAnalysisPolicyVersion,
+    promptVersion: config.contentAnalysisPromptVersion,
+    logger,
+    clock: systemClock,
+  });
   const moderation = createModerationModule({
     database: database.db,
     societyRepository: societies.societyRepository,

@@ -28,21 +28,22 @@ export class LambdaContentAnalyzer implements ContentAnalyzerPort {
 
   constructor(config: LambdaContentAnalyzerConfig) {
     this.config = config;
-    this.lambda = new Lambda({ region: config.region, requestHandler: {
-      requestTimeout: config.timeoutMs,
-    } });
+    this.lambda = new Lambda({ region: config.region });
   }
 
   async analyze(request: ContentAnalysisRequest): Promise<AnalysisInvocationResult> {
-    const response = await this.lambda.send(new InvokeCommand({
-      FunctionName: this.config.functionName,
-      Qualifier: this.config.qualifier,
-      InvocationType: "RequestResponse",
-      LogType: "None",
-      Payload: new TextEncoder().encode(
-        JSON.stringify({ request }),
-      ),
-    }));
+    const response = await this.lambda.send(
+      new InvokeCommand({
+        FunctionName: this.config.functionName,
+        Qualifier: this.config.qualifier,
+        InvocationType: "RequestResponse",
+        LogType: "None",
+        Payload: new TextEncoder().encode(
+          JSON.stringify({ request }),
+        ),
+      }),
+      { abortSignal: AbortSignal.timeout(this.config.timeoutMs) },
+    );
 
     const statusCode = response.StatusCode ?? 0;
     if (statusCode !== 200) {

@@ -40,7 +40,9 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
     profile: dependencies.profile,
     media: dependencies.media,
     events,
-    onThreadCreated: dependencies.onThreadCreated,
+    ...(dependencies.onThreadCreated !== undefined
+      ? { onThreadCreated: dependencies.onThreadCreated }
+      : {}),
     ...authorization,
   });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });
