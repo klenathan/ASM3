@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import type { Logger } from "pino";
 
@@ -17,9 +17,9 @@ export type ContentAnalysisMode = "off" | "shadow" | "enforce";
 
 export interface ContentAnalysisServiceDeps {
   repository: ContentAnalysisRepository;
-  analyzer: ContentAnalyzerPort;
+  analyzer?: ContentAnalyzerPort;
   threadContext: ThreadAnalysisContextPort;
-  reportContext: ReportAnalysisContextPort;
+  reportContext?: ReportAnalysisContextPort;
   mode: ContentAnalysisMode;
   policyVersion: string;
   promptVersion: string;
@@ -68,7 +68,7 @@ export class ContentAnalysisService {
       const request = this.buildThreadRequest(context);
       await this.deps.repository.markStarted(run.id, startedAt);
 
-      const invocation = await this.deps.analyzer.analyze(request);
+      const invocation = await this.deps.analyzer!.analyze(request);
 
       await this.deps.repository.recordSuccess({
         id: run.id,
@@ -175,18 +175,7 @@ export class ContentAnalysisService {
 }
 
 function classifyError(error: unknown): string {
-  const value = error as { code?: unknown; message?: unknown };
+  const value = error as { code?: unknown };
   if (typeof value?.code === "string" && value.code) return value.code;
   return "ANALYSIS_INVOCATION_FAILED";
-}
-
-/** Deterministic fingerprint of a serialized request (kept for future use). */
-export function hashRequest(request: unknown): string {
-  return createHash("sha256")
-    .update(JSON.stringify(request))
-    .digest("hex");
-}
-
-export function safeString(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.length > 0 ? value : fallback;
 }

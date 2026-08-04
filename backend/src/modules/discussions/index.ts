@@ -21,6 +21,7 @@ export interface DiscussionsModuleDependencies {
   readonly media: ThreadMediaPort;
   readonly events?: ThreadEventPublisher;
   readonly clock?: Clock;
+  readonly onThreadCreated?: (threadId: string) => void;
 }
 
 export function createDiscussionsModule(dependencies: DiscussionsModuleDependencies) {
@@ -39,6 +40,7 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
     profile: dependencies.profile,
     media: dependencies.media,
     events,
+    onThreadCreated: dependencies.onThreadCreated,
     ...authorization,
   });
   const commentService = new CommentService({ repository, transactions, clock, ...authorization });

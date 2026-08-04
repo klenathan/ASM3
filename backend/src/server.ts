@@ -19,6 +19,20 @@ import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
 import { NoopThreadEventPublisher } from "./modules/discussions/application/thread-events.port";
 import { SqsThreadEventPublisher } from "./modules/discussions/infrastructure/thread-events.sqs.publisher";
+import {
+  ContentAnalysisService,
+  DrizzleContentAnalysisRepository,
+  LambdaContentAnalyzer,
+  ThreadAnalysisContextAdapter,
+} from "./modules/content-analysis/index";
+import { systemClock } from "./shared/application/clock";
+
+/** Global community policy used when no `community_policy` config row is set. */
+const DEFAULT_GLOBAL_POLICY =
+  "RMIT Society is an RMIT-only community forum. Posts must be respectful and constructive. " +
+  "No harassment, hate speech, threats, doxxing, spam, or illegal content. " +
+  "No recruiting or referral farming where the poster offers no value first. " +
+  "Keep content on-topic and truthful.";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -51,12 +65,16 @@ async function main(): Promise<void> {
     configReader: createPlatformConfigReader(database.db),
     avatarMedia: media.mediaService,
   });
+  let contentAnalysisService: ContentAnalysisService | undefined;
   const discussions = createDiscussionsModule({
     database: database.db,
     membershipRepository: societies.membershipRepository,
     societyRepository: societies.societyRepository,
     media: media.mediaService,
     events: threadEventPublisher,
+    onThreadCreated: (threadId) => {
+      void contentAnalysisService?.analyzeNewThread(threadId);
+    },
     profile: {
       findPublicIdentity: async (userId) => {
         const account = await identity.repository.findAccountByUserId(userId);

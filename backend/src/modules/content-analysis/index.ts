@@ -3,6 +3,7 @@
  *
  * Public surface exposed to the rest of the backend:
  *  - `ContentAnalysisService` (use cases, authorization, orchestration)
+ *  - infrastructure adapters used at the composition root
  *  - context ports the service consumes (implemented by Discussions,
  *    Moderation, Societies, and Media).
  *
@@ -11,13 +12,21 @@
  */
 export * from "./application/content-analysis.dto";
 
-export type {
+export {
   ContentAnalysisService,
+  type ContentAnalysisServiceDeps,
+  type ContentAnalysisMode,
 } from "./application/content-analysis.service";
 
 export type {
   ContentAnalyzerPort,
 } from "./application/content-analyzer.port";
+
+export type {
+  ContentAnalysisRepository,
+  RecordRunResultInput,
+  RecordRunFailureInput,
+} from "./application/content-analysis.repository";
 
 export type {
   ThreadAnalysisContextPort,
@@ -28,3 +37,20 @@ export type {
   ReportAnalysisContextPort,
   ReportAnalysisContext,
 } from "./application/report-analysis-context.port";
+
+export {
+  DrizzleContentAnalysisRepository,
+} from "./infrastructure/drizzle-content-analysis.repository";
+
+export {
+  LambdaContentAnalyzer,
+  type LambdaContentAnalyzerConfig,
+} from "./infrastructure/lambda-content-analyzer";
+
+export {
+  ThreadAnalysisContextAdapter,
+  type ThreadAnalysisContextDeps,
+  type ThreadAnalysisContextThread,
+  type ThreadAnalysisContextAsset,
+  type ThreadAnalysisContextRule,
+} from "./infrastructure/thread-analysis-context";

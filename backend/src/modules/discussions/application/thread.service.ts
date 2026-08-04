@@ -38,6 +38,12 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly profile: DiscussionProfilePort;
   readonly media: ThreadMediaPort;
   readonly events: ThreadEventPublisher;
+  /**
+   * Optional fire-and-forget hook invoked after a thread is committed and its
+   * event published. Used to trigger downstream async work (e.g. content
+   * analysis) without blocking thread creation.
+   */
+  readonly onThreadCreated?: (threadId: string) => void;
 }
 
 export class ThreadService {
@@ -48,6 +54,7 @@ export class ThreadService {
   private readonly profile: DiscussionProfilePort;
   private readonly media: ThreadMediaPort;
   private readonly events: ThreadEventPublisher;
+  private readonly onThreadCreated?: (threadId: string) => void;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
@@ -57,6 +64,7 @@ export class ThreadService {
     this.profile = dependencies.profile;
     this.media = dependencies.media;
     this.events = dependencies.events;
+    this.onThreadCreated = dependencies.onThreadCreated;
   }
 
   async createThread(
@@ -87,6 +95,7 @@ export class ThreadService {
     });
 
     await this.events.publishThreadCreated(thread);
+    this.onThreadCreated?.(thread.id);
 
     const vote = principal === undefined
       ? null

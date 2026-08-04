@@ -144,8 +144,8 @@ export function ThreadMedia({
 
 /**
  * Facebook-style responsive preview grid. Renders up to four tiles in the
- * card; larger sets keep only the first four until the '+N' overflow tile
- * (US-002) is added.
+ * card; when more than four media exist the fourth tile becomes an overflow
+ * tile showing a remaining item behind a '+N' count overlay.
  */
 function MediaGrid({
   mediaIds,
@@ -161,22 +161,40 @@ function MediaGrid({
   readonly className?: string;
 }) {
   const count = mediaIds.length;
-  const visibleCount = Math.min(count, 4);
-  const layout = gridLayout(visibleCount);
+  const overflow = count > 4 ? count - 4 : 0;
+  // Build up to four tiles. The final tile doubles as the overflow tile when
+  // more than four media exist, showing a remaining (5th onward) item behind a
+  // '+N' overlay so the tile is never empty.
+  const tiles: { mediaIndex: number; overflow: boolean }[] = [];
+  for (let i = 0; i < Math.min(count, 3); i++) {
+    tiles.push({ mediaIndex: i, overflow: false });
+  }
+  if (count >= 4) {
+    tiles.push({ mediaIndex: overflow > 0 ? 4 : 3, overflow: overflow > 0 });
+  }
+
+  const layout = gridLayout(tiles.length);
 
   return (
     <div className={cn(layout.container, className)}>
-      {mediaIds.slice(0, visibleCount).map((id, index) => {
+      {tiles.map(({ mediaIndex, overflow }) => {
+        const id = mediaIds[mediaIndex];
         const match = urls.find((media) => media.mediaId === id);
         return (
           <GridTile
-            key={id}
+            key={`${id}-${mediaIndex}`}
             url={match?.url}
             loading={pending}
-            index={index}
-            aspect={layout.tile(index)}
-            onClick={() => onOpen(index)}
-          />
+            index={mediaIndex}
+            aspect={layout.tile(mediaIndex)}
+            onClick={() => onOpen(mediaIndex)}
+          >
+            {overflow ? (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-2xl font-semibold text-white">
+                +{overflow}
+              </span>
+            ) : undefined}
+          </GridTile>
         );
       })}
     </div>
