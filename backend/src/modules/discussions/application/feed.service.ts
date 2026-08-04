@@ -1,4 +1,4 @@
-import type { PageRequest } from "../../../shared/application/pagination";
+import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 import { normalizePageSize } from "../../../shared/application/pagination";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
@@ -13,6 +13,8 @@ import {
   type DiscussionAuthorizationDependencies,
 } from "./discussion.authorization";
 import type {
+  AnalysisQueueFilter,
+  AnalysisQueuePageDto,
   CommentPageDto,
   HomeFeedPageDto,
   ThreadPageDto,
@@ -22,6 +24,7 @@ import type {
   UserThreadActivityPageDto,
 } from "./discussion.dto";
 import {
+  toAnalysisQueueThreadDto,
   toCommentPageDto,
   toHomeFeedThreadDto,
   toThreadPageDto,
@@ -193,6 +196,74 @@ export class FeedService {
     return this.analysisDecisionReader.findLatestDecisionsByThreads([...new Set(threadIds)]);
   }
 
+  async listSocietyAnalysisQueue(
+    principal: RequestPrincipal,
+    slug: string,
+    page: PageRequest,
+    filter: AnalysisQueueFilter = "all",
+  ): Promise<AnalysisQueuePageDto> {
+    const society = await requireSocietyBySlug(this.authorization, slug);
+    if (!(await hasSocietyModeratorAuthority(this.authorization, principal, society.id))) {
+      throw new ApplicationError("SOCIETY_FORBIDDEN", "Society moderator access is required");
+    }
+    return this.buildAnalysisQueue(
+      await this.repository.listThreads(society.id, normalizePage(page), true),
+      filter,
+    );
+  }
+
+  async listGlobalAnalysisQueue(
+    principal: RequestPrincipal,
+    page: PageRequest,
+    filter: AnalysisQueueFilter = "all",
+  ): Promise<AnalysisQueuePageDto> {
+    if (principal.platformRole !== "system_admin") {
+      throw new ApplicationError("ADMIN_REQUIRED", "System-admin access is required");
+    }
+    return this.buildAnalysisQueue(
+      await this.repository.listAllThreads(normalizePage(page)),
+      filter,
+    );
+  }
+
+  /**
+   * Build the moderator/admin content-analysis review queue for a page of
+   * threads. Keeps only threads whose latest decision is `null` (none/pending)
+   * or `review`; `allow` threads are dropped. A thread that has no recorded
+   * decision (never analyzed, or a failed run) is treated as `none` so it is
+   * never mistaken for reviewed.
+   */
+  private async buildAnalysisQueue(
+    result: PageResult<ThreadRecord>,
+    filter: AnalysisQueueFilter,
+  ): Promise<AnalysisQueuePageDto> {
+    const threadIds = result.items.map((thread) => thread.id);
+    const decisions = await this.decisionsFor(threadIds);
+    const mediaByThread = await this.mediaByThread(result.items);
+    const authorById = await this.identitiesFor(result.items);
+    const societyById = await this.societiesFor(result.items);
+
+    const items = result.items.flatMap((thread) => {
+      const decision = decisions.get(thread.id) ?? null;
+      if (!matchesAnalysisFilter(decision, filter)) return [];
+      const society = societyById.get(thread.societyId);
+      if (society === undefined) return [];
+      return [toAnalysisQueueThreadDto(
+        thread,
+        society,
+        mediaByThread.get(thread.id) ?? [],
+        authorById.get(thread.authorId) ?? null,
+        decision,
+      )];
+    });
+
+    return {
+      items,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    };
+  }
+
   async listUserComments(
     viewer: RequestPrincipal | undefined,
     authorId: string,
@@ -267,4 +338,19 @@ export class FeedService {
 function normalizePage(page: PageRequest): PageRequest {
   const limit = normalizePageSize(page.limit);
   return page.cursor === undefined ? { limit } : { limit, cursor: page.cursor };
+}
+
+function matchesAnalysisFilter(
+  decision: "allow" | "review" | null,
+  filter: AnalysisQueueFilter,
+): boolean {
+  switch (filter) {
+    case "none":
+      return decision === null;
+    case "review":
+      return decision === "review";
+    case "all":
+    default:
+      return decision === null || decision === "review";
+  }
 }

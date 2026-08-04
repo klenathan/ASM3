@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   History,
+  ScanSearch,
   ShieldCheck,
   SlidersHorizontal,
   UserCog,
@@ -11,6 +12,7 @@ import {
 export type AdminSectionId =
   | "users"
   | "moderation"
+  | "content"
   | "health"
   | "audit"
   | "config"
@@ -44,6 +46,14 @@ export const adminSections: AdminSection[] = [
     heading: "Moderation",
     icon: ShieldCheck,
     blurb: "Global report queue and resolution history.",
+    pending: false,
+  },
+  {
+    id: "content",
+    label: "Content review",
+    heading: "Content review",
+    icon: ScanSearch,
+    blurb: "Threads flagged by the automated content check.",
     pending: false,
   },
   {

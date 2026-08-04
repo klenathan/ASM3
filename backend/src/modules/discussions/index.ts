@@ -99,6 +99,9 @@ export type { DiscussionRepository } from "./application/discussion.repository";
 export { registerDiscussionRoutes, registerDiscussionsRoutes } from "./presentation/discussion.routes";
 export type { DiscussionRouteDependencies } from "./presentation/discussion.routes";
 export type {
+  AnalysisQueueFilter,
+  AnalysisQueueThreadDto,
+  AnalysisQueuePageDto,
   CommentDto,
   CommentPageDto,
   CreateCommentCommand,

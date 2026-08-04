@@ -2,6 +2,7 @@ import type { PageResult } from "../../../shared/application/pagination";
 import type { SocietyRecord } from "../../societies/domain/society";
 import type { CommentRecord, ThreadRecord } from "../domain/discussion";
 import type {
+  AnalysisQueueThreadDto,
   CommentDto,
   CommentPageDto,
   HomeFeedThreadDto,
@@ -79,6 +80,20 @@ export function toHomeFeedThreadDto(
     societySlug: society.slug,
     societyName: society.name,
     myVote,
+  };
+}
+
+export function toAnalysisQueueThreadDto(
+  record: ThreadRecord,
+  society: SocietyRecord,
+  media: readonly ThreadMediaRecord[] = [],
+  author?: ProfileIdentity | null,
+  analysisDecision: "allow" | "review" | null = null,
+): AnalysisQueueThreadDto {
+  return {
+    ...toThreadDto(record, media, author, 0, analysisDecision),
+    societySlug: society.slug,
+    societyName: society.name,
   };
 }
 

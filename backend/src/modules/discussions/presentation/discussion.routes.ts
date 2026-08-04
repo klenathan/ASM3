@@ -7,6 +7,8 @@ import type { ThreadService } from "../application/thread.service";
 import type { VoteService } from "../application/vote.service";
 import { createDiscussionController } from "./discussion.controller";
 import {
+  analysisQueuePageSchema,
+  analysisQueueQuerySchema,
   commentPageSchema,
   commentSchema,
   createCommentRequestSchema,
@@ -271,6 +273,35 @@ export interface DiscussionRouteDependencies {
   readonly feedService: FeedService;
 }
 
+const listSocietyAnalysisQueueRoute = createRoute({
+  method: "get",
+  path: "/api/v1/mod/societies/{societySlug}/analysis",
+  tags: ["Discussions"],
+  summary: "List the content-analysis review queue for a society",
+  request: { params: societySlugParams, query: analysisQueueQuerySchema },
+  responses: {
+    200: { description: "Society analysis queue", content: { "application/json": { schema: analysisQueuePageSchema } } },
+    400: { description: "Invalid query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "Society moderator access is required", content: { "application/json": { schema: errorSchema } } },
+    404: { description: "Society was not found", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const listGlobalAnalysisQueueRoute = createRoute({
+  method: "get",
+  path: "/api/v1/admin/analysis",
+  tags: ["Discussions"],
+  summary: "List the global content-analysis review queue across all societies",
+  request: { query: analysisQueueQuerySchema },
+  responses: {
+    200: { description: "Global analysis queue", content: { "application/json": { schema: analysisQueuePageSchema } } },
+    400: { description: "Invalid query", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
 export function registerDiscussionRoutes(
   app: OpenAPIHono<AppEnvironment>,
   dependencies: DiscussionRouteDependencies,
@@ -291,6 +322,8 @@ export function registerDiscussionRoutes(
   app.openapi(updateCommentRoute, (context) => controller.updateComment(context) as never);
   app.openapi(deleteCommentRoute, (context) => controller.deleteComment(context) as never);
   app.openapi(voteCommentRoute, (context) => controller.voteComment(context) as never);
+  app.openapi(listSocietyAnalysisQueueRoute, (context) => controller.listSocietyAnalysisQueue(context) as never);
+  app.openapi(listGlobalAnalysisQueueRoute, (context) => controller.listGlobalAnalysisQueue(context) as never);
 }
 
 export const registerDiscussionsRoutes = registerDiscussionRoutes;

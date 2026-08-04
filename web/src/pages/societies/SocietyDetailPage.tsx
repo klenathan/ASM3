@@ -10,6 +10,7 @@ import {
   AvatarImage,
 } from "../../components/ui/avatar";
 import { useAuth } from "../../features/auth/auth-context";
+import { ReviewQueue } from "../../features/analysis/review-queue";
 import { useMediaUrl } from "../../features/media/use-media-url";
 import { DiscussionCard } from "../../features/discussions/thread-card";
 import type { DiscussionItem } from "../../features/discussions/types";
@@ -274,6 +275,29 @@ export function SocietyDetailPage() {
           </div>
         )}
       </section>
+
+      {membership?.role === "moderator" && (
+        <section
+          aria-labelledby="content-review-title"
+          className="mt-10 border-t-2 border-foreground pt-8"
+        >
+          <div className="flex flex-col gap-1">
+            <h2
+              id="content-review-title"
+              className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase"
+            >
+              Content review
+            </h2>
+            <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+              Threads whose automated content check returned none or needs
+              review. Debug build — read-only.
+            </p>
+          </div>
+          <div className="mt-5">
+            <ReviewQueue scope="moderator" slug={society.slug} />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -299,6 +299,13 @@ class FakeDiscussionRepository implements DiscussionRepository {
     return { items, nextCursor: null, hasMore: false };
   }
 
+  async listAllThreads(_page: PageRequest): Promise<PageResult<ThreadRecord>> {
+    const items = [...this.threads.values()].filter(
+      (thread) => thread.status === "published",
+    );
+    return { items, nextCursor: null, hasMore: false };
+  }
+
   async findThread(threadId: string): Promise<ThreadRecord | null> {
     return this.threads.get(threadId) ?? null;
   }
