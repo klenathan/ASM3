@@ -204,6 +204,7 @@ function makeService(
     contextPort?: ThreadAnalysisContextPort;
     removalPort?: AutomatedRemovalPort;
     threshold?: number;
+    maxRetries?: number;
     loadThreadSnapshot?: (threadId: string) => Promise<ThreadAnalysisSnapshot>;
   } = {},
 ) {
@@ -232,6 +233,9 @@ function makeService(
     ...(overrides.threshold === undefined
       ? {}
       : { threshold: overrides.threshold }),
+    ...(overrides.maxRetries === undefined
+      ? {}
+      : { maxRetries: overrides.maxRetries }),
     ...(overrides.removalPort === undefined
       ? {}
       : { removalPort: overrides.removalPort }),
@@ -344,6 +348,7 @@ describe("ContentAnalysisService.retryStaleRuns", () => {
       threadId: "t1",
       reportId: null,
       status: "queued",
+      attemptCount: 0,
       decision: null,
       inputHash: "",
       modelId: null,
@@ -430,6 +435,23 @@ describe("ContentAnalysisService.retryStaleRuns", () => {
     // re-execution succeeded -> recorded as a successful run.
     expect(repository.succeeded.map((s) => s.id)).toEqual(["run-f"]);
   });
+
+  it("does not re-invoke a failed run after max retries", async () => {
+    const analyze = vi.fn(async () => successInvocation());
+    const { service, repository } = makeService({
+      analyzer: { analyze },
+      maxRetries: 3,
+    });
+    repository.pending.push(
+      pendingRun({ id: "run-f", status: "failed", attemptCount: 3 }),
+    );
+
+    const retried = await service.retryStaleRuns();
+
+    expect(retried).toBe(0);
+    expect(analyze).not.toHaveBeenCalled();
+    expect(repository.succeeded).toHaveLength(0);
+  });
 });
 
 describe("ContentAnalysisService.sweepPending", () => {
@@ -481,6 +503,7 @@ describe("ContentAnalysisService.sweepPending", () => {
       threadId: "t3",
       reportId: null,
       status: "failed",
+      attemptCount: 1,
       decision: null,
       inputHash: "",
       modelId: null,

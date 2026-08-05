@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, lt, max } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, max, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type {
   ContentAnalysisRepository,
@@ -71,7 +71,11 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
   async markStarted(id: string, startedAt: Date): Promise<void> {
     await this.db
       .update(contentAnalysisRuns)
-      .set({ status: "running", startedAt, attemptCount: 1 })
+      .set({
+        status: "running",
+        startedAt,
+        attemptCount: sql`${contentAnalysisRuns.attemptCount} + 1`,
+      })
       .where(eq(contentAnalysisRuns.id, id));
   }
 
@@ -384,6 +388,7 @@ function toRun(row: RunRow): ContentAnalysisRun {
     reportId: row.reportId,
     status: row.status as ContentAnalysisRun["status"],
     decision: row.decision as ContentAnalysisRun["decision"],
+    attemptCount: row.attemptCount,
     inputHash: row.inputHash ?? "",
     modelId: row.modelId,
     lambdaFunctionVersion: row.lambdaFunctionVersion,

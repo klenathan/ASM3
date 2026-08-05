@@ -18,6 +18,7 @@ export interface HandlerConfig {
   retryBaseDelayMs: number;
   retryMaxDelayMs: number;
   deadlineMs: number;
+  imageUrlExpiresInSeconds: number;
   allowedMediaBucket: string;
   allowedMediaPrefix: string;
   maxModelTokens: number;
@@ -49,6 +50,8 @@ function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
     // Must stay below the Lambda function timeout so a retried OpenRouter
     // call can still complete inside its configured runtime.
     deadlineMs: Number(env.OPENROUTER_DEADLINE_MS ?? 175_000),
+    // OpenRouter fetches private S3 images through these temporary URLs.
+    imageUrlExpiresInSeconds: Number(env.IMAGE_URL_EXPIRES_SECONDS ?? 300),
     allowedMediaBucket: required.ALLOWED_MEDIA_BUCKET!,
     allowedMediaPrefix: required.ALLOWED_MEDIA_PREFIX!,
     maxModelTokens: Number(env.MAX_MODEL_TOKENS ?? 2048),
@@ -83,6 +86,7 @@ function createAnalyzer(config: HandlerConfig, logger: Logger): Analyzer {
       retryBaseDelayMs: config.retryBaseDelayMs,
       retryMaxDelayMs: config.retryMaxDelayMs,
       deadlineMs: config.deadlineMs,
+      imageUrlExpiresInSeconds: config.imageUrlExpiresInSeconds,
     },
     {
       allowedBucket: config.allowedMediaBucket,

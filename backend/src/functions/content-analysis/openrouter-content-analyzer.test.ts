@@ -73,6 +73,7 @@ function makeAnalyzer(fetchMock: typeof fetch) {
       retryBaseDelayMs: 1,
       retryMaxDelayMs: 10,
       deadlineMs: 60_000,
+      imageUrlExpiresInSeconds: 300,
     },
     {
       allowedBucket: "test-media",

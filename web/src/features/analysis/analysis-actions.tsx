@@ -6,6 +6,16 @@ import { cn } from "../../lib/utils";
 
 import { Button } from "../../components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
+import {
   reanalyzeThread,
   setAnalysisDecision,
   type AnalysisActionScope,
@@ -47,6 +57,8 @@ export function AnalysisActions({
     | { kind: "success" | "error"; text: string }
     | null
   >(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const flash = (kind: "success" | "error", text: string) => {
     setFeedback({ kind, text });
@@ -86,16 +98,14 @@ export function AnalysisActions({
 
   if (!shouldShowAnalysisActions(decision, failed)) return null;
 
-  const handleReject = () => {
-    if (!window.confirm("Reject this post? It will be hidden from the community."))
-      return;
-    const reason = window.prompt(
-      "Optional reason for rejecting (left blank if none):",
-    );
-    if (reason === null) return;
+  const submitReject = () => {
+    setRejectOpen(false);
+    setRejectReason("");
     decisionMutation.mutate({
       decision: "reject",
-      ...(reason.trim().length === 0 ? {} : { reason: reason.trim() }),
+      ...(rejectReason.trim().length === 0
+        ? {}
+        : { reason: rejectReason.trim() }),
     });
   };
 
@@ -115,7 +125,10 @@ export function AnalysisActions({
           type="button"
           size="sm"
           variant="destructive"
-          onClick={handleReject}
+          onClick={() => {
+            setRejectReason("");
+            setRejectOpen(true);
+          }}
           disabled={busy}
         >
           Reject
@@ -134,6 +147,48 @@ export function AnalysisActions({
           )}
         </Button>
       </div>
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject this post?</DialogTitle>
+            <DialogDescription>
+              It will be hidden from the community. You can add an optional
+              reason for future reference.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="reject-reason">Reason (optional)</Label>
+            <Textarea
+              id="reject-reason"
+              value={rejectReason}
+              maxLength={500}
+              rows={3}
+              placeholder="Optional reason for rejecting…"
+              onChange={(event) => setRejectReason(event.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-none border-foreground/20 shadow-none"
+              onClick={() => setRejectOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-10 rounded-none px-4 font-semibold shadow-none"
+              onClick={submitReject}
+              disabled={decisionMutation.isPending}
+            >
+              {decisionMutation.isPending ? "Rejecting…" : "Reject post"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {feedback !== null && (
         <p
           role={feedback.kind === "error" ? "alert" : "status"}

@@ -403,6 +403,7 @@ ANALYSIS_MAX_TOTAL_IMAGE_BYTES=
 ANALYSIS_TIMEOUT_MS=175000
 ANALYSIS_STALE_AFTER_MS=900000
 ANALYSIS_RETRY_INTERVAL_MS=60000
+ANALYSIS_MAX_RETRIES=3
 ```
 
 Lambda:
@@ -431,7 +432,7 @@ Modes:
 When `CONTENT_ANALYSIS_MODE` is not `off`, a background set-interval sweep (`ANALYSIS_RETRY_INTERVAL_MS`, default `60s`) guarantees every published thread eventually gets an automated decision by:
 
 - **Backfilling** published threads that have **no analysis run at all** — creates a run (`trigger_type = 'backfill'`) and executes it. Runs oldest-first and is bounded per tick (default 50) by `ANALYSIS_STALE_AFTER_MS` (default 15 min), so a history backfill drains across successive ticks without a single large synchronous burst.
-- **Retrying** runs still unsettled — `queued`, `running`, or `failed` — older than `ANALYSIS_STALE_AFTER_MS`. A failed Lambda invocation already writes `status = 'failed'`, so such runs are automatically re-invoked on the next sweep until they settle.
+- **Retrying** runs still unsettled — `queued`, `running`, or `failed` — older than `ANALYSIS_STALE_AFTER_MS`. A failed Lambda invocation already writes `status = 'failed'`, so such runs are re-invoked on the next sweep until they settle or reach `ANALYSIS_MAX_RETRIES` (default 3 total invocations per run). Runs at the limit remain failed and are not sent to Lambda again.
 
 `succeeded` runs are never re-triggered by the sweep.
 

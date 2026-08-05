@@ -52,6 +52,7 @@ resource "aws_lambda_function" "content_analysis" {
       OPENROUTER_RETRY_BASE_DELAY_MS = tostring(var.content_analysis_openrouter_retry_base_delay_ms)
       OPENROUTER_RETRY_MAX_DELAY_MS  = tostring(var.content_analysis_openrouter_retry_max_delay_ms)
       OPENROUTER_DEADLINE_MS         = tostring(var.content_analysis_openrouter_deadline_ms)
+      IMAGE_URL_EXPIRES_SECONDS       = "300"
       OPENROUTER_API_KEY_SECRET_ARN  = aws_secretsmanager_secret.openrouter_api_key[0].arn
       ALLOWED_MEDIA_BUCKET           = aws_s3_bucket.media.bucket
       ALLOWED_MEDIA_PREFIX           = "media/"

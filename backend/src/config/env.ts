@@ -77,6 +77,7 @@ const environmentSchema = z
     ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(175_000),
     ANALYSIS_STALE_AFTER_MS: z.coerce.number().int().min(1).default(15 * 60 * 1000),
     ANALYSIS_RETRY_INTERVAL_MS: z.coerce.number().int().min(1).default(60_000),
+    ANALYSIS_MAX_RETRIES: z.coerce.number().int().min(1).default(3),
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
@@ -189,6 +190,7 @@ export interface AppConfig {
   readonly contentAnalysisTimeoutMs: number;
   readonly analysisStaleAfterMs: number;
   readonly analysisRetryIntervalMs: number;
+  readonly analysisMaxRetries: number;
   readonly analysisMaxImages: number;
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
@@ -234,6 +236,7 @@ export function loadConfig(
     contentAnalysisTimeoutMs: result.data.ANALYSIS_TIMEOUT_MS,
     analysisStaleAfterMs: result.data.ANALYSIS_STALE_AFTER_MS,
     analysisRetryIntervalMs: result.data.ANALYSIS_RETRY_INTERVAL_MS,
+    analysisMaxRetries: result.data.ANALYSIS_MAX_RETRIES,
     analysisMaxImages: result.data.ANALYSIS_MAX_IMAGES,
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,

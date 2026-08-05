@@ -55,6 +55,9 @@ export function isPendingRunStatus(status: AnalysisRunStatus): boolean {
  */
 export const DEFAULT_STALE_PENDING_MS = 15 * 60 * 1000;
 
+/** Default maximum number of Lambda invocations allowed for one analysis run. */
+export const DEFAULT_MAX_RETRIES = 3;
+
 /** Default cap on stale runs processed by a single scheduler tick. */
 export const DEFAULT_STALE_PENDING_LIMIT = 50;
 
@@ -124,6 +127,7 @@ export interface ContentAnalysisRun {
   threadId: string;
   reportId: string | null;
   status: AnalysisRunStatus;
+  attemptCount: number;
   decision: "allow" | "review" | null;
   inputHash: string;
   modelId: string | null;

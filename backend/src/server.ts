@@ -185,6 +185,7 @@ async function main(): Promise<void> {
     policyVersion: config.contentAnalysisPolicyVersion,
     promptVersion: config.contentAnalysisPromptVersion,
     threshold: config.contentAnalysisAutoRemoveConfidence,
+    maxRetries: config.analysisMaxRetries,
     // Auto-removal enforcement (ATR-005/006/007): only active in enforce mode.
     // The removal port's atomic check is the final authority; when no removal
     // port is wired (e.g. analysis not configured) enforcement is skipped.
@@ -247,6 +248,7 @@ async function main(): Promise<void> {
       {
         intervalMs: config.analysisRetryIntervalMs,
         staleAfterMs: config.analysisStaleAfterMs,
+        maxRetries: config.analysisMaxRetries,
       },
       "content-analysis pending sweep scheduler started",
     );

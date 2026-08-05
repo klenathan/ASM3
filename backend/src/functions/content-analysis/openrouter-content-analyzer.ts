@@ -7,7 +7,8 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { buildPrompt } from "./prompt";
 import type { ContentAnalysisRequest, ContentAnalysisResult } from "./contracts";
 import type { Logger } from "./logger";
@@ -24,6 +25,7 @@ export interface OpenRouterConfig {
   retryBaseDelayMs: number;
   retryMaxDelayMs: number;
   deadlineMs: number;
+  imageUrlExpiresInSeconds: number;
 }
 
 export interface ImageBounds {
@@ -284,22 +286,30 @@ export class OpenRouterContentAnalyzer {
         throw new Error("total image size exceeds configured limit");
       }
 
-      const obj = await this.s3.send(new GetObjectCommand({
+      const obj = await this.s3.send(new HeadObjectCommand({
         Bucket: image.bucket,
         Key: image.key,
       }));
-      const bytes = await obj.Body?.transformToByteArray();
-      if (!bytes) throw new Error("empty image object");
-      if (bytes.byteLength !== image.byteSize || bytes.byteLength > this.bounds.maxImageBytes) {
+      if (obj.ContentLength !== image.byteSize || image.byteSize > this.bounds.maxImageBytes) {
         throw new Error("image metadata does not match the stored object");
       }
       if (obj.ContentType && obj.ContentType !== image.contentType) {
         throw new Error("image MIME metadata does not match the approved request");
       }
+      // Keep image bytes out of the OpenRouter JSON body. The provider fetches
+      // this short-lived URL directly from S3 instead of receiving base64 data.
+      const url = await getSignedUrl(
+        this.s3,
+        new GetObjectCommand({
+          Bucket: image.bucket,
+          Key: image.key,
+        }),
+        { expiresIn: this.config.imageUrlExpiresInSeconds },
+      );
       blocks.push({
         type: "image_url",
         image_url: {
-          url: `data:${image.contentType};base64,${Buffer.from(bytes).toString("base64")}`,
+          url,
         },
       });
     }

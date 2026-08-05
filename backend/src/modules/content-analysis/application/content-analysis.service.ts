@@ -25,6 +25,7 @@ import {
   shouldAutoRemove,
 } from "../domain/content-analysis.policy";
 import {
+  DEFAULT_MAX_RETRIES,
   DEFAULT_STALE_PENDING_MS,
   DEFAULT_STALE_PENDING_LIMIT,
   type AnalysisOverrideDecision,
@@ -48,6 +49,8 @@ export interface ContentAnalysisServiceDeps {
    * Defaults to {@link DEFAULT_AUTO_REMOVE_THRESHOLD} when omitted.
    */
   threshold?: number;
+  /** Maximum number of analyzer invocations allowed for one run. */
+  maxRetries?: number;
   /**
    * Port used to enforce removal of a reviewed, high-confidence thread.
    * When omitted, enforcement is skipped with a warning (config left
@@ -171,14 +174,36 @@ export class ContentAnalysisService {
       olderThan,
       options?.limit ?? DEFAULT_STALE_PENDING_LIMIT,
     );
+    const maxRetries = this.deps.maxRetries ?? DEFAULT_MAX_RETRIES;
+    let retried = 0;
     for (const run of runs) {
+      if (run.attemptCount >= maxRetries) {
+        this.deps.logger.warn(
+          {
+            runId: run.id,
+            threadId: run.threadId,
+            status: run.status,
+            attemptCount: run.attemptCount,
+            maxRetries,
+          },
+          "content-analysis run reached max retries; leaving it unchanged",
+        );
+        continue;
+      }
       this.deps.logger.info(
-        { runId: run.id, threadId: run.threadId, status: run.status },
+        {
+          runId: run.id,
+          threadId: run.threadId,
+          status: run.status,
+          attemptCount: run.attemptCount,
+          maxRetries,
+        },
         "retrying stale pending content-analysis run",
       );
       await this.executeAnalysis(run);
+      retried += 1;
     }
-    return runs.length;
+    return retried;
   }
 
   /**
@@ -416,6 +441,7 @@ export class ContentAnalysisService {
       threadId,
       reportId: null,
       status: "queued",
+      attemptCount: 0,
       decision: null,
       inputHash: "",
       modelId: null,
