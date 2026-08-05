@@ -61,11 +61,13 @@ export class FeedService {
   ): Promise<ThreadPageDto> {
     const society = await requireSocietyBySlug(this.authorization, slug);
     const societyId = society.id;
-    const includeRetained = principal === undefined
-      ? false
-      : await hasSocietyModeratorAuthority(this.authorization, principal, societyId);
+    // The society feed always shows only published threads, for every role.
+    // Hidden (auto-removed / manually removed) threads are surfaced to
+    // moderators and system admins through the dedicated content-analysis
+    // review queue and the per-thread analysis view, never mixed into the
+    // ordinary feed.
     const normalizedPage = normalizePage(page);
-    const result = await this.repository.listThreads(societyId, normalizedPage, includeRetained);
+    const result = await this.repository.listThreads(societyId, normalizedPage, false);
     const mediaByThread = await this.mediaByThread(result.items);
     const authorById = await this.identitiesFor(result.items);
     const voteByThread = new Map<string, -1 | 0 | 1>();

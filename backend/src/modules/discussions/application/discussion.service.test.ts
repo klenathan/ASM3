@@ -646,11 +646,11 @@ describe("ThreadService.getThreadAnalysis", () => {
       .resolves.toBeNull();
   });
 
-  it("denies a plain member (no mod authority)", async () => {
+  it("allows a plain member to read the analysis (read-only)", async () => {
     const repository = new FakeDiscussionRepository();
     const service = createThreadService(repository);
     const thread = await service.createThread(member, society.id, {
-      title: "Private analysis",
+      title: "Public analysis",
       body: "Body",
     });
     const reader: ThreadAnalysisDetailsReader = {
@@ -658,7 +658,7 @@ describe("ThreadService.getThreadAnalysis", () => {
     };
 
     await expect(withReader(repository, reader).getThreadAnalysis(member, thread.id))
-      .rejects.toMatchObject({ code: "SOCIETY_FORBIDDEN" });
+      .resolves.toEqual(details);
   });
 
   it("rejects a thread that does not exist", async () => {

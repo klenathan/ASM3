@@ -45,17 +45,22 @@ resource "aws_lambda_function" "content_analysis" {
   environment {
     variables = {
       # AWS_REGION is injected by Lambda runtime and is reserved by AWS.
-      OPENROUTER_BASE_URL           = "https://openrouter.ai/api/v1"
-      OPENROUTER_MODEL              = var.content_analysis_openrouter_model
-      OPENROUTER_API_KEY_SECRET_ARN = aws_secretsmanager_secret.openrouter_api_key[0].arn
-      ALLOWED_MEDIA_BUCKET          = aws_s3_bucket.media.bucket
-      ALLOWED_MEDIA_PREFIX          = "media/"
-      MAX_MODEL_TOKENS              = tostring(var.content_analysis_max_model_tokens)
-      MAX_IMAGE_BYTES               = tostring(var.content_analysis_max_image_bytes)
-      MAX_TOTAL_IMAGE_BYTES         = tostring(var.content_analysis_max_total_image_bytes)
-      MAX_IMAGES                    = tostring(var.content_analysis_max_images)
-      ALLOWED_MIME_TYPES            = var.content_analysis_allowed_mime_types
-      LOG_LEVEL                     = "info"
+      OPENROUTER_BASE_URL            = "https://openrouter.ai/api/v1"
+      OPENROUTER_MODEL               = var.content_analysis_openrouter_model
+      OPENROUTER_TIMEOUT_MS          = tostring(var.content_analysis_openrouter_timeout_ms)
+      OPENROUTER_MAX_RETRIES         = tostring(var.content_analysis_openrouter_max_retries)
+      OPENROUTER_RETRY_BASE_DELAY_MS = tostring(var.content_analysis_openrouter_retry_base_delay_ms)
+      OPENROUTER_RETRY_MAX_DELAY_MS  = tostring(var.content_analysis_openrouter_retry_max_delay_ms)
+      OPENROUTER_DEADLINE_MS         = tostring(var.content_analysis_openrouter_deadline_ms)
+      OPENROUTER_API_KEY_SECRET_ARN  = aws_secretsmanager_secret.openrouter_api_key[0].arn
+      ALLOWED_MEDIA_BUCKET           = aws_s3_bucket.media.bucket
+      ALLOWED_MEDIA_PREFIX           = "media/"
+      MAX_MODEL_TOKENS               = tostring(var.content_analysis_max_model_tokens)
+      MAX_IMAGE_BYTES                = tostring(var.content_analysis_max_image_bytes)
+      MAX_TOTAL_IMAGE_BYTES          = tostring(var.content_analysis_max_total_image_bytes)
+      MAX_IMAGES                     = tostring(var.content_analysis_max_images)
+      ALLOWED_MIME_TYPES             = var.content_analysis_allowed_mime_types
+      LOG_LEVEL                      = "info"
     }
   }
 

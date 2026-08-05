@@ -22,6 +22,7 @@ export interface AnalysisQueueThread {
   readonly createdAt: string
   readonly updatedAt: string
   readonly deletedAt: string | null
+  readonly status: "published" | "removed" | "deleted"
   readonly analysisDecision: "allow" | "review" | null
 }
 

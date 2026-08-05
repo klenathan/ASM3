@@ -20,6 +20,10 @@ export interface OpenRouterConfig {
   apiKey: string | undefined;
   maxModelTokens: number;
   requestTimeoutMs: number;
+  maxRetries: number;
+  retryBaseDelayMs: number;
+  retryMaxDelayMs: number;
+  deadlineMs: number;
 }
 
 export interface ImageBounds {
@@ -57,55 +61,177 @@ export class OpenRouterContentAnalyzer {
     const apiKey = await this.loadApiKey();
     const imageBlocks = await this.loadImageBlocks(request);
     this.logger.info({ analysisId: request.analysisId, imageCount: imageBlocks.length }, "image blocks loaded");
-    const response = await fetch(
-      `${this.config.baseUrl.replace(/\/$/, "")}/chat/completions`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          ...(process.env.OPENROUTER_SITE_URL
-            ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL }
-            : {}),
-          ...(process.env.OPENROUTER_APP_NAME
-            ? { "X-Title": process.env.OPENROUTER_APP_NAME }
-            : {}),
-        },
-        body: JSON.stringify({
-          model: this.config.modelId,
-          messages: [
-            {
-              role: "system",
-              content: buildPrompt(request.globalPolicy, societyRulesText(request)),
-            },
-            { role: "user", content: this.buildContentBlocks(request, imageBlocks) },
-          ],
-          max_tokens: this.config.maxModelTokens,
-          response_format: { type: "json_object" },
-        }),
-        signal: AbortSignal.timeout(this.config.requestTimeoutMs),
-      },
-    );
-
-    const responseText = await response.text();
-    if (!response.ok) {
-      this.logger.error({ analysisId: request.analysisId, status: response.status }, "OpenRouter request failed");
-      throw new Error(`OpenRouter request failed with HTTP ${response.status}`);
-    }
-
-    let payload: unknown;
-    try {
-      payload = JSON.parse(responseText);
-    } catch {
-      throw new Error("OpenRouter returned invalid JSON");
-    }
-    const result = this.parseResult(payload);
-    const durationMs = Math.round(performance.now() - startedAt);
+    const url = `${this.config.baseUrl.replace(/\/$/, "")}/chat/completions`;
     this.logger.info(
-      { analysisId: request.analysisId, decision: result.decision, durationMs },
-      "content analysis completed",
+      {
+        analysisId: request.analysisId,
+        modelId: this.config.modelId,
+        requestTimeoutMs: this.config.requestTimeoutMs,
+      },
+      "invoking OpenRouter chat completions",
     );
-    return result;
+    const deadlineAt = performance.now() + this.config.deadlineMs;
+
+    for (let attempt = 0; ; attempt += 1) {
+      const attemptStartedAt = performance.now();
+      const remainingMs = deadlineAt - performance.now();
+      if (remainingMs <= 0) {
+        throw new Error(
+          "OpenRouter request deadline exceeded before an attempt could start",
+        );
+      }
+      // Do not let a single token-producing attempt outlive the Lambda so a
+      // retried call can still fit inside its configured timeout.
+      const attemptTimeoutMs = Math.min(
+        this.config.requestTimeoutMs,
+        remainingMs,
+      );
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            ...(process.env.OPENROUTER_SITE_URL
+              ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL }
+              : {}),
+            ...(process.env.OPENROUTER_APP_NAME
+              ? { "X-Title": process.env.OPENROUTER_APP_NAME }
+              : {}),
+          },
+          body: JSON.stringify({
+            model: this.config.modelId,
+            messages: [
+              {
+                role: "system",
+                content: buildPrompt(request.globalPolicy, societyRulesText(request)),
+              },
+              { role: "user", content: this.buildContentBlocks(request, imageBlocks) },
+            ],
+            max_tokens: this.config.maxModelTokens,
+            response_format: { type: "json_object" },
+          }),
+          signal: AbortSignal.timeout(attemptTimeoutMs),
+        });
+      } catch (error) {
+        const elapsedMs = Math.round(performance.now() - attemptStartedAt);
+        this.logger.error(
+          {
+            analysisId: request.analysisId,
+            attempt,
+            attemptTimeoutMs,
+            elapsedMs,
+            err: error,
+          },
+          "OpenRouter request aborted or failed",
+        );
+        if (error instanceof DOMException && error.name === "TimeoutError") {
+          throw new Error(
+            `OpenRouter request timed out after ${attemptTimeoutMs}ms`,
+          );
+        }
+        throw error;
+      }
+      const fetchElapsedMs = Math.round(performance.now() - attemptStartedAt);
+      this.logger.info(
+        {
+          analysisId: request.analysisId,
+          attempt,
+          status: response.status,
+          fetchElapsedMs,
+        },
+        "OpenRouter responded",
+      );
+
+      const responseText = await response.text();
+      if (response.ok) {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(responseText);
+        } catch {
+          throw new Error("OpenRouter returned invalid JSON");
+        }
+        const result = this.parseResult(payload);
+        const durationMs = Math.round(performance.now() - startedAt);
+        this.logger.info(
+          { analysisId: request.analysisId, decision: result.decision, durationMs },
+          "content analysis completed",
+        );
+        return result;
+      }
+
+      // Transient upstream failures (rate limits and 5xx) are retried with
+      // exponential backoff and jitter. 429 honors Retry-After when present.
+      if (attempt >= this.config.maxRetries || !this.isRetryableStatus(response.status)) {
+        this.logger.error(
+          {
+            analysisId: request.analysisId,
+            attempt,
+            status: response.status,
+            maxRetries: this.config.maxRetries,
+          },
+          "OpenRouter request failed",
+        );
+        throw new Error(`OpenRouter request failed with HTTP ${response.status}`);
+      }
+
+      const retryAfter = response.headers.get("retry-after");
+      const delayMs = this.retryDelayMs(response.status, retryAfter, attempt);
+      const nowMs = performance.now();
+      if (nowMs + delayMs >= deadlineAt) {
+        this.logger.error(
+          {
+            analysisId: request.analysisId,
+            attempt,
+            status: response.status,
+            reason: "no remaining budget for retry",
+          },
+          "OpenRouter request failed",
+        );
+        throw new Error(`OpenRouter request failed with HTTP ${response.status}`);
+      }
+      this.logger.warn(
+        {
+          analysisId: request.analysisId,
+          attempt,
+          status: response.status,
+          retryAfter,
+          delayMs,
+          nextAttempt: attempt + 1,
+        },
+        "OpenRouter rate limit/5xx; retrying",
+      );
+      await this.sleep(delayMs);
+    }
+  }
+
+  private isRetryableStatus(status: number): boolean {
+    return status === 429 || (status >= 500 && status <= 599);
+  }
+
+  private retryDelayMs(
+    status: number,
+    retryAfter: string | null,
+    attempt: number,
+  ): number {
+    if (status === 429 && retryAfter !== null) {
+      const seconds = Number(retryAfter);
+      if (!Number.isNaN(seconds) && seconds > 0) {
+        return Math.min(this.config.retryMaxDelayMs, seconds * 1000);
+      }
+    }
+    const jitter = Math.floor(Math.random() * this.config.retryBaseDelayMs);
+    const backoff = Math.min(
+      this.config.retryMaxDelayMs,
+      this.config.retryBaseDelayMs * 2 ** attempt,
+    );
+    return backoff + jitter;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async loadApiKey(): Promise<string> {

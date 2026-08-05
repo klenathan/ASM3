@@ -145,7 +145,39 @@ function createService(
   });
 }
 
-describe("FeedService analysis queue", () => {
+describe("FeedService analysis queue", () => {  it("excludes removed (auto-hidden) threads from the society feed for every role", async () => {
+    const removedThread = thread("thread-removed", "Auto-removed thread");
+    class RetainedRepo extends FakeDiscussionRepository {
+      override threads = new Map<string, ThreadRecord>([
+        [allowed.id, allowed],
+        [removedThread.id, { ...removedThread, status: "removed" }],
+      ]);
+      override async listThreads(
+        societyId: string,
+        _page: PageRequest,
+        includeRetained: boolean,
+      ): Promise<PageResult<ThreadRecord>> {
+        const items = [...this.threads.values()].filter(
+          (t) => t.societyId === societyId && (includeRetained || t.status === "published"),
+        );
+        return { items, nextCursor: null, hasMore: false };
+      }
+      async findThreadVotes(
+        _threadIds: readonly string[],
+        _userId: string,
+      ): Promise<readonly never[]> {
+        return [];
+      }
+    }
+    const service = createService(new RetainedRepo());
+
+    const forMember = await service.listSocietyThreads(member, society.slug, { limit: 20 });
+    expect(forMember.items.map((item) => item.id)).toEqual(["thread-allow"]);
+
+    const forModerator = await service.listSocietyThreads(moderator, society.slug, { limit: 20 });
+    expect(forModerator.items.map((item) => item.id)).toEqual(["thread-allow"]);
+  });
+
   it("requires society moderator authority for the society queue", async () => {
     const service = createService(new FakeDiscussionRepository());
     await expect(

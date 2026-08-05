@@ -53,10 +53,11 @@ function FindingRow({ finding }: { readonly finding: AnalysisFinding }) {
 }
 
 /**
- * Small privileged card surfacing the full automated content-analysis
- * outcome for a thread, plus Accept / Reject / Re-analyze override actions.
- * Rendered only for system admins and the thread's society moderators;
- * authorization is enforced server-side.
+ * Small card surfacing the full automated content-analysis outcome for a
+ * thread, plus (for the thread's moderators and system admins) the
+ * Accept / Reject / Re-analyze override actions. Ordinary users see the
+ * analysis read-only; override actions are rendered only when `canAct` is
+ * true. Authorization for actions is enforced server-side.
  */
 export function ThreadAnalysisCard({
   analysis,
@@ -64,13 +65,19 @@ export function ThreadAnalysisCard({
   threadId,
   actionScope,
   threadUpdatedAt,
+  autoRemoved = false,
+  canAct = false,
   onResolved,
 }: {
   readonly analysis: ThreadAnalysis | null | undefined;
   readonly status: "loading" | "success" | "error";
   readonly threadId: string;
-  readonly actionScope: AnalysisActionScope;
+  readonly actionScope?: AnalysisActionScope;
   readonly threadUpdatedAt: string;
+  /** Authoritative "hidden by automated policy" state (see `isAutoRemoved`). */
+  readonly autoRemoved?: boolean;
+  /** Show Accept / Reject / Re-analyze override controls (privileged callers). */
+  readonly canAct?: boolean;
   readonly onResolved?: () => void;
 }) {
   return (
@@ -81,7 +88,10 @@ export function ThreadAnalysisCard({
           Automated analysis
         </CardTitle>
         <CardAction>
-          <AnalysisBadge decision={analysis?.decision ?? null} />
+          <AnalysisBadge
+            decision={analysis?.decision ?? null}
+            autoRemoved={autoRemoved}
+          />
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -134,13 +144,15 @@ export function ThreadAnalysisCard({
             </>
           )}
         </div>
-        <AnalysisActions
-          threadId={threadId}
-          actionScope={actionScope}
-          decision={analysis?.decision}
-          threadUpdatedAt={threadUpdatedAt}
-          onResolved={onResolved}
-        />
+        {canAct && (
+          <AnalysisActions
+            threadId={threadId}
+            actionScope={actionScope ?? { scope: "admin" }}
+            decision={analysis?.decision}
+            threadUpdatedAt={threadUpdatedAt}
+            onResolved={onResolved}
+          />
+        )}
       </CardFooter>
     </Card>
   );

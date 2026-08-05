@@ -40,6 +40,7 @@ function renderCard(el: ReactElement) {
 const props = {
   threadId: "t1",
   actionScope,
+  canAct: true,
   threadUpdatedAt: new Date(Date.now() - 1_000).toISOString(),
 };
 
@@ -83,6 +84,35 @@ describe("ThreadAnalysisCard", () => {
     expect(screen.getByText(/Model: deepseek\/test/)).toBeInTheDocument();
     expect(screen.getByText(/Prompt v2/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+  });
+
+  it("shows the analysis read-only for ordinary users (no override actions)", () => {
+    renderCard(
+      <ThreadAnalysisCard
+        {...props}
+        canAct={false}
+        analysis={fullAnalysis}
+        status="success"
+      />,
+    );
+    expect(screen.getByText("Automated analysis")).toBeInTheDocument();
+    expect(screen.getByText("Flagged for a possible policy violation.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Re-analyze" })).not.toBeInTheDocument();
+  });
+
+  it("surfaces the Automatically hidden badge for an auto-removed thread", () => {
+    renderCard(
+      <ThreadAnalysisCard
+        {...props}
+        analysis={fullAnalysis}
+        status="success"
+        autoRemoved
+      />,
+    );
+    expect(screen.getByText("Automatically hidden")).toBeInTheDocument();
+    expect(screen.queryByText("Flagged for review")).not.toBeInTheDocument();
   });
 
   it("surfaces a load error", () => {

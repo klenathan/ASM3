@@ -74,7 +74,7 @@ const environmentSchema = z
       .min(0)
       .max(1)
       .default(0.90),
-    ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(55_000),
+    ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(175_000),
     ANALYSIS_STALE_AFTER_MS: z.coerce.number().int().min(1).default(15 * 60 * 1000),
     ANALYSIS_RETRY_INTERVAL_MS: z.coerce.number().int().min(1).default(60_000),
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),

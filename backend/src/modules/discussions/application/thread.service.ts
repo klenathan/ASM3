@@ -248,8 +248,11 @@ export class ThreadService {
 
   /**
    * Return the full persisted content-analysis outcome for a thread.
-   * Accessible only to system admins or the thread's society moderators.
-   * Returns null when no successful analysis run exists yet.
+   * Readable by any authenticated user who can view the thread itself
+   * (published threads are public; retained threads require the author or a
+   * privileged reader), so ordinary users can see why a post was flagged.
+   * Override actions stay privileged. Returns null when no successful
+   * analysis run exists yet.
    */
   async getThreadAnalysis(
     principal: RequestPrincipal,
@@ -259,16 +262,15 @@ export class ThreadService {
     await requireSociety(this.authorization, thread.societyId);
 
     if (
-      !(await hasSocietyModeratorAuthority(
+      thread.status !== "published" &&
+      !(await canReadRetained(
         this.authorization,
         principal,
         thread.societyId,
+        thread.authorId,
       ))
     ) {
-      throw new ApplicationError(
-        "SOCIETY_FORBIDDEN",
-        "Only a society moderator or system admin can view analysis details",
-      );
+      throw new ApplicationError("NOT_FOUND", "Thread was not found");
     }
     if (this.threadAnalysisReader === undefined) return null;
     return this.threadAnalysisReader.findLatestSucceededAnalysis(threadId);

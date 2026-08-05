@@ -23,6 +23,7 @@ const base: Omit<AnalysisQueueThread, "id" | "title" | "analysisDecision"> = {
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: new Date(Date.now() - 1_000).toISOString(),
   deletedAt: null,
+  status: "published",
 };
 
 const reviewThread: AnalysisQueueThread = {
@@ -111,6 +112,29 @@ describe("ReviewQueue", () => {
       expect(screen.getByText("Flagged for review")).toBeTruthy();
     });
     expect(screen.getByText("Analysis pending")).toBeTruthy();
+  });
+
+  it("renders red Hidden instead of Flagged for review for a removed thread", async () => {
+    const removedThread: AnalysisQueueThread = {
+      ...reviewThread,
+      id: "10000000-0000-4000-8000-000000000004",
+      title: "Auto-removed thread",
+      status: "removed",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ items: [removedThread], nextCursor: null, hasMore: false }),
+      ),
+    );
+
+    renderQueue();
+
+    await waitFor(() => {
+      expect(screen.getByText("Auto-removed thread")).toBeTruthy();
+    });
+    expect(screen.queryByText("Flagged for review")).toBeNull();
+    expect(screen.getByText("Hidden")).toBeTruthy();
   });
 
   it("hides actions for fresh pending threads but shows them for stale ones", async () => {

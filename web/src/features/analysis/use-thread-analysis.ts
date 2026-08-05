@@ -5,7 +5,7 @@ import type { ThreadAnalysis } from "./types";
 
 /**
  * Full automated content-analysis details for a thread.
- * Only enabled for privileged viewers (system admin / society moderator).
+ * Enabled for signed-in viewers; override actions remain privileged.
  */
 export function useThreadAnalysis(
   threadId: string,

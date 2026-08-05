@@ -14,6 +14,10 @@ export interface HandlerConfig {
   apiKeySecretArn: string | undefined;
   apiKey: string | undefined;
   requestTimeoutMs: number;
+  maxRetries: number;
+  retryBaseDelayMs: number;
+  retryMaxDelayMs: number;
+  deadlineMs: number;
   allowedMediaBucket: string;
   allowedMediaPrefix: string;
   maxModelTokens: number;
@@ -38,7 +42,13 @@ function loadConfig(env: Record<string, string | undefined>): HandlerConfig {
     baseUrl: env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
     apiKeySecretArn: env.OPENROUTER_API_KEY_SECRET_ARN,
     apiKey: env.OPENROUTER_API_KEY,
-    requestTimeoutMs: Number(env.OPENROUTER_TIMEOUT_MS ?? 50_000),
+    requestTimeoutMs: Number(env.OPENROUTER_TIMEOUT_MS ?? 170_000),
+    maxRetries: Number(env.OPENROUTER_MAX_RETRIES ?? 2),
+    retryBaseDelayMs: Number(env.OPENROUTER_RETRY_BASE_DELAY_MS ?? 1_000),
+    retryMaxDelayMs: Number(env.OPENROUTER_RETRY_MAX_DELAY_MS ?? 8_000),
+    // Must stay below the Lambda function timeout so a retried OpenRouter
+    // call can still complete inside its configured runtime.
+    deadlineMs: Number(env.OPENROUTER_DEADLINE_MS ?? 175_000),
     allowedMediaBucket: required.ALLOWED_MEDIA_BUCKET!,
     allowedMediaPrefix: required.ALLOWED_MEDIA_PREFIX!,
     maxModelTokens: Number(env.MAX_MODEL_TOKENS ?? 2048),
@@ -69,6 +79,10 @@ function createAnalyzer(config: HandlerConfig, logger: Logger): Analyzer {
       apiKey: config.apiKey,
       maxModelTokens: config.maxModelTokens,
       requestTimeoutMs: config.requestTimeoutMs,
+      maxRetries: config.maxRetries,
+      retryBaseDelayMs: config.retryBaseDelayMs,
+      retryMaxDelayMs: config.retryMaxDelayMs,
+      deadlineMs: config.deadlineMs,
     },
     {
       allowedBucket: config.allowedMediaBucket,
@@ -117,6 +131,18 @@ export function createHandler(
         if (!config.apiKeySecretArn && !config.apiKey) {
           throw new Error(
             "missing required env: OPENROUTER_API_KEY_SECRET_ARN",
+          );
+        }
+        if (analyzer === null) {
+          activeLogger.info(
+            {
+              modelId: config.modelId,
+              requestTimeoutMs: config.requestTimeoutMs,
+              maxModelTokens: config.maxModelTokens,
+              allowedMediaBucket: config.allowedMediaBucket,
+              maxImages: config.maxImages,
+            },
+            "content-analysis Lambda configured",
           );
         }
         analyzer ??= analyzerFactory(config, activeLogger);

@@ -184,10 +184,40 @@ variable "content_analysis_memory" {
   default     = 512
 }
 
+variable "content_analysis_openrouter_timeout_ms" {
+  description = "Per-request timeout in ms for the OpenRouter call inside the Lambda. Must stay below the Lambda function timeout."
+  type        = number
+  default     = 170000
+}
+
+variable "content_analysis_openrouter_max_retries" {
+  description = "Maximum retries for transient OpenRouter failures (429 rate limits and 5xx). Each retry uses exponential backoff with jitter."
+  type        = number
+  default     = 2
+}
+
+variable "content_analysis_openrouter_retry_base_delay_ms" {
+  description = "Base backoff delay in ms for the first OpenRouter retry; doubled per attempt and jittered."
+  type        = number
+  default     = 1000
+}
+
+variable "content_analysis_openrouter_retry_max_delay_ms" {
+  description = "Upper bound in ms for a single OpenRouter retry delay (also caps Retry-After-backed 429 delays)."
+  type        = number
+  default     = 8000
+}
+
+variable "content_analysis_openrouter_deadline_ms" {
+  description = "Overall budget in ms for OpenRouter attempts including retries and backoff. Must stay below the Lambda function timeout."
+  type        = number
+  default     = 175000
+}
+
 variable "content_analysis_timeout_seconds" {
   description = "Lambda timeout in seconds; must stay below the SQS visibility timeout."
   type        = number
-  default     = 55
+  default     = 180
 }
 
 variable "content_analysis_reserved_concurrency" {

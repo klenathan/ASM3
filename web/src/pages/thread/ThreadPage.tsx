@@ -48,7 +48,7 @@ export function ThreadPage() {
   const isPrivileged =
     user?.platformRole === "system_admin" ||
     membershipQuery.data?.role === "moderator";
-  const analysisQuery = useThreadAnalysis(id, isPrivileged);
+  const analysisQuery = useThreadAnalysis(id, isAuthenticated);
   const societyQuery = useSociety(slug);
   const threadQuery = useThread(id);
   const commentsQuery = useThreadComments(id);
@@ -207,16 +207,20 @@ export function ThreadPage() {
               </div>
             </article>
 
-            {isPrivileged && (
+            {isAuthenticated && (
               <ThreadAnalysisCard
                 threadId={id}
                 actionScope={
                   user?.platformRole === "system_admin"
                     ? { scope: "admin" }
-                    : { scope: "moderator", slug }
+                    : membershipQuery.data?.role === "moderator"
+                      ? { scope: "moderator", slug }
+                      : undefined
                 }
                 analysis={analysisQuery.data}
                 threadUpdatedAt={thread.updatedAt}
+                autoRemoved={autoRemoved}
+                canAct={isPrivileged}
                 status={
                   analysisQuery.isLoading
                     ? "loading"

@@ -20,7 +20,7 @@ resource "aws_sqs_queue" "thread_events_dlq" {
 
 resource "aws_sqs_queue" "content_analysis_reanalysis" {
   name                       = "${local.name}-content-analysis-reanalysis"
-  visibility_timeout_seconds = 120
+  visibility_timeout_seconds = 300
   message_retention_seconds  = 1209600
   receive_wait_time_seconds  = 20
   sqs_managed_sse_enabled    = true

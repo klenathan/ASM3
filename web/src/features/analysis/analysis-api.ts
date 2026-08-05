@@ -30,8 +30,8 @@ export function fetchAnalysisQueue(
 
 /**
  * Full automated content-analysis details for a thread.
- * Privileged only: system admin or the thread's society moderator.
- * Resolves to null when no successful analysis run exists yet.
+ * Readable by any signed-in user who can view the thread; override actions
+ * remain privileged. Resolves to null when no successful analysis run exists.
  */
 export function fetchThreadAnalysis(
   threadId: string,

@@ -98,12 +98,11 @@ const threadAnalysisRoute = createRoute({
   method: "get",
   path: "/api/v1/threads/{threadId}/analysis",
   tags: ["Discussions"],
-  summary: "Get full content-analysis details for a thread (moderator/system-admin)",
+  summary: "Get full content-analysis details for a thread",
   request: { params: threadIdParams },
   responses: {
     200: { description: "Thread analysis details (null when none yet)", content: { "application/json": { schema: threadAnalysisResponseSchema } } },
     401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
-    403: { description: "Moderator or system-admin access is required", content: { "application/json": { schema: errorSchema } } },
     404: { description: "Thread was not found", content: { "application/json": { schema: errorSchema } } },
   },
 });
