@@ -139,9 +139,13 @@ function createService(
     membershipRepository: new FakeMembershipRepository() as unknown as MembershipRepository,
     societyRepository: new FakeSocietyRepository() as unknown as SocietyRepository,
     analysisDecisionReader: {
-      findLatestDecisionsByThreads: async () => decisions,
-      findLatestStatusByThreads: async () => new Map(),
-      findOverriddenThreadIds: async () => new Set(),
+      findLatestAnalysisStatesByThreads: async () => new Map(
+        [...decisions].map(([id, decision]) => [id, {
+          status: "succeeded" as const,
+          decision,
+          override: null,
+        }]),
+      ),
     },
   });
 }

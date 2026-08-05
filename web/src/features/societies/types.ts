@@ -50,6 +50,8 @@ export interface Thread {
   readonly updatedAt: string
   readonly deletedAt: string | null
   readonly analysisDecision?: 'allow' | 'review' | null
+  readonly analysisFailed?: boolean
+  readonly analysisOverride?: 'accept' | 'reject' | null
 }
 
 export interface ThreadPage {

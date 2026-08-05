@@ -5,6 +5,7 @@ import type {
 } from "../domain/content-analysis";
 import type {
   AnalysisDecision,
+  AnalysisThreadState,
   SentimentLabel,
   ThreadAnalysisDetails,
 } from "./content-analysis.dto";
@@ -59,6 +60,9 @@ export interface ContentAnalysisRepository {
   findLatestDecisionsByThreads(
     threadIds: readonly string[],
   ): Promise<ReadonlyMap<string, AnalysisDecision>>;
+  findLatestAnalysisStatesByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, AnalysisThreadState>>;
   findLatestSucceededAnalysis(
     threadId: string,
   ): Promise<ThreadAnalysisDetails | null>;

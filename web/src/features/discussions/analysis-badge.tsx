@@ -53,11 +53,11 @@ export function AnalysisBadge({
         ? "autoRemoved"
         : hidden
           ? "hidden"
-          : decision === "allow" || decision === "review"
+          : failed
+            ? "failed"
+            : decision === "allow" || decision === "review"
             ? decision
-            : failed
-              ? "failed"
-              : "pending";
+            : "pending";
 
   return (
     <Badge

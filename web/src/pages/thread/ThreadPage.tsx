@@ -165,6 +165,8 @@ export function ThreadPage() {
                         "Automatically hidden" state to ordinary viewers. */}
                     <AnalysisBadge
                       decision={thread.analysisDecision}
+                      failed={thread.analysisFailed}
+                      override={thread.analysisOverride}
                       autoRemoved={autoRemoved}
                       className="h-6 px-2.5"
                     />

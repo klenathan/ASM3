@@ -18,6 +18,8 @@ export interface ThreadDto {
   readonly deletedAt: string | null;
   /** Latest automated content-analysis outcome; null when none/pending. */
   readonly analysisDecision: "allow" | "review" | null;
+  readonly analysisFailed: boolean;
+  readonly analysisOverride: "accept" | "reject" | null;
 }
 
 export type ThreadPageDto = PageResult<ThreadDto>;
@@ -34,6 +36,7 @@ export interface AnalysisQueueThreadDto extends ThreadDto {
   readonly societyName: string;
   /** True when the latest settled analysis run failed (decision still null). */
   readonly analysisFailed: boolean;
+  readonly analysisOverride: "accept" | "reject" | null;
 }
 
 export type AnalysisQueuePageDto = PageResult<AnalysisQueueThreadDto>;
@@ -91,6 +94,7 @@ export interface UserThreadActivityDto {
   readonly authorAvatarMediaId: string | null;
   readonly myVote: -1 | 0 | 1;
   readonly analysisDecision: "allow" | "review" | null;
+  readonly analysisOverride: "accept" | "reject" | null;
 }
 
 export type UserThreadActivityPageDto = PageResult<UserThreadActivityDto>;

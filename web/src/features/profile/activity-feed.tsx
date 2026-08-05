@@ -77,6 +77,7 @@ export function ActivityFeed({
                 myVote: thread.myVote,
                 mediaIds: thread.mediaIds,
                 analysisDecision: thread.analysisDecision,
+                analysisOverride: thread.analysisOverride,
               };
               return (
                 <DiscussionCard

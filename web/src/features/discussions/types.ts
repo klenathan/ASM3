@@ -11,5 +11,7 @@ export interface DiscussionItem {
   readonly societyName: string | null
   readonly myVote: -1 | 0 | 1
   readonly mediaIds: readonly string[]
-  readonly analysisDecision?: "allow" | "review" | null
+   readonly analysisDecision?: "allow" | "review" | null
+   readonly analysisFailed?: boolean
+   readonly analysisOverride?: "accept" | "reject" | null
 }

@@ -33,7 +33,7 @@ import {
   type ProfileIdentity,
 } from "./discussion.mappers";
 import type { DiscussionRepository } from "./discussion.repository";
-import type { AnalysisDecisionReader } from "./analysis-decision.reader";
+import type { AnalysisDecisionReader, AnalysisState } from "./analysis-decision.reader";
 
 export interface FeedServiceDependencies extends DiscussionAuthorizationDependencies {
   readonly repository: DiscussionRepository;
@@ -78,8 +78,8 @@ export class FeedService {
       );
       for (const vote of votes) voteByThread.set(vote.threadId, vote.value);
     }
-    const decisions = await this.decisionsFor(result.items.map((thread) => thread.id));
-    return toThreadPageDto(result, mediaByThread, authorById, voteByThread, decisions);
+    const analysisStates = await this.analysisStatesFor(result.items.map((thread) => thread.id));
+    return toThreadPageDto(result, mediaByThread, authorById, voteByThread, analysisStates);
   }
 
   async listThreadComments(
@@ -129,7 +129,7 @@ export class FeedService {
     const societyById = await this.societiesFor(result.items);
     const votes = await this.repository.findThreadVotes(threadIds, principal.userId);
     const voteById = new Map(votes.map((vote) => [vote.threadId, vote.value]));
-    const decisions = await this.decisionsFor(threadIds);
+    const analysisStates = await this.analysisStatesFor(threadIds);
 
     const items: HomeFeedPageDto["items"] = result.items.flatMap((thread) => {
       const society = societyById.get(thread.societyId);
@@ -140,7 +140,9 @@ export class FeedService {
         mediaByThread.get(thread.id) ?? [],
         authorById.get(thread.authorId) ?? null,
         voteById.get(thread.id) ?? 0,
-        decisions.get(thread.id) ?? null,
+         analysisStates.get(thread.id)?.decision ?? null,
+         analysisStates.get(thread.id)?.status === "failed",
+         analysisStates.get(thread.id)?.override ?? null,
       )];
     });
 
@@ -168,7 +170,7 @@ export class FeedService {
       );
       for (const vote of votes) voteByThread.set(vote.threadId, vote.value);
     }
-    const decisions = await this.decisionsFor(result.items.map((thread) => thread.id));
+    const analysisStates = await this.analysisStatesFor(result.items.map((thread) => thread.id));
     const items: UserThreadActivityDto[] = result.items.flatMap((thread) => {
       const society = societyById.get(thread.societyId);
       return society === undefined
@@ -179,7 +181,8 @@ export class FeedService {
             identity,
             voteByThread.get(thread.id) ?? 0,
             mediaByThread.get(thread.id) ?? [],
-            decisions.get(thread.id) ?? null,
+             analysisStates.get(thread.id)?.decision ?? null,
+             analysisStates.get(thread.id)?.override ?? null,
           )];
     });
     return {
@@ -189,13 +192,13 @@ export class FeedService {
     };
   }
 
-  private async decisionsFor(
+  private async analysisStatesFor(
     threadIds: readonly string[],
-  ): Promise<ReadonlyMap<string, "allow" | "review">> {
+  ): Promise<ReadonlyMap<string, AnalysisState>> {
     if (this.analysisDecisionReader === undefined || threadIds.length === 0) {
       return new Map();
     }
-    return this.analysisDecisionReader.findLatestDecisionsByThreads([...new Set(threadIds)]);
+    return this.analysisDecisionReader.findLatestAnalysisStatesByThreads([...new Set(threadIds)]);
   }
 
   async listSocietyAnalysisQueue(
@@ -240,21 +243,16 @@ export class FeedService {
     filter: AnalysisQueueFilter,
   ): Promise<AnalysisQueuePageDto> {
     const threadIds = result.items.map((thread) => thread.id);
-    const decisions = await this.decisionsFor(threadIds);
-    const statuses = this.analysisDecisionReader === undefined
-      ? new Map<string, "succeeded" | "failed">()
-      : await this.analysisDecisionReader.findLatestStatusByThreads(threadIds);
-    const overridden = this.analysisDecisionReader === undefined
-      ? new Set<string>()
-      : await this.analysisDecisionReader.findOverriddenThreadIds(threadIds);
+    const analysisStates = await this.analysisStatesFor(threadIds);
     const mediaByThread = await this.mediaByThread(result.items);
     const authorById = await this.identitiesFor(result.items);
     const societyById = await this.societiesFor(result.items);
 
     const items = result.items.flatMap((thread) => {
-      if (overridden.has(thread.id)) return [];
-      const decision = decisions.get(thread.id) ?? null;
-      const analysisFailed = statuses.get(thread.id) === "failed";
+      const state = analysisStates.get(thread.id);
+      if (state?.override !== null && state?.override !== undefined) return [];
+      const decision = state?.decision ?? null;
+      const analysisFailed = state?.status === "failed";
       if (!matchesAnalysisFilter(decision, filter)) return [];
       const society = societyById.get(thread.societyId);
       if (society === undefined) return [];
@@ -265,6 +263,7 @@ export class FeedService {
         authorById.get(thread.authorId) ?? null,
         decision,
         analysisFailed,
+        state?.override ?? null,
       )];
     });
 

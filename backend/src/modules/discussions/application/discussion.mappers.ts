@@ -24,6 +24,8 @@ export function toThreadDto(
   author?: ProfileIdentity | null,
   myVote: -1 | 0 | 1 = 0,
   analysisDecision: "allow" | "review" | null = null,
+  analysisFailed = false,
+  analysisOverride: "accept" | "reject" | null = null,
 ): ThreadDto {
   return {
     id: record.id,
@@ -39,6 +41,8 @@ export function toThreadDto(
     authorAvatarMediaId: author?.avatarMediaId ?? null,
     myVote,
     analysisDecision,
+    analysisFailed,
+    analysisOverride,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     deletedAt: record.deletedAt?.toISOString() ?? null,
@@ -50,7 +54,7 @@ export function toThreadPageDto(
   mediaByThread: ReadonlyMap<string, readonly ThreadMediaRecord[]>,
   authorById: ReadonlyMap<string, ProfileIdentity> = new Map(),
   voteByThread: ReadonlyMap<string, -1 | 0 | 1> = new Map(),
-  decisions: ReadonlyMap<string, "allow" | "review"> = new Map(),
+  analysisStates: ReadonlyMap<string, { decision: "allow" | "review" | null; status: "queued" | "running" | "succeeded" | "failed" | null; override: "accept" | "reject" | null }> = new Map(),
 ): ThreadPageDto {
   return {
     items: page.items.map((record) =>
@@ -59,7 +63,9 @@ export function toThreadPageDto(
         mediaByThread.get(record.id) ?? [],
         authorById.get(record.authorId),
         voteByThread.get(record.id) ?? 0,
-        decisions.get(record.id) ?? null,
+         analysisStates.get(record.id)?.decision ?? null,
+         analysisStates.get(record.id)?.status === "failed",
+         analysisStates.get(record.id)?.override ?? null,
       ),
     ),
     nextCursor: page.nextCursor,
@@ -74,9 +80,11 @@ export function toHomeFeedThreadDto(
   author?: ProfileIdentity | null,
   myVote: -1 | 0 | 1 = 0,
   analysisDecision: "allow" | "review" | null = null,
+  analysisFailed = false,
+  analysisOverride: "accept" | "reject" | null = null,
 ): HomeFeedThreadDto {
   return {
-    ...toThreadDto(record, media, author, myVote, analysisDecision),
+    ...toThreadDto(record, media, author, myVote, analysisDecision, analysisFailed, analysisOverride),
     societySlug: society.slug,
     societyName: society.name,
     myVote,
@@ -90,9 +98,10 @@ export function toAnalysisQueueThreadDto(
   author?: ProfileIdentity | null,
   analysisDecision: "allow" | "review" | null = null,
   analysisFailed = false,
+  analysisOverride: "accept" | "reject" | null = null,
 ): AnalysisQueueThreadDto {
   return {
-    ...toThreadDto(record, media, author, 0, analysisDecision),
+    ...toThreadDto(record, media, author, 0, analysisDecision, analysisFailed, analysisOverride),
     societySlug: society.slug,
     societyName: society.name,
     analysisFailed,
@@ -144,6 +153,7 @@ export function toUserThreadActivityDto(
   myVote: -1 | 0 | 1 = 0,
   media: readonly ThreadMediaRecord[] = [],
   analysisDecision: "allow" | "review" | null = null,
+  analysisOverride: "accept" | "reject" | null = null,
 ): UserThreadActivityDto {
   return {
     id: record.id,
@@ -162,6 +172,7 @@ export function toUserThreadActivityDto(
     authorAvatarMediaId: identity.avatarMediaId,
     myVote,
     analysisDecision,
+    analysisOverride,
   };
 }
 

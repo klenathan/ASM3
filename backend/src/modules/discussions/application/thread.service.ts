@@ -163,13 +163,15 @@ export class ThreadService {
     const vote = principal === undefined
       ? null
       : await this.repository.findThreadVote(thread.id, principal.userId);
-    const decision = await this.latestDecision(thread.id);
+    const analysis = await this.latestAnalysis(thread.id);
     return toThreadDto(
       thread,
       await this.repository.listThreadMedia(thread.id),
       undefined,
       vote?.value ?? 0,
-      decision,
+      analysis?.decision ?? null,
+      analysis?.status === "failed",
+      analysis?.override ?? null,
     );
   }
 
@@ -376,10 +378,10 @@ export class ThreadService {
     return thread;
   }
 
-  private async latestDecision(threadId: string): Promise<"allow" | "review" | null> {
+  private async latestAnalysis(threadId: string) {
     if (this.analysisDecisionReader === undefined) return null;
-    const decisions = await this.analysisDecisionReader.findLatestDecisionsByThreads([threadId]);
-    return decisions.get(threadId) ?? null;
+    const states = await this.analysisDecisionReader.findLatestAnalysisStatesByThreads([threadId]);
+    return states.get(threadId) ?? null;
   }
 }
 

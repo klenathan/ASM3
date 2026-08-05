@@ -26,6 +26,7 @@ export interface AnalysisQueueThread {
   readonly analysisDecision: "allow" | "review" | null
   /** True when the latest settled analysis run failed (decision is null). */
   readonly analysisFailed: boolean
+  readonly analysisOverride?: "accept" | "reject" | null
 }
 
 export interface AnalysisQueuePage {

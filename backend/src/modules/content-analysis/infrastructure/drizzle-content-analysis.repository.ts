@@ -170,6 +170,44 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
     return decisions;
   }
 
+  async findLatestAnalysisStatesByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, {
+    readonly status: "queued" | "running" | "succeeded" | "failed";
+    readonly decision: "allow" | "review" | null;
+    readonly override: "accept" | "reject" | null;
+  }>> {
+    if (threadIds.length === 0) return new Map();
+    const rows = await this.db
+      .selectDistinctOn(
+        [contentAnalysisRuns.threadId],
+        {
+          threadId: contentAnalysisRuns.threadId,
+          status: contentAnalysisRuns.status,
+          decision: contentAnalysisRuns.decision,
+        },
+      )
+      .from(contentAnalysisRuns)
+      .where(
+        and(
+          inArray(contentAnalysisRuns.threadId, [...threadIds]),
+        ),
+      )
+      .orderBy(contentAnalysisRuns.threadId, desc(contentAnalysisRuns.createdAt));
+    const overrides = await this.findLatestOverridesByThreads(threadIds);
+    return new Map<string, {
+      readonly status: "queued" | "running" | "succeeded" | "failed";
+      readonly decision: "allow" | "review" | null;
+      readonly override: "accept" | "reject" | null;
+    }>(rows.map((row) => [row.threadId, {
+      status: row.status as "queued" | "running" | "succeeded" | "failed",
+      decision: row.status === "succeeded"
+        ? row.decision as "allow" | "review" | null
+        : null,
+      override: overrides.get(row.threadId) ?? null,
+    }]));
+  }
+
   async findLatestSucceededAnalysis(
     threadId: string,
   ): Promise<ThreadAnalysisDetails | null> {

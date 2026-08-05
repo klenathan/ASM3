@@ -17,6 +17,8 @@ export interface HomeFeedThread {
   readonly updatedAt: string
   readonly deletedAt: string | null
   readonly analysisDecision?: 'allow' | 'review' | null
+  readonly analysisFailed?: boolean
+  readonly analysisOverride?: 'accept' | 'reject' | null
 }
 
 export interface HomeFeedPage {

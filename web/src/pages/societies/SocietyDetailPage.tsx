@@ -254,6 +254,8 @@ export function SocietyDetailPage() {
                 myVote: thread.myVote,
                 mediaIds: thread.mediaIds,
                 analysisDecision: thread.analysisDecision,
+                analysisFailed: thread.analysisFailed,
+                analysisOverride: thread.analysisOverride,
               };
               return (
                 <DiscussionCard

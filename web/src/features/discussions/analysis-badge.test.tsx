@@ -14,6 +14,18 @@ describe("AnalysisBadge", () => {
     expect(screen.getByText("Flagged for review")).toBeTruthy();
   });
 
+  it("renders failure even when an older decision is still present", () => {
+    render(<AnalysisBadge decision="allow" failed />);
+    expect(screen.getByText("Automated analysis failed")).toBeTruthy();
+    expect(screen.queryByText("Reviewed by automated content check")).toBeNull();
+  });
+
+  it("renders an accepted human override", () => {
+    render(<AnalysisBadge decision="review" override="accept" />);
+    expect(screen.getByText("Approved — accepted for review")).toBeTruthy();
+    expect(screen.queryByText("Flagged for review")).toBeNull();
+  });
+
   it("renders Analysis pending when there is no decision", () => {
     render(<AnalysisBadge decision={null} />);
     expect(screen.getByText("Analysis pending")).toBeTruthy();

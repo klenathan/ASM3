@@ -161,6 +161,17 @@ class StubRepository implements ContentAnalysisRepository {
     void threadIds;
     return map;
   }
+  async findLatestAnalysisStatesByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, { status: "succeeded" | "failed"; decision: "allow" | "review" | null; override: "accept" | "reject" | null }>> {
+    const map = new Map<string, { status: "succeeded" | "failed"; decision: "allow" | "review" | null; override: "accept" | "reject" | null }>();
+    for (const run of this.created) {
+      if (threadIds.includes(run.threadId)) {
+        map.set(run.threadId, { status: run.status === "failed" ? "failed" : "succeeded", decision: run.decision, override: null });
+      }
+    }
+    return map;
+  }
   async findLatestSucceededAnalysis(): Promise<ThreadAnalysisDetails | null> {
     return null;
   }

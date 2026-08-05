@@ -53,6 +53,12 @@ export type AnalysisDecision = "allow" | "review";
 /** Human override of the automated decision: `accept` approves, `reject` hides. */
 export type AnalysisOverrideDecision = "accept" | "reject";
 
+export interface AnalysisThreadState {
+  readonly status: "queued" | "running" | "succeeded" | "failed" | null;
+  readonly decision: AnalysisDecision | null;
+  readonly override: AnalysisOverrideDecision | null;
+}
+
 export type SentimentLabel = "positive" | "neutral" | "negative" | "mixed";
 
 export type Severity = "low" | "medium" | "high";

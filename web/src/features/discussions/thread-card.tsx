@@ -72,7 +72,11 @@ export function DiscussionCard({
               </Link>
             )}
           </h3>
-          <AnalysisBadge decision={item.analysisDecision} />
+          <AnalysisBadge
+            decision={item.analysisDecision}
+            failed={item.analysisFailed}
+            override={item.analysisOverride}
+          />
         </div>
         {item.body !== null && item.body.length > 0 && (
           <p className="mt-2 line-clamp-3 leading-7 text-muted-foreground">

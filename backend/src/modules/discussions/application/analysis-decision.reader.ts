@@ -6,22 +6,14 @@
  */
 export type AnalysisDecision = "allow" | "review";
 
+export interface AnalysisState {
+  readonly status: "queued" | "running" | "succeeded" | "failed" | null;
+  readonly decision: AnalysisDecision | null;
+  readonly override: "accept" | "reject" | null;
+}
+
 export interface AnalysisDecisionReader {
-  findLatestDecisionsByThreads(
+  findLatestAnalysisStatesByThreads(
     threadIds: readonly string[],
-  ): Promise<ReadonlyMap<string, AnalysisDecision>>;
-  /**
-   * Return the latest settled run status per thread (succeeded or failed),
-   * omitting threads whose latest run is still pending/queued/running or that
-   * have no run. Lets the review queue surface failed analysis distinctly from
-   * threads still awaiting a decision.
-   */
-  findLatestStatusByThreads(
-    threadIds: readonly string[],
-  ): Promise<ReadonlyMap<string, "succeeded" | "failed">>;
-  /**
-   * Return the set of thread IDs that have a recorded human override, so the
-   * review queue can drop already-resolved threads.
-   */
-  findOverriddenThreadIds(threadIds: readonly string[]): Promise<Set<string>>;
+  ): Promise<ReadonlyMap<string, AnalysisState>>;
 }
