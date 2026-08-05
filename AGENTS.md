@@ -6,6 +6,13 @@
 - Keep the main thread thin; hand off tool-heavy or exploratory tasks to subagents and consume only their summarized results.
 - When exploring, stay inside this repository only. Do not explore, search, or read outside this repo (no system-wide scans, no unrelated paths) unless the task explicitly requires it.
 
+## Documentation structure
+
+- All product documentation lives under `docs/`, organized by feature: `docs/<feature>/<files...>` (e.g. `docs/backend-architecture/`, `docs/content-analysis/`, `docs/caching/`, `docs/admin-center/`, `docs/architecture/`).
+- Put actionable roadmaps, plans, and backlogs inside their feature folder alongside the docs that describe the feature (e.g. `docs/admin-center/ADMIN_CENTER_PLAN.md`).
+- Do not add loose files directly under `docs/`. When writing new docs or backlogs, first place them in the existing feature folder that owns that domain, or create a new `docs/<feature>/` folder when none covers it.
+- Keep relative links between docs pointing at the correct `docs/<feature>/...` path after any move.
+
 ## Product vocabulary
 
 - **Society** means an RMIT community, equivalent to a subreddit.
@@ -14,7 +21,7 @@
 
 ## Backend architecture
 
-- Treat `backend` as a domain-oriented modular monolith. Follow `docs/BACKEND_ARCHITECTURE.md` as the backend structure and logical-schema baseline.
+- Treat `backend` as a domain-oriented modular monolith. Follow `docs/backend-architecture/BACKEND_ARCHITECTURE.md` as the backend structure and logical-schema baseline.
 - Organize product code by bounded context under `backend/src/modules/<context>/`, then by `domain`, `application`, `infrastructure`, and `presentation`.
 - Required dependency flow: **Route → Controller → Service → Repository port → Infrastructure adapter**.
 - Controllers own Hono/OpenAPI/Zod transport concerns only. They must not contain business rules, authorization decisions, transactions, or Drizzle queries.

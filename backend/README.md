@@ -2,7 +2,7 @@
 
 Node.js 22 backend for RMIT Society. Built with Hono, TypeScript 7, Drizzle ORM, and PostgreSQL 17.
 
-Accepted modular-monolith structure, DDD layer boundaries, logical data model, and implementation order are documented in [`../docs/BACKEND_ARCHITECTURE.md`](../docs/BACKEND_ARCHITECTURE.md). Product schema migrations remain deferred until implementation of each tested vertical slice.
+Accepted modular-monolith structure, DDD layer boundaries, logical data model, and implementation order are documented in [`../docs/backend-architecture/BACKEND_ARCHITECTURE.md`](../docs/backend-architecture/BACKEND_ARCHITECTURE.md). Product schema migrations remain deferred until implementation of each tested vertical slice.
 
 ## Phase-one scope
 

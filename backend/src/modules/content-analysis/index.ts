@@ -8,7 +8,7 @@
  *    Moderation, Societies, and Media).
  *
  * Modules must not import another module's controllers, concrete
- * repositories, or tables. See docs/BACKEND_ARCHITECTURE.md.
+ * repositories, or tables. See docs/backend-architecture/BACKEND_ARCHITECTURE.md.
  */
 export * from "./application/content-analysis.dto";
 

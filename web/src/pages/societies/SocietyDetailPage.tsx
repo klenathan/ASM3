@@ -108,7 +108,7 @@ export function SocietyDetailPage() {
         className="mt-8 border-t-2 border-foreground pt-8"
       >
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row items-start gap-5 md:items-between justify-between">
+          <div className="flex flex-col md:flex-row items-start justify-between gap-5 md:items-center">
             <div className="flex flex-row gap-4">
               <Avatar className="!size-20">
                 {avatarUrl.data ? (
@@ -143,7 +143,7 @@ export function SocietyDetailPage() {
 
                 <h1
                   id="society-title"
-                  className="font-heading text-[clamp(2.25rem,4.5vw,3.5rem)] leading-none font-semibold tracking-[-0.01em] uppercase"
+                  className="font-heading text-[clamp(2rem,4vw,3rem)] leading-none font-semibold tracking-[-0.01em] uppercase"
                 >
                   {society.name}
                 </h1>
@@ -160,7 +160,7 @@ export function SocietyDetailPage() {
                   if (isMember) void leave.mutateAsync();
                   else void join.mutateAsync();
                 }}
-                className="h-12 rounded-none px-5 text-base font-semibold shadow-none"
+                className="h-12 shrink-0 rounded-none px-5 text-base font-semibold shadow-none"
               >
                 {isMember ? "Leave society" : "Join this society"}
               </Button>
@@ -290,7 +290,7 @@ export function SocietyDetailPage() {
             </h2>
             <p className="max-w-xl text-sm leading-6 text-muted-foreground">
               Threads whose automated content check returned none or needs
-              review. Debug build — read-only.
+              review.
             </p>
           </div>
           <div className="mt-5">

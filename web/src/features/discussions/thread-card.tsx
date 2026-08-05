@@ -1,13 +1,6 @@
 import { ArrowBigUp, MessageCircle, Share2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
 import { cn } from "../../lib/utils";
 import { ThreadMedia } from "../media/thread-media";
 import { timeAgo } from "./use-thread-vote";
@@ -37,12 +30,12 @@ export function DiscussionCard({
         onClick={(event) => event.stopPropagation()}
         className="font-medium hover:text-primary"
       >
-        u/{item.authorDisplayName}
+        {item.authorDisplayName}
       </Link>
     );
 
   return (
-    <Card
+    <div
       role={threadUrl === null ? undefined : "link"}
       tabIndex={threadUrl === null ? undefined : 0}
       onClick={openThread}
@@ -53,58 +46,56 @@ export function DiscussionCard({
         openThread();
       }}
       className={cn(
-        "max-w-5xl",
+        "flex flex-col gap-3 border-b border-foreground/15 py-5",
         threadUrl === null
           ? undefined
           : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
       )}
     >
-      <CardHeader className="gap-1.5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {showSociety && item.societySlug !== null && (
-            <>
-              <Link
-                to={`/s/${item.societySlug}`}
-                onClick={(event) => event.stopPropagation()}
-                className="font-semibold text-foreground hover:text-primary"
-              >
-                r/{item.societyName}
-              </Link>
-              <span aria-hidden="true">·</span>
-            </>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        {showSociety && item.societySlug !== null && (
+          <>
+            <Link
+              to={`/s/${item.societySlug}`}
+              onClick={(event) => event.stopPropagation()}
+              className="font-semibold text-foreground hover:text-primary"
+            >
+              {item.societyName}
+            </Link>
+            <span aria-hidden="true">·</span>
+          </>
+        )}
+        <span>
+          {author ?? (
+            <span className="text-muted-foreground/70">[deleted]</span>
           )}
-          <span>
-            {author ?? (
-              <span className="text-muted-foreground/70">[deleted]</span>
-            )}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>{timeAgo(item.createdAt)}</span>
-        </div>
-      </CardHeader>
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>{timeAgo(item.createdAt)}</span>
+      </div>
 
-      <CardContent className="space-y-2">
+      <div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <CardTitle className="text-lg font-semibold leading-snug">
+          <h3 className="font-heading text-lg font-semibold leading-snug">
             {item.title}
-          </CardTitle>
+          </h3>
           <AnalysisBadge decision={item.analysisDecision} />
         </div>
         {item.body !== null && item.body.length > 0 && (
-          <p className="line-clamp-3 leading-7 text-muted-foreground">
+          <p className="mt-2 line-clamp-3 leading-7 text-muted-foreground">
             {item.body}
           </p>
         )}
         {item.mediaIds !== undefined && item.mediaIds.length > 0 && (
-          <div>
+          <div className="mt-2">
             <ThreadMedia mediaIds={item.mediaIds} size="md" />
           </div>
         )}
-      </CardContent>
+      </div>
 
-      <CardFooter className="gap-5 text-xs font-medium text-muted-foreground">
+      <div className="flex items-center gap-5 text-xs font-medium text-muted-foreground">
         {onToggleLike === undefined ? (
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center min-h-11 gap-1.5 px-2 -mx-2">
             <ArrowBigUp aria-hidden="true" className="size-4" strokeWidth={2} />
             {item.score}
           </span>
@@ -118,7 +109,7 @@ export function DiscussionCard({
             aria-pressed={liked}
             aria-label={liked ? "Unlike this thread" : "Like this thread"}
             className={cn(
-              "inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+              "inline-flex min-h-11 items-center gap-1.5 px-2 -mx-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
               liked ? "text-primary" : "hover:text-primary",
             )}
           >
@@ -138,7 +129,7 @@ export function DiscussionCard({
             openThread();
           }}
           disabled={threadUrl === null}
-          className="inline-flex items-center gap-1 hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground"
+          className="inline-flex min-h-11 items-center gap-1.5 px-2 -mx-2 transition-colors hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground"
         >
           <MessageCircle
             aria-hidden="true"
@@ -147,10 +138,10 @@ export function DiscussionCard({
           />
           {item.commentCount} comment{item.commentCount === 1 ? "" : "s"}
         </button>
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center min-h-11 gap-1.5 px-2 -mx-2">
           <Share2 aria-hidden="true" className="size-4" strokeWidth={2} />
         </span>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

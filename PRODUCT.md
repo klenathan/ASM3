@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-The `web` frontend uses React 19, Vite 8, TypeScript 7, Tailwind CSS 4, shadcn/ui, React Router 7, TanStack Query, and pnpm. The backend uses Node.js 22, Hono, TypeScript, Drizzle ORM, and PostgreSQL as a domain-oriented modular monolith. See `docs/BACKEND_ARCHITECTURE.md`. AWS deployment choices are confirmed below; keep the system simple enough for one student to implement, explain, deploy, and demonstrate reliably.
+The `web` frontend uses React 19, Vite 8, TypeScript 7, Tailwind CSS 4, shadcn/ui, React Router 7, TanStack Query, and pnpm. The backend uses Node.js 22, Hono, TypeScript, Drizzle ORM, and PostgreSQL as a domain-oriented modular monolith. See `docs/backend-architecture/BACKEND_ARCHITECTURE.md`. AWS deployment choices are confirmed below; keep the system simple enough for one student to implement, explain, deploy, and demonstrate reliably.
 
 ## Users
 

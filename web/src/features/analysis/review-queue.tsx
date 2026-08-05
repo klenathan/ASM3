@@ -61,7 +61,7 @@ function QueueCard({
         </p>
       )}
       <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-4 text-xs text-muted-foreground">
-        <span>r/{item.societyName}</span>
+        <span>{item.societyName}</span>
         <span aria-hidden="true">·</span>
         <span>
           {item.authorDisplayName === null

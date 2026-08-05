@@ -1,5 +1,12 @@
 import { ImagePlus, LockKeyhole, PenLine, Send, Trash2, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -7,7 +14,12 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { Textarea } from "../../components/ui/textarea";
 import type { CreateThreadDraft } from "./types";
 
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGES = 20;
 
@@ -56,7 +68,10 @@ export function SocietyThreadComposer({
 
   if (access === "loading") {
     return (
-      <div aria-label="Checking posting access" className="border-y border-foreground/15 py-5">
+      <div
+        aria-label="Checking posting access"
+        className="border-y border-foreground/15 py-5"
+      >
         <Skeleton className="h-12 w-full rounded-none" />
       </div>
     );
@@ -99,7 +114,9 @@ export function SocietyThreadComposer({
     event.preventDefault();
     const nextErrors: ComposerErrors = {
       ...(title.trim() === "" ? { title: "Add a clear thread title." } : {}),
-      ...(body.trim() === "" ? { body: "Write something for the society." } : {}),
+      ...(body.trim() === ""
+        ? { body: "Write something for the society." }
+        : {}),
     };
     setErrors(nextErrors);
     setUnexpectedError(undefined);
@@ -122,7 +139,9 @@ export function SocietyThreadComposer({
       setIsOpen(false);
       setPublished(true);
     } catch {
-      setUnexpectedError("Your thread was not published. Review it and try again.");
+      setUnexpectedError(
+        "Your thread was not published. Review it and try again.",
+      );
     }
   }
 
@@ -157,7 +176,9 @@ export function SocietyThreadComposer({
   }
 
   function removeImage(index: number) {
-    setImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setImages((current) =>
+      current.filter((_, currentIndex) => currentIndex !== index),
+    );
     setErrors((current) => ({ ...current, images: undefined }));
   }
 
@@ -173,21 +194,19 @@ export function SocietyThreadComposer({
             window.requestAnimationFrame(() => titleRef.current?.focus());
           }}
         >
-          <span
-            aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center bg-primary font-semibold text-primary-foreground"
-          >
-            {initials(displayName)}
+          <span className="hidden items-center gap-2 text-sm font-semibold text-secondary sm:inline-flex bg-primary p-2">
+            <PenLine aria-hidden="true" className="size-4" /> New thread
           </span>
+
           <span className="min-w-0 flex-1 text-sm text-muted-foreground transition-colors group-hover:text-foreground">
             Start a thread in {societyName}
           </span>
-          <span className="hidden items-center gap-2 text-sm font-semibold text-primary sm:inline-flex">
-            <PenLine aria-hidden="true" className="size-4" /> New thread
-          </span>
         </button>
         {published && (
-          <p role="status" className="mt-3 border-t border-foreground/10 pt-3 text-sm font-medium text-primary">
+          <p
+            role="status"
+            className="mt-3 border-t border-foreground/10 pt-3 text-sm font-medium text-primary"
+          >
             Thread published. It is now first in the society feed.
           </p>
         )}
@@ -206,7 +225,10 @@ export function SocietyThreadComposer({
     >
       <div className="flex items-start justify-between gap-4 border-b border-foreground/15 px-4 py-4 sm:px-5">
         <div>
-          <h2 id="thread-composer-title" className="font-heading text-xl font-semibold uppercase">
+          <h2
+            id="thread-composer-title"
+            className="font-heading text-xl font-semibold uppercase"
+          >
             Start a thread
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -232,7 +254,9 @@ export function SocietyThreadComposer({
             <label htmlFor={titleId} className="text-sm font-semibold">
               Thread title
             </label>
-            <span className="text-xs text-muted-foreground">{title.length}/300</span>
+            <span className="text-xs text-muted-foreground">
+              {title.length}/300
+            </span>
           </div>
           <Input
             ref={titleRef}
@@ -241,12 +265,15 @@ export function SocietyThreadComposer({
             maxLength={300}
             disabled={isSubmitting}
             aria-invalid={errors.title !== undefined}
-            aria-describedby={errors.title === undefined ? undefined : titleErrorId}
+            aria-describedby={
+              errors.title === undefined ? undefined : titleErrorId
+            }
             className="mt-2 h-12 rounded-none border-foreground/20 bg-background px-3 text-base"
             placeholder="What should members know?"
             onChange={(event) => {
               setTitle(event.target.value);
-              if (errors.title !== undefined) setErrors((current) => ({ ...current, title: undefined }));
+              if (errors.title !== undefined)
+                setErrors((current) => ({ ...current, title: undefined }));
             }}
           />
           {errors.title && (
@@ -268,12 +295,15 @@ export function SocietyThreadComposer({
             rows={6}
             disabled={isSubmitting}
             aria-invalid={errors.body !== undefined}
-            aria-describedby={errors.body === undefined ? undefined : bodyErrorId}
+            aria-describedby={
+              errors.body === undefined ? undefined : bodyErrorId
+            }
             className="mt-2 min-h-36 resize-y rounded-none border-foreground/20 bg-background px-3 py-3 text-base leading-7"
             placeholder="Add context, ask a question, or share an update…"
             onChange={(event) => {
               setBody(event.target.value);
-              if (errors.body !== undefined) setErrors((current) => ({ ...current, body: undefined }));
+              if (errors.body !== undefined)
+                setErrors((current) => ({ ...current, body: undefined }));
             }}
           />
           {errors.body && (
@@ -300,7 +330,9 @@ export function SocietyThreadComposer({
               className="sr-only"
               disabled={isSubmitting || images.length >= MAX_IMAGES}
               aria-label="Choose thread images"
-              aria-describedby={errors.images === undefined ? undefined : imagesErrorId}
+              aria-describedby={
+                errors.images === undefined ? undefined : imagesErrorId
+              }
               onChange={(event) => addImages(event.currentTarget.files)}
             />
             <Button
@@ -316,7 +348,10 @@ export function SocietyThreadComposer({
           </div>
 
           {previews.length > 0 && (
-            <ul aria-label="Selected images" className="mt-4 grid gap-2 sm:grid-cols-2">
+            <ul
+              aria-label="Selected images"
+              className="mt-4 grid gap-2 sm:grid-cols-2"
+            >
               {previews.map(({ file, url }, index) => (
                 <li
                   key={fileKey(file)}
@@ -337,7 +372,9 @@ export function SocietyThreadComposer({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{file.name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {formatFileSize(file.size)}
+                    </p>
                   </div>
                   <Button
                     type="button"
@@ -356,14 +393,21 @@ export function SocietyThreadComposer({
           )}
 
           {errors.images && (
-            <p id={imagesErrorId} role="alert" className="mt-3 text-sm text-destructive">
+            <p
+              id={imagesErrorId}
+              role="alert"
+              className="mt-3 text-sm text-destructive"
+            >
               {errors.images}
             </p>
           )}
         </div>
 
         {submissionError && (
-          <p role="alert" className="border-t border-destructive/30 pt-4 text-sm text-destructive">
+          <p
+            role="alert"
+            className="border-t border-destructive/30 pt-4 text-sm text-destructive"
+          >
             {submissionError}
           </p>
         )}
@@ -386,7 +430,9 @@ export function SocietyThreadComposer({
         >
           <Send aria-hidden="true" />
           {isSubmitting
-            ? images.length > 0 ? "Uploading & publishing…" : "Publishing…"
+            ? images.length > 0
+              ? "Uploading & publishing…"
+              : "Publishing…"
             : "Publish thread"}
         </Button>
       </div>
@@ -396,18 +442,25 @@ export function SocietyThreadComposer({
 
 function useImagePreviews(images: readonly File[]) {
   const previews = useMemo(
-    () => images.map((file) => ({
-      file,
-      url: typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null,
-    })),
+    () =>
+      images.map((file) => ({
+        file,
+        url:
+          typeof URL.createObjectURL === "function"
+            ? URL.createObjectURL(file)
+            : null,
+      })),
     [images],
   );
 
-  useEffect(() => () => {
-    for (const preview of previews) {
-      if (preview.url !== null) URL.revokeObjectURL(preview.url);
-    }
-  }, [previews]);
+  useEffect(
+    () => () => {
+      for (const preview of previews) {
+        if (preview.url !== null) URL.revokeObjectURL(preview.url);
+      }
+    },
+    [previews],
+  );
 
   return previews;
 }
@@ -417,16 +470,19 @@ function fileKey(file: File): string {
 }
 
 function formatFileSize(byteSize: number): string {
-  if (byteSize < 1024 * 1024) return `${Math.max(1, Math.round(byteSize / 1024))} KB`;
+  if (byteSize < 1024 * 1024)
+    return `${Math.max(1, Math.round(byteSize / 1024))} KB`;
   return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function initials(displayName: string): string {
-  return displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
+  return (
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?"
+  );
 }
