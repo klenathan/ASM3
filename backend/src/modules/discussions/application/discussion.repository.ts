@@ -67,6 +67,12 @@ export interface DiscussionRepository {
   ): Promise<readonly ThreadVoteRecord[]>;
   findThread(threadId: string): Promise<ThreadRecord | null>;
   findThreadForUpdate(threadId: string): Promise<ThreadRecord | null>;
+  /**
+   * List IDs of published threads created before `olderThan`, ordered
+   * oldest-first and bounded by `limit`. Used by the content-analysis backfill
+   * sweep to discover threads that never received an analysis run.
+   */
+  listPublishedThreadIdsBefore(olderThan: Date, limit?: number): Promise<string[]>;
   createThread(input: CreateThreadInput): Promise<ThreadRecord>;
   updateThread(threadId: string, input: UpdateThreadInput): Promise<ThreadRecord | null>;
   softDeleteThread(threadId: string, deletedAt: Date, updatedAt: Date): Promise<ThreadRecord | null>;

@@ -28,4 +28,10 @@ export interface ThreadAnalysisSnapshot {
 export interface ThreadAnalysisContextPort {
   loadThreadContext(threadId: string): Promise<ThreadAnalysisContext>;
   loadThreadSnapshot(threadId: string): Promise<ThreadAnalysisSnapshot>;
+  /**
+   * List IDs of published threads created before `olderThan`, oldest-first,
+   * bounded by `limit`. Used by the stale-analysis sweep to backfill threads
+   * that never received an analysis run.
+   */
+  listPublishedThreadIdsBefore(olderThan: Date, limit?: number): Promise<string[]>;
 }

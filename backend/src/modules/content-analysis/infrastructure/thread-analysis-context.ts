@@ -46,6 +46,10 @@ export interface ThreadAnalysisContextDeps {
     societyId: string,
   ) => Promise<readonly ThreadAnalysisContextRule[]>;
   readonly readGlobalPolicy: () => Promise<string>;
+  readonly listPublishedThreadIdsBefore: (
+    olderThan: Date,
+    limit?: number,
+  ) => Promise<string[]>;
   readonly mediaBucket: string;
   readonly maxImages: number;
   readonly clock: Clock;
@@ -111,5 +115,9 @@ export class ThreadAnalysisContextAdapter implements ThreadAnalysisContextPort {
       authorId: thread.authorId,
       status: thread.status,
     };
+  }
+
+  async listPublishedThreadIdsBefore(olderThan: Date, limit?: number): Promise<string[]> {
+    return this.deps.listPublishedThreadIdsBefore(olderThan, limit);
   }
 }

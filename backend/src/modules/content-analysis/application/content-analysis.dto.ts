@@ -11,7 +11,8 @@ export type AnalysisTriggerType =
   | "thread_created"
   | "thread_updated"
   | "report_created"
-  | "reanalysis";
+  | "reanalysis"
+  | "backfill";
 
 export interface ContentAnalysisRequest {
   analysisId: string;

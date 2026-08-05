@@ -84,13 +84,22 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
       .from(contentAnalysisRuns)
       .where(
         and(
-          inArray(contentAnalysisRuns.status, ["queued", "running"]),
+          inArray(contentAnalysisRuns.status, ["queued", "running", "failed"]),
           lt(contentAnalysisRuns.createdAt, olderThan),
         ),
       )
       .orderBy(asc(contentAnalysisRuns.createdAt))
       .limit(limit);
     return rows.map(toRun);
+  }
+
+  async findThreadIdsWithRun(threadIds: readonly string[]): Promise<Set<string>> {
+    if (threadIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ threadId: contentAnalysisRuns.threadId })
+      .from(contentAnalysisRuns)
+      .where(inArray(contentAnalysisRuns.threadId, [...threadIds]));
+    return new Set(rows.map((row) => row.threadId));
   }
 
   async recordSuccess(input: RecordRunResultInput): Promise<void> {

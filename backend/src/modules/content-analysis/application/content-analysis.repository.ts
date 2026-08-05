@@ -43,11 +43,19 @@ export interface ContentAnalysisRepository {
   recordSuccess(input: RecordRunResultInput): Promise<void>;
   recordFailure(input: RecordRunFailureInput): Promise<void>;
   /**
-   * Return non-terminal runs (queued/running) whose run was created before
+   * Return unsettled runs (queued/running/failed) whose run was created before
    * `olderThan`. Ordered oldest-first and bounded by `limit` so each scheduler
    * tick retries the most stale backlog first.
    */
   findStalePending(olderThan: Date, limit?: number): Promise<ContentAnalysisRun[]>;
+
+  /**
+   * Return the subset of `threadIds` that already have at least one analysis
+   * run. Used by the backfill sweep to avoid creating duplicate runs for
+   * threads that were already analyzed (successfully or not).
+   */
+  findThreadIdsWithRun(threadIds: readonly string[]): Promise<Set<string>>;
+
   findLatestDecisionsByThreads(
     threadIds: readonly string[],
   ): Promise<ReadonlyMap<string, AnalysisDecision>>;

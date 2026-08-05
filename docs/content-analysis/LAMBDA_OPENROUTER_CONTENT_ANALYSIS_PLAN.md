@@ -401,6 +401,8 @@ ANALYSIS_MAX_IMAGES=
 ANALYSIS_MAX_IMAGE_BYTES=
 ANALYSIS_MAX_TOTAL_IMAGE_BYTES=
 ANALYSIS_TIMEOUT_MS=175000
+ANALYSIS_STALE_AFTER_MS=900000
+ANALYSIS_RETRY_INTERVAL_MS=60000
 ```
 
 Lambda:
@@ -423,6 +425,16 @@ Modes:
 - `enforce`: create or edit threads as `pending_analysis` and gate publication.
 
 `CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE` is a number in `[0,1]` (default `0.90`) used only in `enforce` mode to decide whether a reviewed thread with at least one high-severity finding at or above the threshold is automatically removed rather than routed to manual moderation. It has no effect in `off` or `shadow` mode; sentiment, popularity, and aggregate counts are never used as triggers.
+
+### Background pending sweep
+
+When `CONTENT_ANALYSIS_MODE` is not `off`, a background set-interval sweep (`ANALYSIS_RETRY_INTERVAL_MS`, default `60s`) guarantees every published thread eventually gets an automated decision by:
+
+- **Backfilling** published threads that have **no analysis run at all** — creates a run (`trigger_type = 'backfill'`) and executes it. Runs oldest-first and is bounded per tick (default 50) by `ANALYSIS_STALE_AFTER_MS` (default 15 min), so a history backfill drains across successive ticks without a single large synchronous burst.
+- **Retrying** runs still unsettled — `queued`, `running`, or `failed` — older than `ANALYSIS_STALE_AFTER_MS`. A failed Lambda invocation already writes `status = 'failed'`, so such runs are automatically re-invoked on the next sweep until they settle.
+
+`succeeded` runs are never re-triggered by the sweep.
+
 
 Production configuration must fail validation when mode is `shadow` or `enforce` but Lambda settings are missing. Lambda startup must fail closed when the OpenRouter model, API-key secret, bucket, or resource-limit settings are missing. The API key must never be placed in Terraform configuration, ECS environment variables, or source control.
 

@@ -193,6 +193,18 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
     return rows.map(toThreadVote);
   }
 
+  async listPublishedThreadIdsBefore(olderThan: Date, limit = 50): Promise<string[]> {
+    const rows = await this.executor
+      .select({ id: threads.id })
+      .from(threads)
+      .where(
+        and(eq(threads.status, "published"), lt(threads.createdAt, olderThan)),
+      )
+      .orderBy(asc(threads.createdAt), asc(threads.id))
+      .limit(limit);
+    return rows.map((row) => row.id as string);
+  }
+
   async findThread(threadId: string): Promise<ThreadRecord | null> {
     return this.findThreadInternal(threadId, false);
   }

@@ -139,10 +139,17 @@ class StubRepository implements ContentAnalysisRepository {
     return this.pending
       .filter(
         (run) =>
-          (run.status === "queued" || run.status === "running") &&
+          (run.status === "queued" || run.status === "running" || run.status === "failed") &&
           run.createdAt < olderThan,
       )
       .slice(0, limit);
+  }
+  async findThreadIdsWithRun(threadIds: readonly string[]): Promise<Set<string>> {
+    const ids = new Set<string>();
+    for (const run of [...this.created, ...this.pending]) {
+      if (threadIds.includes(run.threadId)) ids.add(run.threadId);
+    }
+    return ids;
   }
   async findLatestDecisionsByThreads(
     threadIds: readonly string[],
@@ -197,6 +204,7 @@ function makeService(
     {
       loadThreadContext: vi.fn(async () => context),
       loadThreadSnapshot: vi.fn(async () => publishedSnapshot),
+      listPublishedThreadIdsBefore: vi.fn(async () => []),
     };
   const service = new ContentAnalysisService({
     repository,
@@ -274,6 +282,7 @@ describe("ContentAnalysisService.analyzeNewThread", () => {
         throw error;
       }),
       loadThreadSnapshot: vi.fn(async () => publishedSnapshot),
+      listPublishedThreadIdsBefore: vi.fn(async () => []),
     };
     const { service, repository } = makeService({ contextPort });
 
@@ -391,6 +400,88 @@ describe("ContentAnalysisService.retryStaleRuns", () => {
       id: "run-1",
       errorCode: "ANALYSIS_INVOCATION_FAILED",
     });
+  });
+
+  it("re-invokes failed runs so the next cron tick re-analyzes them", async () => {
+    const analyze = vi.fn(async () => successInvocation());
+    const { service, repository } = makeService({ analyzer: { analyze } });
+    repository.pending.push(
+      pendingRun({ id: "run-f", threadId: "t-f", status: "failed" }),
+    );
+
+    const retried = await service.retryStaleRuns();
+
+    expect(retried).toBe(1);
+    expect(analyze).toHaveBeenCalledTimes(1);
+    // re-execution succeeded -> recorded as a successful run.
+    expect(repository.succeeded.map((s) => s.id)).toEqual(["run-f"]);
+  });
+});
+
+describe("ContentAnalysisService.sweepPending", () => {
+  function ctxPort(ids: string[]): ThreadAnalysisContextPort {
+    return {
+      loadThreadContext: vi.fn(async () => context),
+      loadThreadSnapshot: vi.fn(async () => publishedSnapshot),
+      listPublishedThreadIdsBefore: vi.fn(async () => ids),
+    };
+  }
+
+  it("does nothing when mode is off", async () => {
+    const { service, repository } = makeService({ mode: "off" });
+    const result = await service.sweepPending();
+    expect(result).toEqual({ backfilled: 0, retried: 0 });
+    expect(repository.created).toHaveLength(0);
+  });
+
+  it("backfills published threads that have no analysis run", async () => {
+    const analyze = vi.fn(async () => successInvocation());
+    const { service, repository } = makeService({
+      analyzer: { analyze },
+      contextPort: ctxPort(["t-no-1", "t-no-2"]),
+    });
+
+    const result = await service.sweepPending();
+
+    expect(result).toEqual({ backfilled: 2, retried: 0 });
+    expect(repository.created).toHaveLength(2);
+    expect(repository.created.map((r) => r.triggerType)).toEqual([
+      "backfill",
+      "backfill",
+    ]);
+    expect(analyze).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips threads that already have a run and retries stale failed runs", async () => {
+    const analyze = vi.fn(async () => successInvocation());
+    const { service, repository } = makeService({
+      analyzer: { analyze },
+      contextPort: ctxPort(["t-have-run", "t3"]),
+    });
+    await service.analyzeNewThread("t-have-run");
+    repository.pending.push({
+      id: "run-s",
+      sourceEventId: "t3",
+      runNumber: 1,
+      triggerType: "thread_created",
+      threadId: "t3",
+      reportId: null,
+      status: "failed",
+      decision: null,
+      inputHash: "",
+      modelId: null,
+      lambdaFunctionVersion: null,
+      createdAt: new Date("2026-08-03T00:00:00.000Z"),
+    });
+
+    const before = repository.created.length;
+    const result = await service.sweepPending();
+
+    // t-have-run already has a run (skipped); t3 is not backfilled (has a run)
+    // but its stale failed run is retried and settles as succeeded.
+    expect(result).toEqual({ backfilled: 0, retried: 1 });
+    expect(repository.created.length).toBe(before);
+    expect(repository.succeeded.map((s) => s.id)).toContain("run-s");
   });
 });
 

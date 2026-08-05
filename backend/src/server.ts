@@ -171,6 +171,8 @@ async function main(): Promise<void> {
     listSocietyRules: (societyId) => societies.societyRepository.listRules(societyId),
     readGlobalPolicy: async () =>
       (await configReader("community_policy")) ?? DEFAULT_GLOBAL_POLICY,
+    listPublishedThreadIdsBefore: (olderThan, limit) =>
+      discussions.repository.listPublishedThreadIdsBefore(olderThan, limit),
     mediaBucket: config.mediaBucket ?? "",
     maxImages: config.analysisMaxImages,
     clock: systemClock,
@@ -211,10 +213,11 @@ async function main(): Promise<void> {
     reanalysisWorker.start();
     logger.info("content-analysis reanalysis worker started");
   }
-  // Recurring scheduler that settles content-analysis runs stuck in a pending
-  // state (queued/running) past the stale threshold, e.g. when a previous
-  // synchronous Lambda invocation hung or was aborted. Runs not settled by a
-  // pass are picked up again next tick.
+  // Recurring sweep that guarantees every published thread eventually gets an
+  // automated analysis decision: it backfills published threads that never
+  // received a run and retries runs stuck in a pending/queued/running/failed
+  // state past the stale threshold (e.g. a hung or aborted Lambda invocation).
+  // Threads not settled by a pass are picked up again next tick.
   let analysisRetryTimer: NodeJS.Timeout | undefined;
   if (
     contentAnalysisService !== undefined &&
@@ -222,16 +225,19 @@ async function main(): Promise<void> {
   ) {
     const tick = async () => {
       try {
-        const retried = await contentAnalysisService.retryStaleRuns({
+        const { backfilled, retried } = await contentAnalysisService.sweepPending({
           staleAfterMs: config.analysisStaleAfterMs,
         });
-        if (retried > 0) {
-          logger.info({ retried }, "retried stale content-analysis runs");
+        if (backfilled > 0 || retried > 0) {
+          logger.info(
+            { backfilled, retried },
+            "content-analysis pending sweep processed",
+          );
         }
       } catch (error) {
         logger.error(
           { err: error },
-          "content-analysis stale-run retry tick failed",
+          "content-analysis pending sweep tick failed",
         );
       }
     };
@@ -242,7 +248,7 @@ async function main(): Promise<void> {
         intervalMs: config.analysisRetryIntervalMs,
         staleAfterMs: config.analysisStaleAfterMs,
       },
-      "content-analysis staleness retry scheduler started",
+      "content-analysis pending sweep scheduler started",
     );
   }
   const moderation = createModerationModule({

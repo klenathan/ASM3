@@ -93,7 +93,8 @@ export type AnalysisTriggerType =
   | "thread_created"
   | "thread_updated"
   | "report_created"
-  | "reanalysis";
+  | "reanalysis"
+  | "backfill";
 
 /**
  * A human override of the automated content-analysis decision for a thread.

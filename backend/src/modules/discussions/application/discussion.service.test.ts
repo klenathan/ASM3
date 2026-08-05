@@ -317,6 +317,14 @@ class FakeDiscussionRepository implements DiscussionRepository {
     return this.threads.get(threadId) ?? null;
   }
 
+  async listPublishedThreadIdsBefore(olderThan: Date, limit = 50): Promise<string[]> {
+    return [...this.threads.values()]
+      .filter((t) => t.status === "published" && t.createdAt < olderThan)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, limit)
+      .map((t) => t.id);
+  }
+
   async findThreadsByIds(ids: readonly string[]): Promise<readonly ThreadRecord[]> {
     const idSet = new Set(ids);
     return [...this.threads.values()].filter((thread) => idSet.has(thread.id));

@@ -145,13 +145,13 @@ export class ContentAnalysisService {
   }
 
   /**
-   * Retry pending runs that have been stuck (still queued/running) longer than
-   * the stale threshold, typically because a previous synchronous Lambda
-   * invocation hung or was aborted without settling the run. Re-invokes the
-   * analyzer for each stale run and settles it to succeeded/failed. Runs that
-   * remain non-terminal after this pass are picked up again on the next
-   * scheduler tick, which satisfies the "trigger the job again if still
-   * pending" requirement.
+   * Retry runs that have been unsettled (still queued/running or failed)
+   * longer than the stale threshold, typically because a previous synchronous
+   * Lambda invocation hung, was aborted, or failed without settling the run.
+   * Re-invokes the analyzer for each stale run and settles it to
+   * succeeded/failed. Runs that remain non-terminal after this pass are picked
+   * up again on the next scheduler tick, which satisfies the "trigger the job
+   * again if still pending" requirement.
    *
    * Returns the number of stale runs re-triggered. No-op when analysis is off
    * or no analyzer is configured.
@@ -179,6 +179,58 @@ export class ContentAnalysisService {
       await this.executeAnalysis(run);
     }
     return runs.length;
+  }
+
+  /**
+   * Recurring sweep that guarantees every published thread eventually receives
+   * an automated analysis decision:
+   *  1. Backfills threads that never had an analysis run by creating a run and
+   *     executing it (drains oldest-first across ticks via `limit`).
+   *  2. Retries runs still unsettled (queued/running/failed) past the stale
+   *     threshold.
+   * A run that succeeds is never re-triggered here; a run that keeps failing is
+   * re-invoked again on the next tick until it settles.
+   *
+   * Returns the number of backfilled threads and retried runs. No-op when
+   * analysis is off or no analyzer is configured.
+   */
+  async sweepPending(options?: {
+    staleAfterMs?: number;
+    limit?: number;
+  }): Promise<{ backfilled: number; retried: number }> {
+    if (this.deps.mode === "off" || this.deps.analyzer === undefined) {
+      return { backfilled: 0, retried: 0 };
+    }
+    const staleAfterMs = options?.staleAfterMs ?? DEFAULT_STALE_PENDING_MS;
+    const limit = options?.limit ?? DEFAULT_STALE_PENDING_LIMIT;
+    const olderThan = new Date(this.deps.clock.now().getTime() - staleAfterMs);
+
+    // 1) Backfill published threads that never received an analysis run.
+    const candidateIds =
+      await this.deps.threadContext.listPublishedThreadIdsBefore(
+        olderThan,
+        limit,
+      );
+    let backfilled = 0;
+    if (candidateIds.length > 0) {
+      const withRuns = await this.deps.repository.findThreadIdsWithRun(candidateIds);
+      for (const threadId of candidateIds) {
+        if (withRuns.has(threadId)) continue;
+        const run = this.buildRun(threadId, "backfill", 1);
+        await this.deps.repository.create(run);
+        this.deps.logger.info(
+          { runId: run.id, threadId },
+          "backfilling content analysis for thread with no run",
+        );
+        await this.executeAnalysis(run);
+        backfilled += 1;
+      }
+    }
+
+    // 2) Retry stale queued/running/failed runs.
+    const retried = await this.retryStaleRuns({ staleAfterMs, limit });
+
+    return { backfilled, retried };
   }
 
   /**
