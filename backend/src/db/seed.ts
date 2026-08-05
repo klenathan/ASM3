@@ -8,22 +8,29 @@
  *   - threads (some with attached picsum images) and nested comments
  *   - random-but-deterministic upvotes on threads and comments
  *
- * Avatars and thread images resolve through the public picsum.photos API. The
- * remote URL is stored in media_assets.object_key and served back by
- * RemoteMediaStorage via `GET /media/:id/url`. No real S3 upload is required.
+ * Avatars and thread images are sourced from the public picsum.photos API.
+ * When S3 is configured (AWS_REGION + MEDIA_BUCKET), each image is downloaded
+ * and uploaded to the media bucket under `media/<purpose>/<key>` so the
+ * content-analysis agent can fetch it from S3 and review seeded posts with
+ * images. Without S3 (local dev), the remote URL is stored in
+ * media_assets.object_key and served back by RemoteMediaStorage via
+ * `GET /media/:id/url`.
  *
- * Safe to run repeatedly: every insert uses onConflictDoNothing with
- * deterministic UUIDs and values, so existing rows are skipped.
+ * Safe to run repeatedly: media ids are deterministic, so re-running reuses the
+ * existing seeded media rows (and skips the S3 download/upload entirely), and
+ * every other insert uses onConflictDoNothing with deterministic UUIDs and
+ * values.
  *
  * Usage:
  *   pnpm db:seed
  */
 import { randomUUID } from "node:crypto";
 
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { config as loadDotenv } from "dotenv";
 import { eq, sql } from "drizzle-orm";
 
-import { loadConfig } from "../config/env";
+import { loadConfig, type AppConfig } from "../config/env";
 import { createLogger } from "../lib/logger";
 import { createDatabase } from "./client";
 import { normalizeRuleDescription, normalizeRuleTitle } from "../modules/societies/domain/society";
@@ -91,6 +98,107 @@ function picsum(seedKey: string, width: number, height: number): string {
 }
 const userAvatarUrl = (seedKey: string): string => picsum(seedKey, 400, 400);
 const threadImageUrl = (seedKey: string): string => picsum(seedKey, 800, 600);
+
+/** Deterministic UUID derived from an arbitrary string key (same key => same id). */
+function uuidFromKey(key: string): string {
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return uuidFrom(hash);
+}
+
+interface SeedMediaTarget {
+  readonly objectKey: string;
+  readonly contentType: string;
+  readonly byteSize: number;
+}
+
+/**
+ * Uploads seeded images to the configured media bucket when S3 is available so
+ * content-analysis agents can fetch them from private S3 under the approved
+ * `media/` prefix. Falls back to storing the remote picsum URL directly when
+ * S3 is not configured (local dev).
+ */
+class SeedMediaUploader {
+  private readonly s3: S3Client | null;
+  private readonly bucket: string | null;
+
+  constructor(config: AppConfig) {
+    const configured = config.awsRegion !== null && config.mediaBucket !== null;
+    this.s3 = configured
+      ? new S3Client({
+          region: config.awsRegion!,
+          requestChecksumCalculation: "WHEN_REQUIRED",
+        })
+      : null;
+    this.bucket = configured ? config.mediaBucket : null;
+  }
+
+  async upload(
+    sourceUrl: string,
+    purpose: "avatar" | "thread_attachment",
+    assetKey: string,
+  ): Promise<SeedMediaTarget> {
+    if (this.s3 === null || this.bucket === null) {
+      return { objectKey: sourceUrl, contentType: "image/jpeg", byteSize: 1 };
+    }
+
+    const objectKey = `media/${purpose}/${assetKey}`;
+    try {
+      const image = await downloadImage(sourceUrl);
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: objectKey,
+          Body: image.bytes,
+          ContentType: image.contentType,
+        }),
+      );
+      console.log(
+        `[seed] uploaded media to s3://${this.bucket}/${objectKey} (${image.byteSize} bytes)`,
+      );
+      return {
+        objectKey,
+        contentType: image.contentType,
+        byteSize: image.byteSize,
+      };
+    } catch (error) {
+      console.warn(
+        `[seed] S3 upload failed for "${sourceUrl}"; storing remote URL instead:`,
+        error,
+      );
+      return { objectKey: sourceUrl, contentType: "image/jpeg", byteSize: 1 };
+    }
+  }
+}
+
+async function downloadImage(
+  url: string,
+): Promise<{ bytes: Buffer; contentType: string; byteSize: number }> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`image fetch failed with HTTP ${response.status}`);
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const contentType = (response.headers.get("content-type") ?? "image/jpeg")
+    .split(";")[0]
+    ?.trim();
+  return {
+    bytes,
+    contentType: contentType && contentType.length > 0 ? contentType : "image/jpeg",
+    byteSize: bytes.length,
+  };
+}
+
+let seedMediaUploader: SeedMediaUploader | null = null;
+function mediaUploader(): SeedMediaUploader {
+  if (seedMediaUploader === null) {
+    throw new Error("Seed media uploader is not initialised");
+  }
+  return seedMediaUploader;
+}
 
 // ---------------------------------------------------------------------------
 // Seed data definitions
@@ -318,35 +426,48 @@ const THREADS_BY_SOCIETY: Readonly<Record<string, readonly SeedThread[]>> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Ensures a media row whose object_key holds a remote image URL and returns
- * its id. Reused for society avatars, user avatars, and thread images.
+ * Ensures a media row for a seeded image and returns its id. Reused for
+ * society avatars, user avatars, and thread images.
+ *
+ * `sourceUrl` is the picsum URL to fetch; `assetKey` is a stable per-asset key
+ * used to derive the deterministic media id and S3 object key (`media/<purpose>/<assetKey>`).
+ * When S3 is configured the image is uploaded so content-analysis agents can
+ * review it; otherwise the remote URL is stored directly.
  */
 async function seedMedia(
   database: ReturnType<typeof createDatabase>,
   ownerId: string,
-  objectKey: string,
+  sourceUrl: string,
+  assetKey: string,
   purpose: "avatar" | "thread_attachment",
-  contentType = "image/jpeg",
 ): Promise<string> {
+  // Seed runs on every migration. The media id is deterministic per asset, so if
+  // the row already exists we reuse it and skip the picsum download + S3 upload.
+  // We key on the id (not the S3 objectKey) because the objectKey differs by
+  // environment: `media/<purpose>/<assetKey>` when S3 is configured, but the raw
+  // remote picsum URL in local dev.
+  const mediaId = uuidFromKey(`${purpose}:${assetKey}`);
   const existing = await database.db
     .select({ id: mediaAssets.id })
     .from(mediaAssets)
-    .where(eq(mediaAssets.objectKey, objectKey))
+    .where(eq(mediaAssets.id, mediaId))
     .limit(1);
   if (existing[0] !== undefined) {
     return existing[0].id;
   }
 
+  const target = await mediaUploader().upload(sourceUrl, purpose, assetKey);
+
   const now = new Date();
   const [row] = await database.db
     .insert(mediaAssets)
     .values({
-      id: randomUUID(),
+      id: mediaId,
       ownerId,
-      objectKey,
+      objectKey: target.objectKey,
       purpose,
-      contentType,
-      byteSize: 1,
+      contentType: target.contentType,
+      byteSize: target.byteSize,
       checksum: null,
       status: "ready",
       createdAt: now,
@@ -354,7 +475,7 @@ async function seedMedia(
     })
     .returning({ id: mediaAssets.id });
   if (row === undefined) {
-    throw new Error(`Seed media could not be created for key "${objectKey}"`);
+    throw new Error(`Seed media could not be created for key "${target.objectKey}"`);
   }
   return row.id;
 }
@@ -386,7 +507,7 @@ async function seedUsers(
       await passwordAdapter.setPassword(id, SEED_PASSWORD);
     }
 
-    const avatarMediaId = await seedMedia(database, id, userAvatarUrl(user.imageSeed), "avatar");
+    const avatarMediaId = await seedMedia(database, id, userAvatarUrl(user.imageSeed), user.imageSeed, "avatar");
     await database.db
       .insert(userProfiles)
       .values({
@@ -400,7 +521,10 @@ async function seedUsers(
         createdAt: now,
         updatedAt: now,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: { avatarMediaId, updatedAt: now },
+      });
   }
 
   return seeded;
@@ -473,11 +597,15 @@ async function seedThreads(
         .onConflictDoNothing();
 
       if (def.hasImage) {
-        const mediaId = await seedMedia(database, author.id, threadImageUrl(`${society.slug}-${index}`), "thread_attachment");
+        const threadKey = `${society.slug}-${index}`;
+        const mediaId = await seedMedia(database, author.id, threadImageUrl(threadKey), threadKey, "thread_attachment");
         await database.db
           .insert(threadMedia)
           .values({ threadId, mediaId, position: 0 })
-          .onConflictDoNothing();
+          .onConflictDoUpdate({
+            target: [threadMedia.threadId, threadMedia.position],
+            set: { mediaId },
+          });
       }
     }
   }
@@ -623,6 +751,16 @@ async function main(): Promise<void> {
   const credentialStore = new DrizzlePasswordCredentialStore(database.db);
   const passwordAdapter = new LocalPasswordAdapter(credentialStore);
 
+  seedMediaUploader = new SeedMediaUploader(config);
+  if (config.awsRegion !== null && config.mediaBucket !== null) {
+    console.log(
+      `[seed] media will be uploaded to s3://${config.mediaBucket}/media/... ` +
+        `(region ${config.awsRegion})`,
+    );
+  } else {
+    console.log("[seed] S3 not configured; storing remote picsum URLs directly.");
+  }
+
   try {
     await database.checkConnection();
 
@@ -667,7 +805,7 @@ async function main(): Promise<void> {
     // 2. Seed societies and, per society, its rules (both idempotent).
     const societyIds: Map<string, string> = new Map();
     for (const seed of SEED_SOCIETIES) {
-      const avatarMediaId = await seedMedia(database, SEED_OWNER.id, picsum(`society-${seed.slug}`, 400, 400), "avatar");
+      const avatarMediaId = await seedMedia(database, SEED_OWNER.id, picsum(`society-${seed.slug}`, 400, 400), `society-${seed.slug}`, "avatar");
       await database.db
         .insert(societies)
         .values({

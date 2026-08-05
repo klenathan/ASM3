@@ -42,7 +42,7 @@ function FindingRow({ finding }: { readonly finding: AnalysisFinding }) {
         </span>
         <span className="text-xs text-muted-foreground">
           {percent(finding.confidence)} · {SOURCE_LABELS[finding.source]}
-          {finding.sourceId !== undefined ? ` · ${finding.sourceId.slice(0, 8)}` : ""}
+          {finding.sourceId != null ? ` · ${finding.sourceId.slice(0, 8)}` : ""}
         </span>
       </div>
       {finding.evidence.length > 0 && (

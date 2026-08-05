@@ -1,5 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: class {
+    async send() {
+      return { ContentLength: 1, ContentType: "image/jpeg" };
+    }
+  },
+  GetObjectCommand: class {},
+  HeadObjectCommand: class {},
+}));
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class {},
+  GetSecretValueCommand: class {},
+}));
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+  getSignedUrl: vi.fn(async () => "https://media.example/image.jpg"),
+}));
+
 import { OpenRouterContentAnalyzer } from "./openrouter-content-analyzer";
 import type { ContentAnalysisRequest } from "./contracts";
 import type { Logger } from "./logger";
@@ -151,5 +168,34 @@ describe("OpenRouterContentAnalyzer retry", () => {
       "OpenRouter request failed with HTTP 400",
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("splits a combined three-image request after OpenRouter returns 413", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResponse(413, "{}"))
+      .mockImplementation(() => Promise.resolve(makeResponse(200, okBody)));
+    const { analyzer } = makeAnalyzer(fetchMock);
+
+    await analyzer.analyze({
+      ...request,
+      images: [1, 2, 3].map((index) => ({
+        bucket: "test-media",
+        key: `media/${index}.jpg`,
+        contentType: "image/jpeg",
+        byteSize: 1,
+      })),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(
+      JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)).messages[1].content,
+    ).toHaveLength(2);
+    expect(
+      JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body)).messages[1].content,
+    ).toHaveLength(2);
+    expect(
+      JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body)).messages[1].content,
+    ).toHaveLength(2);
   });
 });

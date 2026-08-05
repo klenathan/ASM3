@@ -43,7 +43,7 @@ export interface AnalysisFinding {
   readonly severity: FindingSeverity
   readonly confidence: number
   readonly source: FindingSource
-  readonly sourceId?: string
+  readonly sourceId?: string | null
   readonly evidence: string
 }
 

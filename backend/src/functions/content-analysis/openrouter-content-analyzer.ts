@@ -41,6 +41,16 @@ type OpenRouterContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
+class OpenRouterHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`OpenRouter request failed with HTTP ${status}`);
+    this.name = "OpenRouterHttpError";
+    this.status = status;
+  }
+}
+
 export class OpenRouterContentAnalyzer {
   readonly config: OpenRouterConfig;
   readonly bounds: ImageBounds;
@@ -74,6 +84,52 @@ export class OpenRouterContentAnalyzer {
     );
     const deadlineAt = performance.now() + this.config.deadlineMs;
 
+    try {
+      return await this.requestAnalysis(
+        request,
+        imageBlocks,
+        url,
+        apiKey,
+        startedAt,
+        deadlineAt,
+      );
+    } catch (error) {
+      if (!(error instanceof OpenRouterHttpError) || error.status !== 413 || imageBlocks.length < 2) {
+        throw error;
+      }
+
+      // Some vision providers apply a smaller effective limit after fetching
+      // remote images. Retry one image at a time so a valid three-image post
+      // is not left pending just because the combined request was too large.
+      this.logger.warn(
+        { analysisId: request.analysisId, imageCount: imageBlocks.length },
+        "OpenRouter rejected combined image payload; retrying images individually",
+      );
+      const results = [];
+      for (const image of imageBlocks) {
+        results.push(
+          await this.requestAnalysis(
+            request,
+            [image],
+            url,
+            apiKey,
+            startedAt,
+            deadlineAt,
+          ),
+        );
+      }
+      return mergeImageResults(results);
+    }
+  }
+
+  private async requestAnalysis(
+    request: ContentAnalysisRequest,
+    imageBlocks: OpenRouterContentPart[],
+    url: string,
+    apiKey: string,
+    startedAt: number,
+    deadlineAt: number,
+  ): Promise<ContentAnalysisResult> {
     for (let attempt = 0; ; attempt += 1) {
       const attemptStartedAt = performance.now();
       const remainingMs = deadlineAt - performance.now();
@@ -176,7 +232,7 @@ export class OpenRouterContentAnalyzer {
           },
           "OpenRouter request failed",
         );
-        throw new Error(`OpenRouter request failed with HTTP ${response.status}`);
+        throw new OpenRouterHttpError(response.status);
       }
 
       const retryAfter = response.headers.get("retry-after");
@@ -192,7 +248,7 @@ export class OpenRouterContentAnalyzer {
           },
           "OpenRouter request failed",
         );
-        throw new Error(`OpenRouter request failed with HTTP ${response.status}`);
+        throw new OpenRouterHttpError(response.status);
       }
       this.logger.warn(
         {
@@ -363,6 +419,23 @@ export class OpenRouterContentAnalyzer {
     }
     return result;
   }
+}
+
+function mergeImageResults(results: ContentAnalysisResult[]): ContentAnalysisResult {
+  const first = results[0];
+  if (!first) throw new Error("No image analysis results to merge");
+  const sentiment = results.reduce((best, result) =>
+    result.sentiment.confidence > best.confidence ? result.sentiment : best,
+    first.sentiment,
+  );
+
+  return {
+    decision: results.some((result) => result.decision === "review") ? "review" : "allow",
+    sentiment,
+    findings: results.flatMap((result) => result.findings),
+    summary: results.map((result) => result.summary).join(" "),
+    rationale: results.map((result) => result.rationale).join(" "),
+  };
 }
 
 export function strictResultIssue(value: unknown): string | null {

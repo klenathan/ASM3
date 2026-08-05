@@ -165,6 +165,33 @@ describe("ThreadAnalysisCard", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
+  it("renders findings with a null sourceId without crashing", () => {
+    renderCard(
+      <ThreadAnalysisCard
+        {...props}
+        canAct={false}
+        analysis={{
+          ...fullAnalysis,
+          findings: [
+            {
+              category: "Harassment",
+              severity: "high",
+              confidence: 0.92,
+              source: "title",
+              sourceId: null,
+              evidence: "Contains targeting language.",
+            },
+          ],
+        }}
+        status="success"
+      />,
+    );
+    expect(screen.getByText("Harassment")).toBeInTheDocument();
+    expect(
+      screen.getByText("Contains targeting language."),
+    ).toBeInTheDocument();
+  });
+
   it("surfaces the Automatically hidden badge for an auto-removed thread", () => {
     renderCard(
       <ThreadAnalysisCard
