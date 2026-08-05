@@ -179,13 +179,54 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
       .where(
         and(
           eq(contentAnalysisRuns.threadId, threadId),
-          eq(contentAnalysisRuns.status, "succeeded"),
-          isNotNull(contentAnalysisRuns.decision),
+          inArray(contentAnalysisRuns.status, ["succeeded", "failed"]),
         ),
       )
       .orderBy(desc(contentAnalysisRuns.createdAt))
       .limit(1);
-    return row === undefined ? null : toAnalysisDetails(row);
+    if (row === undefined) return null;
+    const [overrideRow] = await this.db
+      .select()
+      .from(contentAnalysisOverrides)
+      .where(eq(contentAnalysisOverrides.threadId, threadId))
+      .orderBy(desc(contentAnalysisOverrides.createdAt))
+      .limit(1);
+    return toAnalysisDetails(row, overrideRow?.decision as AnalysisOverrideDecision | undefined ?? null);
+  }
+
+  async findLatestStatusByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, "succeeded" | "failed">> {
+    if (threadIds.length === 0) return new Map();
+    const rows = await this.db
+      .selectDistinctOn(
+        [contentAnalysisRuns.threadId],
+        {
+          threadId: contentAnalysisRuns.threadId,
+          status: contentAnalysisRuns.status,
+          createdAt: contentAnalysisRuns.createdAt,
+        },
+      )
+      .from(contentAnalysisRuns)
+      .where(
+        and(
+          inArray(contentAnalysisRuns.threadId, [...threadIds]),
+          inArray(contentAnalysisRuns.status, ["succeeded", "failed"]),
+        ),
+      )
+      .orderBy(
+        contentAnalysisRuns.threadId,
+        desc(contentAnalysisRuns.createdAt),
+      );
+
+    const statuses = new Map<string, "succeeded" | "failed">();
+    for (const row of rows) {
+      statuses.set(
+        row.threadId,
+        row.status === "failed" ? "failed" : "succeeded",
+      );
+    }
+    return statuses;
   }
 
   async saveOverride(input: SaveOverrideInput): Promise<ContentAnalysisOverride> {
@@ -254,10 +295,15 @@ export class DrizzleContentAnalysisRepository implements ContentAnalysisReposito
   }
 }
 
-function toAnalysisDetails(row: RunRow): ThreadAnalysisDetails {
+function toAnalysisDetails(
+  row: RunRow,
+  override: AnalysisOverrideDecision | null = null,
+): ThreadAnalysisDetails {
   return {
     runId: row.id,
+    status: row.status === "failed" ? "failed" : "succeeded",
     decision: row.decision as ThreadAnalysisDetails["decision"],
+    override,
     sentiment:
       row.sentimentLabel !== null && row.confidence !== null
         ? {

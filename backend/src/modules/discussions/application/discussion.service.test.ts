@@ -596,7 +596,9 @@ class FakeSocietyRepository implements SocietyRepository {
 describe("ThreadService.getThreadAnalysis", () => {
   const details: ThreadAnalysisDetails = {
     runId: "run-1",
+    status: "succeeded",
     decision: "review",
+    override: null,
     sentiment: null,
     findings: null,
     summary: "Flagged for review",

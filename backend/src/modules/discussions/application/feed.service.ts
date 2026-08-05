@@ -241,6 +241,9 @@ export class FeedService {
   ): Promise<AnalysisQueuePageDto> {
     const threadIds = result.items.map((thread) => thread.id);
     const decisions = await this.decisionsFor(threadIds);
+    const statuses = this.analysisDecisionReader === undefined
+      ? new Map<string, "succeeded" | "failed">()
+      : await this.analysisDecisionReader.findLatestStatusByThreads(threadIds);
     const overridden = this.analysisDecisionReader === undefined
       ? new Set<string>()
       : await this.analysisDecisionReader.findOverriddenThreadIds(threadIds);
@@ -251,6 +254,7 @@ export class FeedService {
     const items = result.items.flatMap((thread) => {
       if (overridden.has(thread.id)) return [];
       const decision = decisions.get(thread.id) ?? null;
+      const analysisFailed = statuses.get(thread.id) === "failed";
       if (!matchesAnalysisFilter(decision, filter)) return [];
       const society = societyById.get(thread.societyId);
       if (society === undefined) return [];
@@ -260,6 +264,7 @@ export class FeedService {
         mediaByThread.get(thread.id) ?? [],
         authorById.get(thread.authorId) ?? null,
         decision,
+        analysisFailed,
       )];
     });
 

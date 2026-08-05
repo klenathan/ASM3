@@ -6,15 +6,19 @@ export type AnalysisDecision = "allow" | "review" | null | undefined;
 const TITLES = {
   allow: "Reviewed by automated content check",
   review: "Flagged for review",
+  failed: "Automated analysis failed",
   autoRemoved: "Automatically hidden",
   hidden: "Hidden",
   pending: "Analysis pending",
+  approved: "Approved — accepted for review",
+  rejected: "Rejected — hidden",
 } as const;
 
 /**
  * Small badge surfacing the automated content-analysis outcome of a post.
  *   - "allow"       → green "Reviewed"
  *   - "review"      → amber "Flagged for review" (published, awaiting review)
+ *   - "failed"      → red "Automated analysis failed" (latest run errored)
  *   - "auto-removed" → red "Automatically hidden" (only when the caller can
  *     authoritatively prove the thread was hidden by the automated policy;
  *     see `isAutoRemoved` in the analysis feature)
@@ -24,24 +28,36 @@ const TITLES = {
  */
 export function AnalysisBadge({
   decision,
+  failed = false,
   autoRemoved = false,
   hidden = false,
+  override = null,
   className,
 }: {
   readonly decision: AnalysisDecision;
+  /** Latest analysis run failed (decision is null). */
+  readonly failed?: boolean;
   /** Authoritative "hidden by automated policy" state. Overrides everything. */
   readonly autoRemoved?: boolean;
   /** Thread is no longer published. Overrides review/pending. */
   readonly hidden?: boolean;
+  /** Latest human override; `accept` approves, `reject` hides. */
+  readonly override?: "accept" | "reject" | null;
   readonly className?: string;
 }) {
-  const status = autoRemoved
-    ? "autoRemoved"
-    : hidden
-      ? "hidden"
-      : decision === "allow" || decision === "review"
-        ? decision
-        : "pending";
+  const status = override === "accept"
+    ? "approved"
+    : override === "reject"
+      ? "rejected"
+      : autoRemoved
+        ? "autoRemoved"
+        : hidden
+          ? "hidden"
+          : decision === "allow" || decision === "review"
+            ? decision
+            : failed
+              ? "failed"
+              : "pending";
 
   return (
     <Badge
@@ -52,13 +68,17 @@ export function AnalysisBadge({
           "border-emerald-600/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
         status === "review" &&
           "border-amber-600/40 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-        (status === "autoRemoved" || status === "hidden") &&
+        (status === "autoRemoved" || status === "hidden" || status === "failed" || status === "rejected") &&
           "border-red-600/40 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+        status === "approved" &&
+          "border-emerald-600/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
         status === "pending" && "text-muted-foreground",
         className,
       )}
     >
-      {status === "allow" && <span aria-hidden="true">✓</span>}
+      {(status === "allow" || status === "approved") && (
+        <span aria-hidden="true">✓</span>
+      )}
       {TITLES[status]}
     </Badge>
   );

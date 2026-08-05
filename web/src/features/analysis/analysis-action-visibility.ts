@@ -1,17 +1,14 @@
-/** Keep this aligned with the backend stale pending-run threshold. */
-export const ANALYSIS_STALE_AFTER_MS = 1 * 60 * 1000;
-
 export type AnalysisActionDecision = "allow" | "review" | null | undefined;
 
+/**
+ * Override actions are offered only when the thread's analysis outcome is
+ * RESOLVED: the latest settled run accepted (`allow`), flagged for review
+ * (`review`), or failed (`failed`). Threads still awaiting a decision
+ * (queued/running or never analyzed) are not resolved and show no actions.
+ */
 export function shouldShowAnalysisActions(
   decision: AnalysisActionDecision,
-  threadUpdatedAt: string,
-  now = Date.now(),
+  failed = false,
 ): boolean {
-  if (decision === "allow" || decision === "review") return true;
-
-  const updatedAt = Date.parse(threadUpdatedAt);
-  return (
-    Number.isFinite(updatedAt) && now - updatedAt >= ANALYSIS_STALE_AFTER_MS
-  );
+  return decision === "allow" || decision === "review" || failed === true;
 }

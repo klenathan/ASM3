@@ -64,6 +64,15 @@ export interface ContentAnalysisRepository {
   ): Promise<ThreadAnalysisDetails | null>;
 
   /**
+   * Return the latest settled run status per thread (succeeded or failed), or
+   * omit threads with no settled run. Lets callers distinguish threads whose
+   * analysis failed from threads still awaiting a decision.
+   */
+  findLatestStatusByThreads(
+    threadIds: readonly string[],
+  ): Promise<ReadonlyMap<string, "succeeded" | "failed">>;
+
+  /**
    * Persist a human override of the automated decision for a thread. The
    * newest override per thread is authoritative.
    */

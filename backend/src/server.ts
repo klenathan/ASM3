@@ -318,6 +318,10 @@ async function main(): Promise<void> {
           if (error) reject(error);
           else resolve();
         });
+        // Drop idle keep-alive connections so close() resolves promptly
+        // instead of waiting for their keep-alive timeout (default 5s).
+        // In-flight requests are not idle and still complete normally.
+        (server as import("node:http").Server).closeIdleConnections();
       });
       await audit.stop();
       await reanalysisWorker?.stop();

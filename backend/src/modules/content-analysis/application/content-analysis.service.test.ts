@@ -164,6 +164,9 @@ class StubRepository implements ContentAnalysisRepository {
   async findLatestSucceededAnalysis(): Promise<ThreadAnalysisDetails | null> {
     return null;
   }
+  async findLatestStatusByThreads(): Promise<ReadonlyMap<string, "succeeded" | "failed">> {
+    return new Map();
+  }
   async saveOverride(input: SaveOverrideInput): Promise<ContentAnalysisOverride> {
     this.overrides.push(input);
     return { ...input, updatedAt: input.createdAt };

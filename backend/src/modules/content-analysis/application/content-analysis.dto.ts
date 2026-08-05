@@ -50,6 +50,9 @@ export interface ContentAnalysisRequest {
 
 export type AnalysisDecision = "allow" | "review";
 
+/** Human override of the automated decision: `accept` approves, `reject` hides. */
+export type AnalysisOverrideDecision = "accept" | "reject";
+
 export type SentimentLabel = "positive" | "neutral" | "negative" | "mixed";
 
 export type Severity = "low" | "medium" | "high";
@@ -87,7 +90,15 @@ export interface ContentAnalysisResult {
  */
 export interface ThreadAnalysisDetails {
   readonly runId: string;
+  /** Terminal run status; `failed` when the latest settled run errored. */
+  readonly status: "succeeded" | "failed";
   readonly decision: AnalysisDecision | null;
+  /**
+   * Latest human override for the thread, if any. `accept` approves the
+   * review outcome; `reject` hides the thread. Null when no moderator/admin
+   * has overridden the automated decision.
+   */
+  readonly override: AnalysisOverrideDecision | null;
   readonly sentiment: { label: SentimentLabel; confidence: number } | null;
   readonly findings: ContentAnalysisFinding[] | null;
   readonly summary: string | null;

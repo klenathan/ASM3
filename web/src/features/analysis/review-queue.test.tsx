@@ -5,10 +5,9 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ReviewQueue } from "./review-queue";
-import { ANALYSIS_STALE_AFTER_MS } from "./analysis-action-visibility";
 import type { AnalysisQueueThread } from "./types";
 
-const base: Omit<AnalysisQueueThread, "id" | "title" | "analysisDecision"> = {
+const base: Omit<AnalysisQueueThread, "id" | "title" | "analysisDecision" | "analysisFailed"> = {
   societyId: "20000000-0000-4000-8000-000000000001",
   societySlug: "cloud",
   societyName: "Cloud Computing",
@@ -21,7 +20,7 @@ const base: Omit<AnalysisQueueThread, "id" | "title" | "analysisDecision"> = {
   authorAvatarMediaId: null,
   myVote: 0,
   createdAt: "2026-08-01T00:00:00.000Z",
-  updatedAt: new Date(Date.now() - 1_000).toISOString(),
+  updatedAt: "2026-08-01T00:00:00.000Z",
   deletedAt: null,
   status: "published",
 };
@@ -31,6 +30,7 @@ const reviewThread: AnalysisQueueThread = {
   id: "10000000-0000-4000-8000-000000000001",
   title: "Flagged thread",
   analysisDecision: "review",
+  analysisFailed: false,
 };
 
 const noneThread: AnalysisQueueThread = {
@@ -38,13 +38,15 @@ const noneThread: AnalysisQueueThread = {
   id: "10000000-0000-4000-8000-000000000002",
   title: "Pending thread",
   analysisDecision: null,
+  analysisFailed: false,
 };
 
-const staleNoneThread: AnalysisQueueThread = {
-  ...noneThread,
+const failedThread: AnalysisQueueThread = {
+  ...base,
   id: "10000000-0000-4000-8000-000000000003",
-  title: "Stale pending thread",
-  updatedAt: new Date(Date.now() - ANALYSIS_STALE_AFTER_MS - 1_000).toISOString(),
+  title: "Failed analysis thread",
+  analysisDecision: null,
+  analysisFailed: true,
 };
 
 function client() {
@@ -137,12 +139,12 @@ describe("ReviewQueue", () => {
     expect(screen.getByText("Hidden")).toBeTruthy();
   });
 
-  it("hides actions for fresh pending threads but shows them for stale ones", async () => {
+  it("hides actions for pending threads but shows them for failed ones", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
         jsonResponse({
-          items: [noneThread, staleNoneThread],
+          items: [noneThread, failedThread],
           nextCursor: null,
           hasMore: false,
         }),
@@ -152,15 +154,16 @@ describe("ReviewQueue", () => {
     renderQueue();
 
     await waitFor(() => {
-      expect(screen.getByText("Stale pending thread")).toBeTruthy();
+      expect(screen.getByText("Failed analysis thread")).toBeTruthy();
     });
 
-    const freshCard = screen.getByText("Pending thread").closest("article");
-    const staleCard = screen.getByText("Stale pending thread").closest("article");
-    expect(freshCard).not.toBeNull();
-    expect(staleCard).not.toBeNull();
-    expect(within(freshCard!).queryByRole("button", { name: "Accept" })).toBeNull();
-    expect(within(staleCard!).getByRole("button", { name: "Accept" })).toBeTruthy();
+    const pendingCard = screen.getByText("Pending thread").closest("article");
+    const failedCard = screen.getByText("Failed analysis thread").closest("article");
+    expect(pendingCard).not.toBeNull();
+    expect(failedCard).not.toBeNull();
+    expect(within(pendingCard!).queryByRole("button", { name: "Accept" })).toBeNull();
+    expect(within(failedCard!).getByRole("button", { name: "Accept" })).toBeTruthy();
+    expect(screen.getByText("Automated analysis failed")).toBeTruthy();
   });
 
   it("refetches filtered to none when the None yet tab is selected", async () => {

@@ -45,7 +45,9 @@ export const threadPageSchema = z
 export const threadAnalysisSchema = z
   .object({
     runId: z.string().uuid(),
+    status: z.enum(["succeeded", "failed"]),
     decision: z.enum(["allow", "review"]).nullable(),
+    override: z.enum(["accept", "reject"]).nullable(),
     sentiment: z
       .object({
         label: z.enum(["positive", "neutral", "negative", "mixed"]),
@@ -80,6 +82,7 @@ export const analysisQueueThreadSchema = threadSchema
   .extend({
     societySlug: z.string(),
     societyName: z.string(),
+    analysisFailed: z.boolean(),
   })
   .openapi("AnalysisQueueThread");
 

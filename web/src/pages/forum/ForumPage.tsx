@@ -2,8 +2,8 @@ import { HomeFeed } from "../../features/feed/home-feed";
 
 export function ForumPage() {
   return (
-    <main className="px-5 sm:px-8 lg:px-10 max-w-7xl w-full">
-      <section aria-labelledby="forum-title">
+    <main className="flex flex-row px-5 sm:px-8 lg:px-10 w-full">
+      <section aria-labelledby="forum-title max-w-7xl w-full">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-foreground pb-4">
           <h1
             id="forum-title"
@@ -20,6 +20,7 @@ export function ForumPage() {
           <HomeFeed />
         </div>
       </section>
+      {/* <div className="flex grow bg-red-50">Ads goes here</div> */}
     </main>
   );
 }

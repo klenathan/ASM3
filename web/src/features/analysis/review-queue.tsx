@@ -48,7 +48,11 @@ function QueueCard({
   return (
     <article className="group flex flex-col border border-foreground/15 p-4 transition-colors hover:border-primary/50 hover:bg-muted/40">
       <div className="flex items-start justify-between gap-3">
-        <AnalysisBadge decision={item.analysisDecision} hidden={hidden} />
+        <AnalysisBadge
+          decision={item.analysisDecision}
+          failed={item.analysisFailed}
+          hidden={hidden}
+        />
         <span className="text-xs text-muted-foreground">{shortDate(item.createdAt)}</span>
       </div>
       <h3 className="mt-3 line-clamp-2 font-semibold leading-snug group-hover:text-primary">
@@ -83,7 +87,7 @@ function QueueCard({
           threadId={item.id}
           actionScope={actionScope}
           decision={item.analysisDecision}
-          threadUpdatedAt={item.updatedAt}
+          failed={item.analysisFailed}
           onResolved={() =>
             queryClient.invalidateQueries({ queryKey: ["analysis", "queue"] })
           }

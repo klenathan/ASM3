@@ -64,7 +64,6 @@ export function ThreadAnalysisCard({
   status,
   threadId,
   actionScope,
-  threadUpdatedAt,
   autoRemoved = false,
   canAct = false,
   onResolved,
@@ -73,7 +72,6 @@ export function ThreadAnalysisCard({
   readonly status: "loading" | "success" | "error";
   readonly threadId: string;
   readonly actionScope?: AnalysisActionScope;
-  readonly threadUpdatedAt: string;
   /** Authoritative "hidden by automated policy" state (see `isAutoRemoved`). */
   readonly autoRemoved?: boolean;
   /** Show Accept / Reject / Re-analyze override controls (privileged callers). */
@@ -90,7 +88,9 @@ export function ThreadAnalysisCard({
         <CardAction>
           <AnalysisBadge
             decision={analysis?.decision ?? null}
+            failed={analysis?.status === "failed"}
             autoRemoved={autoRemoved}
+            override={analysis?.override ?? null}
           />
         </CardAction>
       </CardHeader>
@@ -107,6 +107,21 @@ export function ThreadAnalysisCard({
         ) : analysis == null ? (
           <p className="text-sm leading-6 text-muted-foreground">
             No analysis has been recorded for this thread yet.
+          </p>
+        ) : analysis.override === "accept" ? (
+          <p className="text-sm leading-6 text-emerald-700 dark:text-emerald-400">
+            This post was accepted for publication after manual review.
+          </p>
+        ) : analysis.override === "reject" ? (
+          <p className="text-sm leading-6 text-destructive">
+            This post was rejected by a moderator or admin and is hidden from
+            the community.
+          </p>
+        ) : analysis.status === "failed" ? (
+          <p role="alert" className="text-sm leading-6 text-destructive">
+            {canAct
+              ? "The automated analysis failed. Use Re-analyze to retry it."
+              : "This thread could not be analyzed automatically."}
           </p>
         ) : (
           <div className="space-y-4">
@@ -144,12 +159,12 @@ export function ThreadAnalysisCard({
             </>
           )}
         </div>
-        {canAct && (
+        {canAct && analysis?.override == null && status === "success" && (
           <AnalysisActions
             threadId={threadId}
             actionScope={actionScope ?? { scope: "admin" }}
             decision={analysis?.decision}
-            threadUpdatedAt={threadUpdatedAt}
+            failed={analysis?.status === "failed"}
             onResolved={onResolved}
           />
         )}

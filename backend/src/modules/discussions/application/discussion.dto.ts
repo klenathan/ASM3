@@ -32,6 +32,8 @@ export type AnalysisQueueFilter = "all" | "none" | "review";
 export interface AnalysisQueueThreadDto extends ThreadDto {
   readonly societySlug: string;
   readonly societyName: string;
+  /** True when the latest settled analysis run failed (decision still null). */
+  readonly analysisFailed: boolean;
 }
 
 export type AnalysisQueuePageDto = PageResult<AnalysisQueueThreadDto>;

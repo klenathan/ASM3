@@ -70,9 +70,7 @@ export function ThreadPage() {
   // hidden". Non-privileged viewers keep the plain review badge.
   const analysis = analysisQuery.data;
   const autoRemoved =
-    isPrivileged &&
-    thread?.status === "removed" &&
-    isAutoRemoved(analysis);
+    isPrivileged && thread?.status === "removed" && isAutoRemoved(analysis);
 
   if (threadQuery.status === "pending" || societyQuery.status === "pending") {
     return (
@@ -218,7 +216,6 @@ export function ThreadPage() {
                       : undefined
                 }
                 analysis={analysisQuery.data}
-                threadUpdatedAt={thread.updatedAt}
                 autoRemoved={autoRemoved}
                 canAct={isPrivileged}
                 status={

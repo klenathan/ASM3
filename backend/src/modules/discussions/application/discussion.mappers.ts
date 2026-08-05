@@ -89,11 +89,13 @@ export function toAnalysisQueueThreadDto(
   media: readonly ThreadMediaRecord[] = [],
   author?: ProfileIdentity | null,
   analysisDecision: "allow" | "review" | null = null,
+  analysisFailed = false,
 ): AnalysisQueueThreadDto {
   return {
     ...toThreadDto(record, media, author, 0, analysisDecision),
     societySlug: society.slug,
     societyName: society.name,
+    analysisFailed,
   };
 }
 

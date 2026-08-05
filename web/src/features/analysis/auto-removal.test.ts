@@ -5,7 +5,9 @@ import type { ThreadAnalysis } from "./types";
 
 const base: ThreadAnalysis = {
   runId: "40000000-0000-4000-8000-000000000001",
+  status: "succeeded",
   decision: "review",
+  override: null,
   sentiment: { label: "negative", confidence: 0.8 },
   findings: [
     { category: "Harassment", severity: "high", confidence: 0.92, source: "title", evidence: "x" },
