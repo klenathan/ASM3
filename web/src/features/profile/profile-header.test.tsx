@@ -50,4 +50,19 @@ describe("ProfileHeader", () => {
     renderWithQueries({ ...base, platformRole: "system_admin" });
     expect(screen.getByText("System admin")).toBeInTheDocument();
   });
+
+  it("shows a suspended marker when the profile is suspended", () => {
+    renderWithQueries({ ...base, status: "suspended" });
+    expect(screen.getByText("Suspended")).toBeInTheDocument();
+  });
+
+  it("shows a deactivated marker when the profile is deactivated", () => {
+    renderWithQueries({ ...base, status: "deactivated" });
+    expect(screen.getByText("Deactivated")).toBeInTheDocument();
+  });
+
+  it("does not show a status marker for an active profile", () => {
+    renderWithQueries(base);
+    expect(screen.queryByText(/suspended|deactivated/i)).not.toBeInTheDocument();
+  });
 });

@@ -76,8 +76,15 @@ export function ProfilePage() {
   }
 
   function handleVisibility(next: boolean) {
+    const previous = isPublic;
     setIsPublic(next);
-    update.mutate({ isPublic: next }, { onSuccess: () => void refresh() });
+    update.mutate(
+      { isPublic: next },
+      {
+        onSuccess: () => void refresh(),
+        onError: () => setIsPublic(previous),
+      },
+    );
   }
 
   const toggleError =
@@ -93,8 +100,7 @@ export function ProfilePage() {
         actions={
           <Button
             type="button"
-            variant="outline"
-            className="h-11 rounded-none border-foreground/20 px-4 shadow-none"
+            variant="paper-outline"
             onClick={() => setEditOpen(true)}
           >
             Edit profile

@@ -1,4 +1,4 @@
-import { Lock, ShieldCheck } from "lucide-react";
+import { Ban, CircleOff, Lock, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
@@ -89,6 +89,16 @@ export function ProfileHeader({
               ) : null}
               {roleLabel}
             </Badge>
+            {profile.status !== "active" && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+                {profile.status === "suspended" ? (
+                  <Ban aria-hidden="true" className="size-3.5" />
+                ) : (
+                  <CircleOff aria-hidden="true" className="size-3.5" />
+                )}
+                {profile.status === "suspended" ? "Suspended" : "Deactivated"}
+              </span>
+            )}
             <span className="text-xs tracking-[0.08em] text-muted-foreground uppercase">
               Joined {joinedLabel(profile.createdAt)}
             </span>

@@ -38,8 +38,8 @@ export function UserProfilePage() {
         </p>
         <Button
           type="button"
-          variant="outline"
-          className="mt-6 h-11 rounded-none border-foreground/20 px-4 shadow-none"
+          variant="paper-outline"
+          className="mt-6"
           asChild
         >
           <Link to="/">

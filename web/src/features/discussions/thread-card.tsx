@@ -35,23 +35,7 @@ export function DiscussionCard({
     );
 
   return (
-    <div
-      role={threadUrl === null ? undefined : "link"}
-      tabIndex={threadUrl === null ? undefined : 0}
-      onClick={openThread}
-      onKeyDown={(event) => {
-        if (threadUrl === null || (event.key !== "Enter" && event.key !== " "))
-          return;
-        event.preventDefault();
-        openThread();
-      }}
-      className={cn(
-        "flex flex-col gap-3 border-b border-foreground/15 py-5",
-        threadUrl === null
-          ? undefined
-          : "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-      )}
-    >
+    <div className="flex flex-col gap-3 border-b border-foreground/15 py-5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {showSociety && item.societySlug !== null && (
           <>
@@ -77,7 +61,16 @@ export function DiscussionCard({
       <div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <h3 className="font-heading text-lg font-semibold leading-snug">
-            {item.title}
+            {threadUrl === null ? (
+              item.title
+            ) : (
+              <Link
+                to={threadUrl}
+                className="text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {item.title}
+              </Link>
+            )}
           </h3>
           <AnalysisBadge decision={item.analysisDecision} />
         </div>

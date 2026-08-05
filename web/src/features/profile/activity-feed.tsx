@@ -4,27 +4,8 @@ import { Link } from "react-router-dom";
 import { Spinner } from "../../components/ui/spinner";
 import { DiscussionCard } from "../discussions/thread-card";
 import type { DiscussionItem } from "../discussions/types";
-import { useThreadVote } from "../discussions/use-thread-vote";
+import { timeAgo, useThreadVote } from "../discussions/use-thread-vote";
 import type { UserCommentActivity, UserThreadActivity } from "./types";
-
-function timeAgo(value: string): string {
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(value).getTime()) / 1000),
-  );
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export function ActivityFeed({
   threads,
@@ -59,12 +40,12 @@ export function ActivityFeed({
     <div className="flex flex-col gap-14">
       <section aria-labelledby="threads-title" className="flex flex-col gap-4">
         <div className="flex items-end justify-between border-b-2 border-foreground pb-4">
-          <h2
+          <h3
             id="threads-title"
             className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase"
           >
             Threads
-          </h2>
+          </h3>
           <span className="text-xs text-muted-foreground">
             {threads.length}
           </span>
@@ -72,9 +53,9 @@ export function ActivityFeed({
 
         {threads.length === 0 ? (
           <div className="py-12">
-            <h3 className="font-heading text-lg tracking-[0.01em] uppercase">
+            <h4 className="font-heading text-lg tracking-[0.01em] uppercase">
               No threads yet.
-            </h3>
+            </h4>
             <p className="mt-2 max-w-md leading-7 text-muted-foreground">
               {threadsEmptyLabel}
             </p>
@@ -113,12 +94,12 @@ export function ActivityFeed({
 
       <section aria-labelledby="comments-title">
         <div className="flex items-end justify-between border-b-2 border-foreground pb-4">
-          <h2
+          <h3
             id="comments-title"
             className="font-heading text-2xl font-semibold tracking-[0.01em] uppercase"
           >
             Comments
-          </h2>
+          </h3>
           <span className="text-xs text-muted-foreground">
             {comments.length}
           </span>
@@ -126,9 +107,9 @@ export function ActivityFeed({
 
         {comments.length === 0 ? (
           <div className="py-12">
-            <h3 className="font-heading text-lg tracking-[0.01em] uppercase">
+            <h4 className="font-heading text-lg tracking-[0.01em] uppercase">
               No comments yet.
-            </h3>
+            </h4>
             <p className="mt-2 max-w-md leading-7 text-muted-foreground">
               {commentsEmptyLabel}
             </p>
@@ -160,9 +141,12 @@ export function ActivityFeed({
                   </span>
                   <span>
                     on{" "}
-                    <span className="font-medium text-foreground">
+                    <Link
+                      to={`/s/${comment.societySlug}/t/${comment.threadId}`}
+                      className="font-medium text-foreground hover:text-primary"
+                    >
                       {comment.threadTitle}
-                    </span>
+                    </Link>
                   </span>
                   <span>
                     by{" "}
