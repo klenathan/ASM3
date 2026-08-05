@@ -104,6 +104,27 @@ Document the selected producer behavior:
 
 The feature must not claim guaranteed audit completeness under option 3.
 
+### Selected producer behavior (ATR-008/ATR-009)
+
+The first version implements **option 3 (minimum acceptable behavior)**:
+
+- The `thread.auto_removed` event is sent directly to the shared `thread-events`
+  SQS queue via `SendMessageCommand` from
+  `backend/src/modules/discussions/infrastructure/thread-events.sqs.publisher.ts`
+  (`SqsThreadEventPublisher.publishAutoRemoved`).
+- **No retry** is performed by the producer. A failed send is logged (with
+  event ID, thread ID, and queue URL, never user content) and swallowed, so a
+  failed send never fails or rolls back an already-committed automatic removal.
+- **Known-loss risk:** because there is no outbox, a producer outage between the
+  committed `published -> removed` transition and the SQS send can lose the
+  event before it reaches the queue. Under this option we do **not** claim
+  guaranteed audit completeness.
+- A **transactional outbox** that records the event intent atomically with the
+  status transition and relays it to SQS is deferred to future work (a
+  potential outbox module/migration). Until then the known-loss window above is
+  accepted and documented.
+
+
 ## 7. Audit row mapping
 
 Map the event to the existing audit repository as follows:

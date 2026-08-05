@@ -45,6 +45,51 @@ Published message body (`ThreadCreatedEvent`):
 The body/content is never included. Consumers should rehydrate authoritative
 data by ID when needed. Message attributes carry `eventType` and `eventVersion`.
 
+### `thread.auto_removed` event (automatic removal)
+
+When the content-analysis automatic-removal path commits a `published ->
+removed` transition, the same publisher sends a second, independently-versioned
+event through the same `thread-events` queue:
+
+```json
+{
+  "eventId": "<analysis-run-uuid>",
+  "eventType": "thread.auto_removed",
+  "version": 1,
+  "threadId": "<uuid>",
+  "societyId": "<uuid>",
+  "authorId": "<uuid>",
+  "analysisRunId": "<uuid>",
+  "reasonCode": "high_severity_high_confidence",
+  "threshold": 0.9,
+  "finding": {
+    "category": "<model-category>",
+    "severity": "high",
+    "confidence": 0.97,
+    "source": "body",
+    "sourceId": null
+  },
+  "modelId": "<model-id>",
+  "promptVersion": "<prompt-version>",
+  "policyVersion": "<policy-version>",
+  "occurredAt": "<ISO-8601 UTC>"
+}
+```
+
+- `eventId` equals `analysisRunId` (stable, idempotent source event ID per
+  duplicate delivery).
+- Message attributes carry `eventType = thread.auto_removed` and
+  `eventVersion = 1`.
+- No thread body or user content is copied into the event or audit row; it
+  links to the restricted analysis run by ID.
+- Delivery follows the same direct-SQS, no-retry, log-and-swallow producer
+  pattern as `thread.created`. See `docs/automatic-thread-removal/
+  EVENT_CONTRACT.md` § 6 for the documented known-loss risk and the deferred
+  transactional outbox.
+
+See `docs/automatic-thread-removal/EVENT_CONTRACT.md` for the full schema and
+validation rules.
+
 ## Code map
 
 Discussions (publisher):

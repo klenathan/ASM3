@@ -23,4 +23,19 @@ describe("AnalysisBadge", () => {
     render(<AnalysisBadge decision={undefined} />);
     expect(screen.getByText("Analysis pending")).toBeTruthy();
   });
+
+  it("renders Automatically hidden when autoRemoved is true, overriding review", () => {
+    render(<AnalysisBadge decision="review" autoRemoved />);
+    expect(screen.getByText("Automatically hidden")).toBeTruthy();
+  });
+
+  it("renders Automatically hidden when autoRemoved is true and decision is null", () => {
+    render(<AnalysisBadge decision={null} autoRemoved />);
+    expect(screen.getByText("Automatically hidden")).toBeTruthy();
+  });
+
+  it("renders the normal review state when autoRemoved is false", () => {
+    render(<AnalysisBadge decision="review" autoRemoved={false} />);
+    expect(screen.getByText("Flagged for review")).toBeTruthy();
+  });
 });

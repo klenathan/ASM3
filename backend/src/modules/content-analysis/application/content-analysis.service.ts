@@ -5,12 +5,25 @@ import type { Logger } from "pino";
 import type { Clock } from "../../../shared/application/clock";
 import type { ContentAnalyzerPort } from "./content-analyzer.port";
 import type {
+  ContentAnalysisFinding,
   ContentAnalysisRequest,
   ContentAnalysisResult,
 } from "./content-analysis.dto";
 import type { ContentAnalysisRepository } from "./content-analysis.repository";
+import type {
+  AutomatedRemovalPort,
+  RemoveThreadIfPublishedInput,
+} from "./automated-removal.port";
+import { AUTO_REMOVE_REASON_CODE } from "./automated-removal.port";
 import type { ReportAnalysisContextPort } from "./report-analysis-context.port";
-import type { ThreadAnalysisContextPort } from "./thread-analysis-context.port";
+import type {
+  ThreadAnalysisContextPort,
+  ThreadAnalysisSnapshot,
+} from "./thread-analysis-context.port";
+import {
+  DEFAULT_AUTO_REMOVE_THRESHOLD,
+  shouldAutoRemove,
+} from "../domain/content-analysis.policy";
 import {
   DEFAULT_STALE_PENDING_MS,
   DEFAULT_STALE_PENDING_LIMIT,
@@ -30,6 +43,22 @@ export interface ContentAnalysisServiceDeps {
   promptVersion: string;
   logger: Logger;
   clock: Clock;
+  /**
+   * Confidence threshold for auto-removal (matches `shouldAutoRemove`).
+   * Defaults to {@link DEFAULT_AUTO_REMOVE_THRESHOLD} when omitted.
+   */
+  threshold?: number;
+  /**
+   * Port used to enforce removal of a reviewed, high-confidence thread.
+   * When omitted, enforcement is skipped with a warning (config left
+   * non-destructive by default).
+   */
+  removalPort?: AutomatedRemovalPort;
+  /**
+   * Loads the authoritative thread snapshot before enforcement. Defaults to
+   * `threadContext.loadThreadSnapshot` when omitted.
+   */
+  loadThreadSnapshot?: (threadId: string) => Promise<ThreadAnalysisSnapshot>;
 }
 
 /**
@@ -41,10 +70,12 @@ export interface ContentAnalysisServiceDeps {
  *  - off:      analysis is never triggered (local development default).
  *  - shadow:   analysis runs and is persisted, but does not change thread
  *              visibility. Used to measure real invocation before enforcement.
- *  - enforce:  analysis gates publication. Thread-status enforcement is
- *              deferred until `pending_analysis`/`pending_review` statuses are
- *              added to the thread schema; today it persists the result and
- *              leaves the thread published (same as shadow) with a warning.
+ *  - enforce:  analysis gates publication. Thread-status transition to
+ *              `pending_review` is still deferred until the thread schema
+ *              supports it; reviewed threads stay published unless a
+ *              high-severity finding meets the auto-removal threshold, in
+ *              which case {@link AutomatedRemovalPort} removes them (only
+ *              when enforce is active and a removal port is wired).
  */
 export class ContentAnalysisService {
   readonly deps: ContentAnalysisServiceDeps;
@@ -187,12 +218,9 @@ export class ContentAnalysisService {
         this.deps.mode === "enforce" &&
         invocation.result.decision === "review"
       ) {
-        // TODO(phase 3): transition thread to `pending_review` and surface in
-        // moderation. Requires extending the thread status schema.
-        this.deps.logger.warn(
-          { threadId, runId: run.id },
-          "content analysis returned review but enforce transition is not yet wired",
-        );
+        // Enforcement is fully isolated so a removal failure can never fail
+        // the (already recorded) successful run or leak out of executeAnalysis.
+        await this.enforceRemoval(run, invocation.result, invocation.modelId);
       }
 
       return invocation.result;
@@ -218,6 +246,108 @@ export class ContentAnalysisService {
         "content analysis failed; thread left as-is",
       );
       return null;
+    }
+  }
+
+  /**
+   * Enforce auto-removal for a thread that the analyzer flagged `review` with
+   * a high-severity, high-confidence finding and that is still published.
+   *
+   * This runs strictly AFTER `recordSuccess` has settled the run as
+   * succeeded, and is deliberately best-effort: it is wrapped in its own
+   * try/catch that only logs, so any failure here never fails the already
+   * succeeded run and never throws out of executeAnalysis.
+   *
+   * Non-destructive by default: off/shadow modes never reach here, and a
+   * missing `removalPort` only logs a warning and skips.
+   */
+  private async enforceRemoval(
+    run: ContentAnalysisRun,
+    result: ContentAnalysisResult,
+    modelId: string | null,
+  ): Promise<void> {
+    const { threadId } = run;
+    const threshold =
+      this.deps.threshold ?? DEFAULT_AUTO_REMOVE_THRESHOLD;
+
+    if (!shouldAutoRemove(result, threshold)) {
+      // Not a match (e.g. allow, or only low/medium-confidence findings):
+      // leave it in the moderation queue for human review.
+      return;
+    }
+
+    if (this.deps.removalPort === undefined) {
+      this.deps.logger.warn(
+        { threadId, runId: run.id, threshold },
+        "content analysis flagged thread for auto-removal but no removal port is wired; leaving non-destructive and routing to manual moderation",
+      );
+      return;
+    }
+
+    try {
+      const loadSnapshot =
+        this.deps.loadThreadSnapshot ??
+        ((id: string) => this.deps.threadContext.loadThreadSnapshot(id));
+      let snapshot: ThreadAnalysisSnapshot | null = null;
+      try {
+        snapshot = await loadSnapshot(threadId);
+      } catch (error) {
+        // Snapshot unavailable (e.g. thread deleted concurrently); the
+        // removal port's atomic check is the final authority anyway.
+        this.deps.logger.debug(
+          { threadId, runId: run.id, error: String(error) },
+          "could not load thread snapshot for auto-removal; skipping enforcement",
+        );
+        return;
+      }
+
+      if (snapshot === null || snapshot.status !== "published") {
+        // Thread no longer published — nothing to remove.
+        return;
+      }
+
+      const finding = selectAutoRemovalFinding(result, threshold);
+      const input: RemoveThreadIfPublishedInput = {
+        threadId: snapshot.threadId,
+        societyId: snapshot.societyId,
+        authorId: snapshot.authorId,
+        analysisRunId: run.id,
+        reasonCode: AUTO_REMOVE_REASON_CODE,
+        threshold,
+        finding: {
+          category: finding.category,
+          severity: "high",
+          confidence: finding.confidence,
+          source: finding.source,
+          ...(finding.sourceId === undefined
+            ? {}
+            : { sourceId: finding.sourceId }),
+        },
+        modelId,
+        promptVersion: this.deps.promptVersion,
+        policyVersion: this.deps.policyVersion,
+        occurredAtEpochMs: this.deps.clock.now().getTime(),
+      };
+
+      const outcome = await this.deps.removalPort.removeThreadIfPublished(input);
+      if (outcome === "removed") {
+        this.deps.logger.info(
+          { threadId, runId: run.id, reasonCode: AUTO_REMOVE_REASON_CODE },
+          "thread auto-removed by content-analysis enforcement",
+        );
+      } else {
+        // already_inactive — another actor/flow removed it concurrently.
+        this.deps.logger.debug(
+          { threadId, runId: run.id },
+          "thread already inactive; no auto-removal applied",
+        );
+      }
+    } catch (error) {
+      // Best-effort: never fail the recorded run for an enforcement error.
+      this.deps.logger.error(
+        { threadId, runId: run.id, error: String(error) },
+        "auto-removal enforcement failed; thread left as-is",
+      );
     }
   }
 
@@ -285,4 +415,30 @@ function classifyError(error: unknown): string {
   const value = error as { code?: unknown };
   if (typeof value?.code === "string" && value.code) return value.code;
   return "ANALYSIS_INVOCATION_FAILED";
+}
+
+/**
+ * Deterministically select the finding that justifies auto-removal.
+ *
+ * Picks the FIRST high-severity finding (in array order) whose confidence is
+ * at or above `threshold`. Array order is the model's stable output order and
+ * is preserved through validation/persistence, so "first in array order"
+ * yields a reproducible choice even when several findings tie as a match.
+ */
+function selectAutoRemovalFinding(
+  result: ContentAnalysisResult,
+  threshold: number,
+): ContentAnalysisFinding {
+  const matching = result.findings.find(
+    (finding) =>
+      finding.severity === "high" && finding.confidence >= threshold,
+  );
+  if (matching === undefined) {
+    // `enforceRemoval` only calls this after `shouldAutoRemove` returned true,
+    // which guarantees at least one matching finding exists.
+    throw new Error(
+      "auto-removal triggered without a matching high-confidence finding",
+    );
+  }
+  return matching;
 }

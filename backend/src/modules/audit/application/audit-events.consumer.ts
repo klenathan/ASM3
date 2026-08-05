@@ -7,6 +7,11 @@ import {
   THREAD_CREATED_EVENT_TYPE,
   THREAD_CREATED_EVENT_VERSION,
 } from "../../discussions/application/thread-events.port";
+import {
+  AUTO_REMOVED_EVENT_TYPE,
+  AUTO_REMOVED_EVENT_VERSION,
+  AUTO_REMOVE_REASON_CODE,
+} from "../../content-analysis/application/automated-removal.port";
 
 const uuidSchema = z.string().uuid();
 
@@ -20,6 +25,50 @@ const threadCreatedMessageSchema = z.object({
   title: z.string().min(1).max(300),
   occurredAt: z.string(),
 }).strict();
+
+const findingSourceSchema = z.enum(["title", "body", "image", "comment"]);
+
+const autoRemovedFindingSchema = z.object({
+  category: z.string().min(1),
+  severity: z.literal("high"),
+  confidence: z.number().min(0).max(1),
+  source: findingSourceSchema,
+  sourceId: z.string().optional(),
+}).strict();
+
+/**
+ * Strict schema for a `thread.auto_removed` message, including threshold and
+ * confidence-range validation.
+ */
+const autoRemovedMessageSchema = z
+  .object({
+    eventId: uuidSchema,
+    eventType: z.literal(AUTO_REMOVED_EVENT_TYPE),
+    version: z.literal(AUTO_REMOVED_EVENT_VERSION),
+    threadId: uuidSchema,
+    societyId: uuidSchema,
+    authorId: uuidSchema,
+    analysisRunId: uuidSchema,
+    reasonCode: z.literal(AUTO_REMOVE_REASON_CODE),
+    threshold: z.number().min(0).max(1),
+    finding: autoRemovedFindingSchema,
+    modelId: z.string().min(1).nullable(),
+    promptVersion: z.string().min(1),
+    policyVersion: z.string().min(1),
+    occurredAt: z.string(),
+  })
+  .strict()
+  .refine(
+    (event) => event.finding.confidence >= event.threshold,
+    {
+      path: ["finding", "confidence"],
+      message: "finding confidence must be >= threshold",
+    },
+  );
+
+export type ParsedAuditEvent =
+  | z.infer<typeof threadCreatedMessageSchema>
+  | z.infer<typeof autoRemovedMessageSchema>;
 
 export interface AuditMessage {
   readonly receiptHandle: string;
@@ -102,16 +151,19 @@ export class AuditEventConsumer {
       return false;
     }
 
-    const result = threadCreatedMessageSchema.safeParse(parsed);
-    if (!result.success) {
+    const eventType = (parsed as { eventType?: unknown })?.eventType;
+    const parsedEvent = eventType === AUTO_REMOVED_EVENT_TYPE
+      ? autoRemovedMessageSchema.safeParse(parsed)
+      : threadCreatedMessageSchema.safeParse(parsed);
+    if (!parsedEvent.success) {
       this.logger.error(
-        { body: message.body, issues: result.error.issues },
+        { body: message.body, issues: parsedEvent.error.issues },
         "received invalid audit message; leaving unacknowledged",
       );
       return false;
     }
 
-    const event = result.data;
+    const event = parsedEvent.data;
     try {
       const outcome = await this.repository.record({
         id: randomUUID(),
@@ -121,7 +173,7 @@ export class AuditEventConsumer {
         threadId: event.threadId,
         societyId: event.societyId,
         authorId: event.authorId,
-        title: event.title,
+        title: "title" in event ? event.title : null,
         payload: { ...event },
         receivedAt: new Date(),
       });

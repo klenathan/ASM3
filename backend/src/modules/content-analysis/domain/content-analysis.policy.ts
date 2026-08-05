@@ -124,6 +124,39 @@ export function outcomeForFailure(): ThreadAnalysisOutcome {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-removal policy
+// ---------------------------------------------------------------------------
+
+/**
+ * Default confidence threshold for flagging a high-severity finding for
+ * automatic removal. Expressed as a probability in [0, 1]; configurable via
+ * the `CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE` environment variable.
+ */
+export const DEFAULT_AUTO_REMOVE_THRESHOLD: number = 0.90;
+
+/**
+ * Decide whether a reviewed thread should be automatically removed rather
+ * than routed to manual moderation.
+ *
+ * Matches only when ALL of the following hold:
+ *  - the analysis decision is `review` (an `allow` never auto-removes);
+ *  - at least one finding is high severity;
+ *  - that high-severity finding's confidence is at or above `threshold`.
+ *
+ * Sentiment, popularity, and aggregate counts are intentionally not used:
+ * they are supporting context, never a trigger for removal.
+ */
+export function shouldAutoRemove(
+  result: ContentAnalysisResult,
+  threshold: number = DEFAULT_AUTO_REMOVE_THRESHOLD,
+): boolean {
+  if (result.decision !== "review") return false;
+  return result.findings.some(
+    (finding) => finding.severity === "high" && finding.confidence >= threshold,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Context limits and deterministic comment selection
 // ---------------------------------------------------------------------------
 

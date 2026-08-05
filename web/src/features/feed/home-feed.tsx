@@ -3,10 +3,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/ui/button";
-import {
-  Card,
-  CardContent,
-} from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Spinner } from "../../components/ui/spinner";
 import { DiscussionCard } from "../discussions/thread-card";
@@ -30,7 +27,7 @@ function toDiscussionItem(thread: HomeFeedThread): DiscussionItem {
     myVote: thread.myVote,
     mediaIds: thread.mediaIds,
     analysisDecision: thread.analysisDecision,
-  }
+  };
 }
 
 function FeedSkeleton() {
@@ -47,7 +44,7 @@ function FeedSkeleton() {
         </Card>
       ))}
     </div>
-  )
+  );
 }
 
 export function HomeFeed() {

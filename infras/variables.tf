@@ -225,3 +225,9 @@ variable "content_analysis_allowed_mime_types" {
   type        = string
   default     = "image/jpeg,image/png,image/webp"
 }
+
+variable "content_analysis_auto_remove_confidence" {
+  description = "Confidence threshold in [0,1] for auto-removing a reviewed thread with a high-severity finding. Only honored in enforce mode; no effect in off/shadow mode."
+  type        = number
+  default     = 0.90
+}

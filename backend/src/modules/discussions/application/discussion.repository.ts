@@ -79,6 +79,12 @@ export interface DiscussionRepository {
     status: "published" | "removed",
     updatedAt: Date,
   ): Promise<ThreadRecord | null>;
+  /**
+   * Atomically transition a thread from `published` to `removed` (automated
+   * moderation). Returns the updated ThreadRecord if transitioned, or null if
+   * not currently `published`. Never updates `deleted` threads.
+   */
+  removePublishedThreadIfActive(threadId: string, updatedAt: Date): Promise<ThreadRecord | null>;
   listThreadMedia(threadId: string): Promise<readonly ThreadMediaRecord[]>;
   replaceThreadMedia(threadId: string, mediaIds: readonly string[]): Promise<readonly ThreadMediaRecord[]>;
 

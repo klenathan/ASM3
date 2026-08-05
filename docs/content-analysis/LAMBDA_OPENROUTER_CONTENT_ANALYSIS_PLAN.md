@@ -395,6 +395,7 @@ CONTENT_ANALYSIS_LAMBDA_FUNCTION=
 CONTENT_ANALYSIS_LAMBDA_QUALIFIER=
 CONTENT_ANALYSIS_POLICY_VERSION=
 CONTENT_ANALYSIS_PROMPT_VERSION=
+CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE=
 ANALYSIS_MAX_COMMENTS=40
 ANALYSIS_MAX_IMAGES=
 ANALYSIS_MAX_IMAGE_BYTES=
@@ -420,6 +421,8 @@ Modes:
 - `off`: preserve current publication behavior for local development;
 - `shadow`: analyze asynchronously without changing visibility;
 - `enforce`: create or edit threads as `pending_analysis` and gate publication.
+
+`CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE` is a number in `[0,1]` (default `0.90`) used only in `enforce` mode to decide whether a reviewed thread with at least one high-severity finding at or above the threshold is automatically removed rather than routed to manual moderation. It has no effect in `off` or `shadow` mode; sentiment, popularity, and aggregate counts are never used as triggers.
 
 Production configuration must fail validation when mode is `shadow` or `enforce` but Lambda settings are missing. Lambda startup must fail closed when the OpenRouter model, API-key secret, bucket, or resource-limit settings are missing. The API key must never be placed in Terraform configuration, ECS environment variables, or source control.
 

@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import type {
+  ContentAnalysisFinding,
+  ContentAnalysisResult,
+} from "../application/content-analysis.dto";
+
 import { assertRunStatusTransition, canTransitRunStatus } from "./content-analysis";
 import {
+  DEFAULT_AUTO_REMOVE_THRESHOLD,
   delimitUntrusted,
   isStrictResult,
   outcomeForDecision,
   outcomeForFailure,
   selectAnalysisComments,
+  shouldAutoRemove,
   strictResultIssue,
   truncateUntrusted,
   UNTRUSTED_CONTENT_FENCE,
@@ -173,5 +180,77 @@ describe("prompt-injection handling", () => {
   it("truncates long content and trims whitespace", () => {
     expect(truncateUntrusted("  12345  ", 3)).toBe("123…");
     expect(truncateUntrusted("short", 20)).toBe("short");
+  });
+});
+
+describe("shouldAutoRemove", () => {
+  const finding = (overrides: Partial<ContentAnalysisFinding> = {}): ContentAnalysisFinding => ({
+    category: "harassment",
+    severity: "high",
+    confidence: 0.9,
+    source: "body",
+    evidence: "e",
+    ...overrides,
+  });
+
+  const result = (overrides: Partial<ContentAnalysisResult> = {}): ContentAnalysisResult => ({
+    decision: "review",
+    sentiment: { label: "negative", confidence: 0.9 },
+    findings: [],
+    summary: "ok",
+    rationale: "r",
+    ...overrides,
+  });
+
+  it("returns true for one high/high finding among lower-severity findings", () => {
+    expect(
+      shouldAutoRemove(
+        result({
+          findings: [
+            finding({ severity: "low", confidence: 0.99 }),
+            finding({ severity: "medium", confidence: 0.99 }),
+            finding({ severity: "high", confidence: 0.95 }),
+          ],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches when confidence is exactly the default threshold (0.90)", () => {
+    expect(
+      shouldAutoRemove(result({ findings: [finding({ confidence: 0.9 })] })),
+    ).toBe(true);
+    expect(
+      shouldAutoRemove(
+        result({ findings: [finding({ confidence: DEFAULT_AUTO_REMOVE_THRESHOLD })] }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match just below the threshold (0.899999)", () => {
+    expect(
+      shouldAutoRemove(result({ findings: [finding({ confidence: 0.899999 })] })),
+    ).toBe(false);
+  });
+
+  it("never matches medium or low severity even at high confidence", () => {
+    expect(
+      shouldAutoRemove(result({ findings: [finding({ severity: "medium", confidence: 1 })] })),
+    ).toBe(false);
+    expect(
+      shouldAutoRemove(result({ findings: [finding({ severity: "low", confidence: 1 })] })),
+    ).toBe(false);
+  });
+
+  it("never matches an allow decision even with a high/high finding", () => {
+    expect(
+      shouldAutoRemove(
+        result({ decision: "allow", findings: [finding({ confidence: 0.99 })] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false when there are no findings", () => {
+    expect(shouldAutoRemove(result({ findings: [] }))).toBe(false);
   });
 });

@@ -21,3 +21,6 @@ force_destroy_buckets = false
 #   content_analysis_openrouter_model = "deepseek/<approved-model-slug>"
 #   content_analysis_zip_path          = "../backend/dist-function/content-analysis.zip"
 # After apply, populate the reported secret ARN with the OpenRouter API key.
+# Confidence threshold [0,1] for auto-removing a reviewed thread with a
+# high-severity finding (default 0.90; no effect in off/shadow mode).
+# content_analysis_auto_remove_confidence = 0.90

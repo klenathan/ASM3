@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { AutoRemovedEvent } from "../../content-analysis/application/automated-removal.port";
 import type { ThreadRecord } from "../domain/discussion";
 
 export const THREAD_CREATED_EVENT_TYPE = "thread.created" as const;
@@ -18,6 +19,7 @@ export interface ThreadCreatedEvent {
 
 export interface ThreadEventPublisher {
   publishThreadCreated(thread: ThreadRecord): Promise<void>;
+  publishAutoRemoved(event: AutoRemovedEvent): Promise<void>;
 }
 
 export function buildThreadCreatedEvent(thread: ThreadRecord): ThreadCreatedEvent {
@@ -39,4 +41,5 @@ export function buildThreadCreatedEvent(thread: ThreadRecord): ThreadCreatedEven
  */
 export class NoopThreadEventPublisher implements ThreadEventPublisher {
   async publishThreadCreated(): Promise<void> {}
+  async publishAutoRemoved(): Promise<void> {}
 }

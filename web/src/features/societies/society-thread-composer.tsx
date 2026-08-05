@@ -475,14 +475,14 @@ function formatFileSize(byteSize: number): string {
   return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function initials(displayName: string): string {
-  return (
-    displayName
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
+// function initials(displayName: string): string {
+//   return (
+//     displayName
+//       .split(/\s+/)
+//       .filter(Boolean)
+//       .map((part) => part[0])
+//       .slice(0, 2)
+//       .join("")
+//       .toUpperCase() || "?"
+//   );
+// }

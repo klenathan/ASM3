@@ -109,6 +109,16 @@ aws sqs get-queue-attributes \
   --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
 ```
 
+**Evidence identifiers you must be able to collect** (define all five for the demo):
+
+| Identifier | Source |
+| ---------- | ------ |
+| thread ID | thread being analyzed / removed |
+| analysis run ID | the `content_analysis_runs` row for the run (== event ID) |
+| event ID | `eventId` on the `thread.auto_removed` message (== analysis run ID) |
+| SQS message ID | `MessageId` returned by `SendMessage`; visible in the publisher log line on success |
+| audit row ID | the `integration_audit_events` row created by the consumer for that `source_event_id` |
+
 Use the existing audit database/query tooling to locate the row by
 `source_event_id` or `thread_id`. Do not copy message bodies containing user
 data into tickets or commits.

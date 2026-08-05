@@ -11,6 +11,11 @@ import {
   THREAD_CREATED_EVENT_VERSION,
   type ThreadEventPublisher,
 } from "../application/thread-events.port";
+import {
+  AUTO_REMOVED_EVENT_TYPE,
+  AUTO_REMOVED_EVENT_VERSION,
+  type AutoRemovedEvent,
+} from "../../content-analysis/application/automated-removal.port";
 
 export interface SqsThreadEventPublisherOptions {
   readonly region: string;
@@ -65,6 +70,41 @@ export class SqsThreadEventPublisher implements ThreadEventPublisher {
           queueUrl: this.queueUrl,
         },
         "failed to publish thread.created event",
+      );
+    }
+  }
+
+  async publishAutoRemoved(event: AutoRemovedEvent): Promise<void> {
+    const command = new SendMessageCommand({
+      QueueUrl: this.queueUrl,
+      MessageBody: JSON.stringify(event),
+      MessageAttributes: {
+        eventType: { DataType: "String", StringValue: AUTO_REMOVED_EVENT_TYPE },
+        eventVersion: { DataType: "String", StringValue: String(AUTO_REMOVED_EVENT_VERSION) },
+      },
+    });
+
+    try {
+      const result = await this.client.send(command);
+      this.logger.info(
+        {
+          eventId: event.eventId,
+          threadId: event.threadId,
+          queueUrl: this.queueUrl,
+          messageId: result.MessageId,
+        },
+        "published thread.auto_removed event",
+      );
+    } catch (error) {
+      // A failed send must not fail an already-committed automatic removal.
+      this.logger.error(
+        {
+          err: error,
+          eventId: event.eventId,
+          threadId: event.threadId,
+          queueUrl: this.queueUrl,
+        },
+        "failed to publish thread.auto_removed event",
       );
     }
   }

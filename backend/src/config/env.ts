@@ -66,8 +66,14 @@ const environmentSchema = z
       .default("off"),
     CONTENT_ANALYSIS_LAMBDA_FUNCTION: z.string().trim().min(1).optional(),
     CONTENT_ANALYSIS_LAMBDA_QUALIFIER: z.string().trim().min(1).default("prod"),
-    CONTENT_ANALYSIS_POLICY_VERSION: z.string().trim().min(1).default("1"),
+    CONTENT_ANALYSIS_POLICY_VERSION: z.string().trim().min(1).default("2"),
     CONTENT_ANALYSIS_PROMPT_VERSION: z.string().trim().min(1).default("1"),
+    CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE: z
+      .coerce
+      .number()
+      .min(0)
+      .max(1)
+      .default(0.90),
     ANALYSIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(55_000),
     ANALYSIS_STALE_AFTER_MS: z.coerce.number().int().min(1).default(15 * 60 * 1000),
     ANALYSIS_RETRY_INTERVAL_MS: z.coerce.number().int().min(1).default(60_000),
@@ -179,6 +185,7 @@ export interface AppConfig {
   readonly contentAnalysisLambdaQualifier: string;
   readonly contentAnalysisPolicyVersion: string;
   readonly contentAnalysisPromptVersion: string;
+  readonly contentAnalysisAutoRemoveConfidence: number;
   readonly contentAnalysisTimeoutMs: number;
   readonly analysisStaleAfterMs: number;
   readonly analysisRetryIntervalMs: number;
@@ -222,6 +229,8 @@ export function loadConfig(
     contentAnalysisLambdaQualifier: result.data.CONTENT_ANALYSIS_LAMBDA_QUALIFIER,
     contentAnalysisPolicyVersion: result.data.CONTENT_ANALYSIS_POLICY_VERSION,
     contentAnalysisPromptVersion: result.data.CONTENT_ANALYSIS_PROMPT_VERSION,
+    contentAnalysisAutoRemoveConfidence:
+      result.data.CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE,
     contentAnalysisTimeoutMs: result.data.ANALYSIS_TIMEOUT_MS,
     analysisStaleAfterMs: result.data.ANALYSIS_STALE_AFTER_MS,
     analysisRetryIntervalMs: result.data.ANALYSIS_RETRY_INTERVAL_MS,

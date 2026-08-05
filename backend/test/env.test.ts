@@ -49,4 +49,34 @@ describe("environment configuration", () => {
       "must be a valid PostgreSQL connection URL",
     );
   });
+
+  it("defaults content-analysis auto-remove confidence to 0.90", () => {
+    expect(loadConfig({ DATABASE_URL: databaseUrl }).contentAnalysisAutoRemoveConfidence).toBe(
+      0.9,
+    );
+  });
+
+  it("parses an explicit auto-remove confidence", () => {
+    expect(
+      loadConfig({
+        DATABASE_URL: databaseUrl,
+        CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE: "0.85",
+      }).contentAnalysisAutoRemoveConfidence,
+    ).toBe(0.85);
+  });
+
+  it("rejects auto-remove confidence below 0 or above 1", () => {
+    expect(() =>
+      loadConfig({
+        DATABASE_URL: databaseUrl,
+        CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE: "-0.1",
+      }),
+    ).toThrow();
+    expect(() =>
+      loadConfig({
+        DATABASE_URL: databaseUrl,
+        CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE: "1.1",
+      }),
+    ).toThrow();
+  });
 });

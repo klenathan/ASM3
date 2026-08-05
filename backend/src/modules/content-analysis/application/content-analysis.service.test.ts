@@ -18,7 +18,12 @@ import type {
 import type {
   ThreadAnalysisContext,
   ThreadAnalysisContextPort,
+  ThreadAnalysisSnapshot,
 } from "./thread-analysis-context.port";
+import type {
+  AutomatedRemovalPort,
+  RemoveThreadIfPublishedInput,
+} from "./automated-removal.port";
 import type { ContentAnalysisRun } from "../domain/content-analysis";
 import type { ContentAnalysisOverride } from "../domain/content-analysis";
 
@@ -30,6 +35,7 @@ const context: ThreadAnalysisContext = {
   threadId: "t1",
   title: "Title",
   body: "Body",
+  status: "published",
   globalPolicy: "policy",
   societyRules: [],
   images: [],
@@ -50,6 +56,54 @@ function successInvocation(): AnalysisInvocationResult {
     providerRequestId: null,
   };
 }
+
+/** Builds a review invocation with high-severity, high-confidence findings. */
+function reviewInvocation(
+  findings: Array<{
+    category: string;
+    severity: "low" | "medium" | "high";
+    confidence: number;
+    source: "title" | "body" | "image" | "comment";
+    sourceId?: string;
+    evidence?: string;
+  }> = [
+    {
+      category: "harassment",
+      severity: "high",
+      confidence: 0.98,
+      source: "body",
+      evidence: "evidence",
+    },
+  ],
+): AnalysisInvocationResult {
+  return {
+    result: {
+      decision: "review",
+      sentiment: { label: "negative", confidence: 0.8 },
+      findings: findings.map((f) => ({ ...f, evidence: f.evidence ?? f.category })),
+      summary: "flagged",
+      rationale: "high confidence violation",
+    },
+    modelId: "deepseek/test",
+    lambdaFunctionVersion: "42",
+    lambdaRequestId: "req-1",
+    providerRequestId: null,
+  };
+}
+
+const publishedSnapshot = {
+  threadId: "t1",
+  societyId: "s1",
+  authorId: "u1",
+  status: "published" as const,
+};
+
+const removedSnapshot = {
+  threadId: "t1",
+  societyId: "s1",
+  authorId: "u1",
+  status: "removed" as const,
+};
 
 class StubRepository implements ContentAnalysisRepository {
   readonly created: ContentAnalysisRun[] = [];
@@ -127,6 +181,9 @@ function makeService(
     mode?: "off" | "shadow" | "enforce";
     analyzer?: ContentAnalyzerPort;
     contextPort?: ThreadAnalysisContextPort;
+    removalPort?: AutomatedRemovalPort;
+    threshold?: number;
+    loadThreadSnapshot?: (threadId: string) => Promise<ThreadAnalysisSnapshot>;
   } = {},
 ) {
   const repository = new StubRepository();
@@ -137,7 +194,10 @@ function makeService(
     };
   const threadContext: ThreadAnalysisContextPort =
     overrides.contextPort ??
-    { loadThreadContext: vi.fn(async () => context) };
+    {
+      loadThreadContext: vi.fn(async () => context),
+      loadThreadSnapshot: vi.fn(async () => publishedSnapshot),
+    };
   const service = new ContentAnalysisService({
     repository,
     analyzer,
@@ -147,6 +207,15 @@ function makeService(
     promptVersion: "1",
     logger,
     clock,
+    ...(overrides.threshold === undefined
+      ? {}
+      : { threshold: overrides.threshold }),
+    ...(overrides.removalPort === undefined
+      ? {}
+      : { removalPort: overrides.removalPort }),
+    ...(overrides.loadThreadSnapshot === undefined
+      ? {}
+      : { loadThreadSnapshot: overrides.loadThreadSnapshot }),
   });
   return { service, repository };
 }
@@ -204,6 +273,7 @@ describe("ContentAnalysisService.analyzeNewThread", () => {
         error.code = "NOT_FOUND";
         throw error;
       }),
+      loadThreadSnapshot: vi.fn(async () => publishedSnapshot),
     };
     const { service, repository } = makeService({ contextPort });
 
@@ -382,5 +452,183 @@ describe("ContentAnalysisService.overrideThread", () => {
     await service.overrideThread("t1", "reject", "admin-1", "   ");
 
     expect(repository.overrides[0]!.reason).toBeNull();
+  });
+});
+
+describe("ContentAnalysisService auto-removal enforcement", () => {
+  function removalPort(
+    outcome: "removed" | "already_inactive" = "removed",
+    fn?: (input: RemoveThreadIfPublishedInput) => void,
+  ) {
+    const call = vi.fn(async (input: RemoveThreadIfPublishedInput) => {
+      fn?.(input);
+      return outcome;
+    });
+    const port: AutomatedRemovalPort = { removeThreadIfPublished: call };
+    return { port, call };
+  }
+
+  it("enforce removes a matching published thread via the removal port", async () => {
+    let captured: RemoveThreadIfPublishedInput | undefined;
+    const { port, call } = removalPort("removed", (input) => {
+      captured = input;
+    });
+    const { service, repository } = makeService({
+      mode: "enforce",
+      analyzer: { analyze: vi.fn(async () => reviewInvocation()) },
+      removalPort: port,
+    });
+
+    const result = await service.analyzeNewThread("t1");
+
+    expect(result?.decision).toBe("review");
+    expect(repository.succeeded).toHaveLength(1);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(captured).toMatchObject({
+      threadId: "t1",
+      societyId: "s1",
+      authorId: "u1",
+      reasonCode: "high_severity_high_confidence",
+      threshold: 0.9,
+      promptVersion: "1",
+      policyVersion: "1",
+      modelId: "deepseek/test",
+    });
+    expect(captured?.finding).toMatchObject({
+      category: "harassment",
+      severity: "high",
+      confidence: 0.98,
+      source: "body",
+    });
+    // The run remains succeeded — enforcement did not alter it.
+    expect(repository.failed).toHaveLength(0);
+  });
+
+  it("does nothing when the snapshot status is not published (port not called)", async () => {
+    const { port, call } = removalPort("removed");
+    const { service, repository } = makeService({
+      mode: "enforce",
+      analyzer: { analyze: vi.fn(async () => reviewInvocation()) },
+      removalPort: port,
+      loadThreadSnapshot: vi.fn(async () => removedSnapshot),
+    });
+
+    const result = await service.analyzeNewThread("t1");
+    expect(result?.decision).toBe("review");
+    expect(repository.succeeded).toHaveLength(1);
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when shouldAutoRemove is false (allow / low confidence)", async () => {
+    // allow decision — never auto-removes.
+    const allow = removalPort("removed");
+    {
+      const { service, repository } = makeService({
+        mode: "enforce",
+        analyzer: { analyze: vi.fn(async () => successInvocation()) },
+        removalPort: allow.port,
+      });
+      await service.analyzeNewThread("t1");
+      expect(repository.succeeded).toHaveLength(1);
+      expect(allow.call).not.toHaveBeenCalled();
+    }
+
+    // review but only low-confidence finding — no auto-removal.
+    const lowConf = removalPort("removed");
+    {
+      const { service } = makeService({
+        mode: "enforce",
+        analyzer: {
+          analyze: vi.fn(async () =>
+            reviewInvocation([
+              { category: "harassment", severity: "high", confidence: 0.5, source: "body" },
+            ]),
+          ),
+        },
+        removalPort: lowConf.port,
+      });
+      await service.analyzeNewThread("t1");
+      expect(lowConf.call).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does nothing for non-matching review findings left in the moderation queue", async () => {
+    const { port, call } = removalPort("removed");
+    const { service } = makeService({
+      mode: "enforce",
+      analyzer: {
+        analyze: vi.fn(async () =>
+          reviewInvocation([
+            { category: "spam", severity: "medium", confidence: 0.95, source: "title" },
+          ]),
+        ),
+      },
+      removalPort: port,
+    });
+    await service.analyzeNewThread("t1");
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("mode shadow and off do nothing even with matching findings", async () => {
+    for (const mode of ["shadow", "off"] as const) {
+      const { port, call } = removalPort("removed");
+      const { service, repository } = makeService({
+        mode,
+        analyzer: { analyze: vi.fn(async () => reviewInvocation()) },
+        removalPort: port,
+      });
+      await service.analyzeNewThread("t1");
+      expect(call).not.toHaveBeenCalled();
+      if (mode === "off") {
+        expect(repository.succeeded).toHaveLength(0);
+      } else {
+        // shadow persists but never removes.
+        expect(repository.succeeded).toHaveLength(1);
+      }
+    }
+  });
+
+  it("skips enforcement (with a warning) when no removal port is wired", async () => {
+    const { service, repository } = makeService({
+      mode: "enforce",
+      analyzer: { analyze: vi.fn(async () => reviewInvocation()) },
+    });
+    const result = await service.analyzeNewThread("t1");
+    expect(result?.decision).toBe("review");
+    expect(repository.succeeded).toHaveLength(1);
+    expect(repository.failed).toHaveLength(0);
+  });
+
+  it("catches an enforcement error and does not fail the run", async () => {
+    const port: AutomatedRemovalPort = {
+      removeThreadIfPublished: vi.fn(async () => {
+        throw new Error("removal boom");
+      }),
+    };
+    const { service, repository } = makeService({
+      mode: "enforce",
+      analyzer: { analyze: vi.fn(async () => reviewInvocation()) },
+      removalPort: port,
+    });
+
+    const result = await service.analyzeNewThread("t1");
+    expect(result?.decision).toBe("review");
+    expect(repository.succeeded).toHaveLength(1);
+    expect(repository.failed).toHaveLength(0);
+  });
+
+  it("does nothing when the removal port returns already_inactive", async () => {
+    const { port, call } = removalPort("already_inactive");
+    const { service, repository } = makeService({
+      mode: "enforce",
+      analyzer: { analyze: vi.fn(async () => reviewInvocation()) },
+      removalPort: port,
+    });
+
+    const result = await service.analyzeNewThread("t1");
+    expect(result?.decision).toBe("review");
+    expect(repository.succeeded).toHaveLength(1);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(repository.failed).toHaveLength(0);
   });
 });

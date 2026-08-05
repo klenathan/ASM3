@@ -1,9 +1,59 @@
 # Automatic Thread Removal Backlog
 
-Status: proposed implementation backlog  
+Status: **implemented (P0 + P1 + P2 complete; see "Implementation status" below)**  
 Owner: backend/content-analysis team  
 Primary scope: `backend/`, `infras/`, and focused frontend regression work  
 Related systems: content analysis, discussions, audit events, SQS reanalysis
+
+## 0. Implementation status
+
+The following backlog items are **implemented** and covered by passing unit
+tests, `pnpm typecheck`, `pnpm lint`, and `pnpm build` from `backend/`:
+
+- **ATR-001** — automatic-removal predicate (`shouldAutoRemove`,
+  `DEFAULT_AUTO_REMOVE_THRESHOLD = 0.90`).
+- **ATR-002** — configurable `CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE`
+  (default 0.90, range `[0,1]`), wired through env, env examples, and
+  OpenTofu.
+- **ATR-003** — policy version bumped to `v2` (local default + infra) and
+  persisted on each run for traceability.
+- **ATR-004** — analysis context carries thread `status` + a minimal
+  `ThreadAnalysisSnapshot` (threadId/societyId/authorId/status).
+- **ATR-005** — framework-neutral `AutomatedRemovalPort` +
+  `DiscussionsAutomatedRemovalAdapter`, plus `NoopAutomatedRemoval`.
+- **ATR-006** — atomic `removePublishedThreadIfActive(threadId, updatedAt)`
+  in the Discussions repository with a `WHERE status = 'published'` guard.
+- **ATR-007** — enforcement in `ContentAnalysisService` after successful
+  persistence (enforce-mode only, isolated from run failure, atomic port as
+  final authority).
+- **ATR-008** — `thread.auto_removed` event v1 contract
+  (`docs/automatic-thread-removal/EVENT_CONTRACT.md`).
+- **ATR-009** — SQS publisher `publishAutoRemoved`, no-op local publisher,
+  delivery behavior documented (direct send, no producer retry, known-loss
+  risk; transactional outbox deferred in ATR-011).
+- **ATR-010** — audit consumer dispatches + validates + persists
+  `thread.auto_removed` with idempotency on `source_event_id`.
+- **ATR-011** — delivery-durability decision documented in EVENT_CONTRACT
+  §6 and `docs/content-analysis/SQS_THREAD_AUDIT_GUIDE.md`.
+- **ATR-012** — existing Accept route restores `removed -> published`
+  (verified; no new restore route added).
+- **ATR-014** — threshold wired through OpenTofu; `tofu validate` passes; no
+  new AWS service/IAM introduced.
+- **ATR-015** — ROLLOUT_RUNBOOK + TEST_PLAN document the five evidence
+  identifiers (thread ID, run ID, event ID, SQS message ID, audit row),
+  gates, queue checks, restore verification, rollback, and Learner Lab
+  teardown.
+- **ATR-013** — frontend "Automatically hidden" presentation for privileged,
+  retained auto-removed threads: `isAutoRemoved`/threshold predicate in
+  `web/src/features/analysis/auto-removal.ts` (+ tests), an `autoRemoved` prop
+  on `AnalysisBadge` (+ tests), and wiring on `ThreadPage` so system admins /
+  society moderators see the indicator when a `removed` thread's latest
+  analysis matches the auto-removal predicate. Covered by `pnpm typecheck`,
+  `pnpm lint`, `pnpm build`, and `pnpm vitest run` from `web/`.
+
+Not yet done:
+
+- (none — all backlog items complete)
 
 ## 1. Product contract
 
@@ -400,27 +450,47 @@ Acceptance criteria:
 - A plain member cannot restore it.
 - The restore path does not delete or rewrite the automatic audit event.
 
-### ATR-013 - Add optional automatic-removal presentation
+### ATR-013 - Optional automatic-removal presentation
 
+**Status: implemented (P2)**  
 Priority: P2  
 Dependencies: ATR-012  
 Target files:
 
-- `web/src/features/analysis/`
-- `web/src/features/discussions/analysis-badge.tsx`
-- relevant page/component tests
+- `web/src/features/analysis/auto-removal.ts` (+ `auto-removal.test.ts`)
+- `web/src/features/discussions/analysis-badge.tsx` (+ `analysis-badge.test.tsx`)
+- `web/src/pages/thread/ThreadPage.tsx`
 
-Tasks:
+Tasks (completed):
 
-- Consider displaying an `Automatically hidden` indicator when a retained
-  thread has a matching analysis result and status `removed`.
-- Keep ordinary `review` and manually removed states distinguishable only if
-  the API provides authoritative data.
-- Do not expose sensitive audit rationale or raw model content to students.
+- Added `isAutoRemoved` + `AUTO_REMOVE_CONFIDENCE_THRESHOLD` as a pure,
+  framework-free predicate in the analysis feature, aligned with the backend
+  `shouldAutoRemove` (review decision + at least one `high`-severity finding at
+  or above `0.90`).
+- Added an `autoRemoved` prop to `AnalysisBadge` rendering a red
+  `Automatically hidden` state that overrides the ordinary review badge.
+- Wired it on `ThreadPage` for system admins / society moderators: the
+  indicator appears only when the viewer is privileged, the thread status is
+  `removed`, and the latest analysis matches the auto-removal predicate.
+- Added focused unit tests for both the predicate and the badge.
+
+Considerations honored:
+
+- The API exposes no per-thread "auto_removed" flag; automatic removal is a
+  plain `removed` status. So the presentation only claims "Automatically
+  hidden" where the API provides authoritative data (full findings, available
+  only to privileged viewers via `fetchThreadAnalysis`). Ordinary `review` and
+  manually-removed states stay distinguishable (plain `review` badge).
+- No sensitive audit rationale or raw model content is exposed to students;
+  the badge is only surfaced to retained, privileged readers alongside the
+  existing analysis UI.
 
 Acceptance criteria:
 
-- This task is optional and does not block backend release.
+- A retained (privileged-reader-visible) thread with status `removed` and a
+  matching analysis result shows `Automatically hidden`.
+- Ordinary `review` states still render `Flagged for review`.
+- No backend changes were needed; the indicator is additive and optional.
 
 ## 7. Epic E: Infrastructure and documentation
 

@@ -163,6 +163,154 @@ describe("AuditEventConsumer", () => {
     await expect(loop).resolves.toBeUndefined();
   });
 
+  // -------------------------------------------------------------------------
+  // thread.auto_removed (ATR-010)
+  // -------------------------------------------------------------------------
+
+  const validAutoRemovedBody = JSON.stringify({
+    eventId: "99999999-9999-4999-8999-999999999999",
+    eventType: "thread.auto_removed",
+    version: 1,
+    threadId: "11111111-1111-4111-8111-111111111111",
+    societyId: "22222222-2222-4222-8222-222222222222",
+    authorId: "33333333-3333-4333-8333-333333333333",
+    analysisRunId: "99999999-9999-4999-8999-999999999999",
+    reasonCode: "high_severity_high_confidence",
+    threshold: 0.9,
+    finding: {
+      category: "harassment",
+      severity: "high",
+      confidence: 0.97,
+      source: "body",
+      sourceId: "src-1",
+    },
+    modelId: "deepseek/test",
+    promptVersion: "prompt-1",
+    policyVersion: "v2",
+    occurredAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("records and acknowledges a valid thread.auto_removed message", async () => {
+    const { source, acknowledged } = batchSource([
+      { receiptHandle: "auto-1", body: validAutoRemovedBody },
+    ]);
+    const repository = makeRepository();
+    const consumer = new AuditEventConsumer({
+      source,
+      repository,
+      logger: makeLogger() as unknown as Logger,
+    });
+    const loop = consumer.start();
+
+    await vi.waitFor(() => {
+      expect(repository.record).toHaveBeenCalledTimes(1);
+    });
+    const input = vi.mocked(repository.record).mock.calls[0]?.[0];
+    expect(input?.eventType).toBe("thread.auto_removed");
+    expect(input?.sourceEventId).toBe("99999999-9999-4999-8999-999999999999");
+    expect(input?.title).toBeNull();
+
+    await vi.waitFor(() => {
+      expect(acknowledged).toContain("auto-1");
+    });
+
+    await consumer.stop();
+    await expect(loop).resolves.toBeUndefined();
+  });
+
+  it("treats a duplicate thread.auto_removed source id as success and acknowledges", async () => {
+    const { source, acknowledged } = batchSource([
+      { receiptHandle: "auto-dup", body: validAutoRemovedBody },
+    ]);
+    const repository = {
+      record: vi.fn(async () => "duplicate"),
+    } as unknown as AuditEventRepository;
+    const consumer = new AuditEventConsumer({
+      source,
+      repository,
+      logger: makeLogger() as unknown as Logger,
+    });
+    const loop = consumer.start();
+
+    await vi.waitFor(() => {
+      expect(acknowledged).toContain("auto-dup");
+    });
+
+    await consumer.stop();
+    await expect(loop).resolves.toBeUndefined();
+  });
+
+  it("does not acknowledge an invalid thread.auto_removed message (unknown reason code)", async () => {
+    const { source, acknowledged } = batchSource([
+      {
+        receiptHandle: "auto-bad",
+        body: JSON.stringify({ ...JSON.parse(validAutoRemovedBody), reasonCode: "bogus" }),
+      },
+    ]);
+    const repository = makeRepository();
+    const consumer = new AuditEventConsumer({
+      source,
+      repository,
+      logger: makeLogger() as unknown as Logger,
+    });
+    const loop = consumer.start();
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(repository.record).not.toHaveBeenCalled();
+    expect(acknowledged).not.toContain("auto-bad");
+
+    await consumer.stop();
+    await expect(loop).resolves.toBeUndefined();
+  });
+
+  it("does not acknowledge a thread.auto_removed message with confidence below threshold", async () => {
+    const { source, acknowledged } = batchSource([
+      {
+        receiptHandle: "auto-low",
+        body: JSON.stringify(
+          { ...JSON.parse(validAutoRemovedBody), finding: { ...JSON.parse(validAutoRemovedBody).finding, confidence: 0.5 } },
+        ),
+      },
+    ]);
+    const repository = makeRepository();
+    const consumer = new AuditEventConsumer({
+      source,
+      repository,
+      logger: makeLogger() as unknown as Logger,
+    });
+    const loop = consumer.start();
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(repository.record).not.toHaveBeenCalled();
+    expect(acknowledged).not.toContain("auto-low");
+
+    await consumer.stop();
+    await expect(loop).resolves.toBeUndefined();
+  });
+
+  it("does not acknowledge an unknown event type", async () => {
+    const { source, acknowledged } = batchSource([
+      {
+        receiptHandle: "auto-unknown-type",
+        body: JSON.stringify({ ...JSON.parse(validAutoRemovedBody), eventType: "thread.bogus" }),
+      },
+    ]);
+    const repository = makeRepository();
+    const consumer = new AuditEventConsumer({
+      source,
+      repository,
+      logger: makeLogger() as unknown as Logger,
+    });
+    const loop = consumer.start();
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(repository.record).not.toHaveBeenCalled();
+    expect(acknowledged).not.toContain("auto-unknown-type");
+
+    await consumer.stop();
+    await expect(loop).resolves.toBeUndefined();
+  });
+
   it("stops polling when stop is called", async () => {
     const { source, aborted } = blockingSource();
     const consumer = new AuditEventConsumer({

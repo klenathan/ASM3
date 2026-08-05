@@ -2,7 +2,7 @@ import { HomeFeed } from "../../features/feed/home-feed";
 
 export function ForumPage() {
   return (
-    <main className="px-5 sm:px-8 lg:px-10 w-full">
+    <main className="px-5 sm:px-8 lg:px-10 max-w-7xl w-full">
       <section aria-labelledby="forum-title">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-foreground pb-4">
           <h1

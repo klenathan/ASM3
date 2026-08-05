@@ -17,6 +17,7 @@ import { useAuth } from "../../features/auth/auth-context";
 import { CommentComposer } from "../../features/discussions/comment-composer";
 import { ThreadAnalysisCard } from "../../features/analysis/thread-analysis-card";
 import { useThreadAnalysis } from "../../features/analysis/use-thread-analysis";
+import { isAutoRemoved } from "../../features/analysis/auto-removal";
 import { AnalysisBadge } from "../../features/discussions/analysis-badge";
 import {
   CommentTree,
@@ -62,6 +63,16 @@ export function ThreadPage() {
   const isMember = membershipQuery.data?.status === "active";
   const comments =
     commentsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+
+  // Only privileged viewers receive the full findings (decision + severity +
+  // confidence) that can authoritatively prove an auto-removal; combined with
+  // the removable thread status, that is what lets us show "Automatically
+  // hidden". Non-privileged viewers keep the plain review badge.
+  const analysis = analysisQuery.data;
+  const autoRemoved =
+    isPrivileged &&
+    thread?.status === "removed" &&
+    isAutoRemoved(analysis);
 
   if (threadQuery.status === "pending" || societyQuery.status === "pending") {
     return (
@@ -151,8 +162,12 @@ export function ThreadPage() {
                     <h1 className="text-balance font-heading text-[clamp(1rem,2vw,3rem)] leading-[0.93] font-semibold tracking-[-0.02em] uppercase">
                       {thread.title}
                     </h1>
+                    {/* analysisDecision is intentionally public; the autoRemoved
+                        variant (privileged-only) is gated above to never leak the
+                        "Automatically hidden" state to ordinary viewers. */}
                     <AnalysisBadge
                       decision={thread.analysisDecision}
+                      autoRemoved={autoRemoved}
                       className="h-6 px-2.5"
                     />
                   </div>

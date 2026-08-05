@@ -91,6 +91,7 @@ describe("discussion services", () => {
       publishThreadCreated: async (thread) => {
         publishedThreads.push(thread);
       },
+      publishAutoRemoved: async () => undefined,
     };
     const service = createThreadService(repository, undefined, publisher);
 
@@ -108,6 +109,7 @@ describe("discussion services", () => {
       publishThreadCreated: async () => {
         published += 1;
       },
+      publishAutoRemoved: async () => undefined,
     });
 
     await expect(
@@ -218,7 +220,10 @@ describe("discussion services", () => {
 function createThreadService(
   repository: FakeDiscussionRepository,
   media: ThreadMediaPort = readyMedia,
-  events: ThreadEventPublisher = { publishThreadCreated: async () => undefined },
+  events: ThreadEventPublisher = {
+    publishThreadCreated: async () => undefined,
+    publishAutoRemoved: async () => undefined,
+  },
 ): ThreadService {
   return new ThreadService({
     repository,
@@ -365,6 +370,14 @@ class FakeDiscussionRepository implements DiscussionRepository {
     const current = await this.findThread(threadId);
     if (current === null) return null;
     const updated: ThreadRecord = { ...current, status, updatedAt };
+    this.threads.set(threadId, updated);
+    return updated;
+  }
+
+  async removePublishedThreadIfActive(threadId: string, updatedAt: Date): Promise<ThreadRecord | null> {
+    const current = await this.findThread(threadId);
+    if (current === null || current.status !== "published") return null;
+    const updated: ThreadRecord = { ...current, status: "removed", updatedAt };
     this.threads.set(threadId, updated);
     return updated;
   }
@@ -592,7 +605,10 @@ describe("ThreadService.getThreadAnalysis", () => {
       clock,
       profile: fakeProfile,
       media: readyMedia,
-      events: { publishThreadCreated: async () => undefined },
+      events: {
+        publishThreadCreated: async () => undefined,
+        publishAutoRemoved: async () => undefined,
+      },
       membershipRepository: new FakeMembershipRepository(),
       societyRepository: new FakeSocietyRepository(),
       threadAnalysisReader: reader,
@@ -672,7 +688,10 @@ describe("ThreadService.moderateAnalysis", () => {
       clock,
       profile: fakeProfile,
       media: readyMedia,
-      events: { publishThreadCreated: async () => undefined },
+      events: {
+        publishThreadCreated: async () => undefined,
+        publishAutoRemoved: async () => undefined,
+      },
       membershipRepository: new FakeMembershipRepository(),
       societyRepository: new FakeSocietyRepository(),
       analysisModeration: {

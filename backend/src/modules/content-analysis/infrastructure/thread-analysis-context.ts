@@ -3,6 +3,7 @@ import { ApplicationError } from "../../../shared/domain/errors";
 import type {
   ThreadAnalysisContext,
   ThreadAnalysisContextPort,
+  ThreadAnalysisSnapshot,
 } from "../application/thread-analysis-context.port";
 
 /**
@@ -12,8 +13,10 @@ import type {
  */
 export interface ThreadAnalysisContextThread {
   readonly societyId: string;
+  readonly authorId: string;
   readonly title: string;
   readonly body: string | null;
+  readonly status: "published" | "removed" | "deleted";
 }
 
 export interface ThreadAnalysisContextAsset {
@@ -86,6 +89,7 @@ export class ThreadAnalysisContextAdapter implements ThreadAnalysisContextPort {
       threadId,
       title: thread.title,
       body: thread.body ?? "",
+      status: thread.status,
       globalPolicy,
       societyRules: ruleRecords.map((rule) => ({
         id: rule.id,
@@ -93,6 +97,19 @@ export class ThreadAnalysisContextAdapter implements ThreadAnalysisContextPort {
         description: rule.description,
       })),
       images,
+    };
+  }
+
+  async loadThreadSnapshot(threadId: string): Promise<ThreadAnalysisSnapshot> {
+    const thread = await this.deps.findThread(threadId);
+    if (thread === null) {
+      throw new ApplicationError("NOT_FOUND", "The thread was not found");
+    }
+    return {
+      threadId,
+      societyId: thread.societyId,
+      authorId: thread.authorId,
+      status: thread.status,
     };
   }
 }

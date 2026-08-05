@@ -31,6 +31,7 @@ export type {
 export type {
   ThreadAnalysisContextPort,
   ThreadAnalysisContext,
+  ThreadAnalysisSnapshot,
 } from "./application/thread-analysis-context.port";
 
 export type {
@@ -78,3 +79,21 @@ export {
   SqsReanalysisMessageSource,
   type SqsReanalysisQueueOptions,
 } from "./infrastructure/reanalysis.sqs";
+
+export {
+  AUTO_REMOVE_REASON_CODE,
+  AUTO_REMOVED_EVENT_TYPE,
+  AUTO_REMOVED_EVENT_VERSION,
+  buildAutoRemovedEvent,
+  NoopAutomatedRemoval,
+  type AutoRemovalResult,
+  type AutoRemovalFinding,
+  type AutomatedRemovalPort,
+  type AutoRemovedEvent,
+  type RemoveThreadIfPublishedInput,
+} from "./application/automated-removal.port";
+
+export {
+  DiscussionsAutomatedRemovalAdapter,
+  type DiscussionsAutomatedRemovalAdapterDeps,
+} from "./infrastructure/automated-removal.adapter";

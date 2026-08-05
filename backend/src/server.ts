@@ -21,6 +21,7 @@ import { NoopThreadEventPublisher } from "./modules/discussions/application/thre
 import { SqsThreadEventPublisher } from "./modules/discussions/infrastructure/thread-events.sqs.publisher";
 import {
   ContentAnalysisService,
+  DiscussionsAutomatedRemovalAdapter,
   DrizzleContentAnalysisRepository,
   LambdaContentAnalyzer,
   ReanalysisWorker,
@@ -151,35 +152,52 @@ async function main(): Promise<void> {
           logger,
         })
       : undefined;
+  const contentAnalysisContext = new ThreadAnalysisContextAdapter({
+    findThread: (threadId) => discussions.repository.findThread(threadId),
+    listThreadMedia: (threadId) => discussions.repository.listThreadMedia(threadId),
+    findMediaAssets: async (mediaIds) => {
+      const assets = await media.repository.findAssets(mediaIds);
+      return assets
+        .filter(
+          (asset) => asset.status === "ready" && asset.purpose === "thread_attachment",
+        )
+        .map((asset) => ({
+          id: asset.id,
+          objectKey: asset.objectKey,
+          contentType: asset.contentType,
+          byteSize: asset.byteSize,
+        }));
+    },
+    listSocietyRules: (societyId) => societies.societyRepository.listRules(societyId),
+    readGlobalPolicy: async () =>
+      (await configReader("community_policy")) ?? DEFAULT_GLOBAL_POLICY,
+    mediaBucket: config.mediaBucket ?? "",
+    maxImages: config.analysisMaxImages,
+    clock: systemClock,
+  });
   contentAnalysisService = new ContentAnalysisService({
     repository: contentAnalysisRepository,
     ...(contentAnalyzer !== undefined ? { analyzer: contentAnalyzer } : {}),
-    threadContext: new ThreadAnalysisContextAdapter({
-      findThread: (threadId) => discussions.repository.findThread(threadId),
-      listThreadMedia: (threadId) => discussions.repository.listThreadMedia(threadId),
-      findMediaAssets: async (mediaIds) => {
-        const assets = await media.repository.findAssets(mediaIds);
-        return assets
-          .filter(
-            (asset) => asset.status === "ready" && asset.purpose === "thread_attachment",
-          )
-          .map((asset) => ({
-            id: asset.id,
-            objectKey: asset.objectKey,
-            contentType: asset.contentType,
-            byteSize: asset.byteSize,
-          }));
-      },
-      listSocietyRules: (societyId) => societies.societyRepository.listRules(societyId),
-      readGlobalPolicy: async () =>
-        (await configReader("community_policy")) ?? DEFAULT_GLOBAL_POLICY,
-      mediaBucket: config.mediaBucket ?? "",
-      maxImages: config.analysisMaxImages,
-      clock: systemClock,
-    }),
+    threadContext: contentAnalysisContext,
     mode: config.contentAnalysisMode,
     policyVersion: config.contentAnalysisPolicyVersion,
     promptVersion: config.contentAnalysisPromptVersion,
+    threshold: config.contentAnalysisAutoRemoveConfidence,
+    // Auto-removal enforcement (ATR-005/006/007): only active in enforce mode.
+    // The removal port's atomic check is the final authority; when no removal
+    // port is wired (e.g. analysis not configured) enforcement is skipped.
+    removalPort: new DiscussionsAutomatedRemovalAdapter({
+      removeThreadIfPublished: (input) => {
+        const thread = discussions.repository
+          .removePublishedThreadIfActive(input.threadId, new Date(input.occurredAtEpochMs));
+        return thread.then(
+          (updated) => (updated === null ? "already_inactive" : "removed"),
+        );
+      },
+      publishAutoRemoved: (event) => threadEventPublisher.publishAutoRemoved(event),
+    }),
+    loadThreadSnapshot: (threadId) =>
+      contentAnalysisContext.loadThreadSnapshot(threadId),
     logger,
     clock: systemClock,
   });
