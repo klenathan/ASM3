@@ -1,9 +1,8 @@
 # ---------------------------------------------------------------------------
-# Glue + Athena analytics contract (ticket #9)
+# Glue + Athena analytics data plane.
 #
-# The legacy EMR/Lambda resources remain in analytics.tf until ticket #8's
-# cutover. These resources are the new data plane used by the ECS orchestrator:
-# Glue materializes a snapshot, and Athena queries the cataloged Parquet data.
+# Glue materializes a consistent PostgreSQL snapshot and Athena queries the
+# cataloged Parquet data. Both are started and reconciled by the ECS backend.
 # ---------------------------------------------------------------------------
 
 variable "analytics_glue_script_path" {

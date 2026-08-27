@@ -26,17 +26,9 @@ force_destroy_buckets = false
 # content_analysis_auto_remove_confidence = 0.90
 
 # ---- Analytics Glue + Athena pipeline (gated) -------------------------------
-# Enable the Glue + Athena analytics pipeline (Analytics AWS category).
-# The old EMR/Lambda resources remain declared until the ticket #8 cutover;
-# this flag also provisions the new catalog and Glue export job.
-# Until that cutover, build the legacy Lambda artifacts as well:
-# (cd backend && pnpm build:analytics)
-# No Lambda build is needed for the Glue/Athena path.
+# Enable the gated Glue + Athena analytics pipeline (Analytics AWS category).
+# No analytics Lambda build is needed.
 #   enable_analytics_pipeline = true
-#   enable_legacy_analytics_schedule = false
-#   analytics_dump_rds_zip         = "../backend/dist-function/analytics-dump-rds.zip"
-#   analytics_start_serverless_zip = "../backend/dist-function/analytics-start-serverless.zip"
-#   analytics_load_results_zip     = "../backend/dist-function/analytics-load-results.zip"
 # Nightly refresh orchestration (Lambda-free): set the Glue job name that the
 # backend orchestrator should start; EventBridge Scheduler + API destination
 # then hit POST /api/v1/admin/analytics/scheduled-refresh with a generated

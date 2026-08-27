@@ -141,53 +141,54 @@ Keep the Lambda outside the VPC so it has outbound HTTPS access without a NAT
 Gateway. The active Learner Lab `LabRole` must allow the function to read the
 secret, read approved S3 media, and write CloudWatch logs.
 
-### Analytics — EMR Serverless (cost-optimized)
+### Analytics — Glue + Athena (gated)
 
 The analytics pipeline is the **Analytics-category AWS service** required by
 Assessment 3. It is fully gated by `enable_analytics_pipeline` (default
 `false`, costs nothing when disabled).
 
-**Why EMR Serverless vs classic EMR:** Classic EMR provisions 2× m5.large
-(4 vCPU) for ~5 minutes nightly plus cluster spin-up time and EMR markup,
-even though the PySpark job (`compute_metrics.py` reading 6 JSONL dumps from
-S3) runs for only a few minutes. Learner Lab caps at 32 vCPU / 9 instances,
-so the 4 vCPU reservation is expensive. EMR Serverless bills only for
-vCPU/memory seconds while the Spark job runs, reuses the same
-`POST /api/v1/admin/analytics/refresh` (system_admin, 202 Accepted) trigger,
-and auto-stops after 15 minutes idle — no EC2 subnet, key, or
-TerminateJobFlows complexity.
+The final path preserves the administrator API and dashboard metrics:
 
-**Chain (automatic, no manual polling):**
-`POST /api/v1/admin/analytics/refresh` → async invoke `analytics-dump-rds`
-Lambda (VPC, RDS → S3 `analytics/staging/<ts>/_SUCCESS`) → S3 event
-triggers `analytics-start-serverless` Lambda
-(`StartJobRunCommand` with `s3://analytics/pyspark/compute_metrics.py`,
-args `--staging-bucket/--staging-path/--output-bucket/--output-path`,
-`sparkSubmitParameters` driver 1 vCPU/3GB + executor 2 vCPU/4GB ×1,
-`logUri` `s3://analytics/emr-serverless-logs`,
-poll `GetJobRun` every 30s, 900s timeout, `CancelJobRun` on timeout)
-→ Spark reads `s3://` (not `s3a://`) and writes
-`coalesce(1).json` to `s3://analytics/output/<ts>/metrics.jsonl` →
-S3 `_SUCCESS` triggers `analytics-load-results` Lambda (VPC) →
-upserts on `(metric_type, society_id, period_start)` into
-`analytics_metrics`. EventBridge `cron(0 2 * * ? *)` also triggers the dump
-nightly. Infras manages `aws_emrserverless_application` (`emr-7.2.0`, SPARK,
-max 3 vCPU/7GB, auto-stop 15m) plus 3 Lambdas via OpenTofu; all reuse
-`LabRole`/`LabInstanceProfile`, CloudWatch logs retained 7 days. `FAILED`
-jobRuns surface as errors and do not trigger load-results. Destroy after demo
-(`tofu destroy`); `End Lab` does not stop Serverless apps.
+```text
+POST /api/v1/admin/analytics/refresh (system_admin, 202 Accepted)
+  -> ECS backend orchestrator
+  -> AWS Glue export job (one repeatable-read RDS snapshot)
+  -> private analytics S3 bucket (partitioned Parquet + manifest)
+  -> Athena queries (four metric groups)
+  -> analytics_metrics in RDS
+  -> GET /api/v1/admin/analytics
+```
 
-Build the artifacts before enabling:
+EventBridge Scheduler invokes the same backend orchestration through the
+authenticated `/api/v1/admin/analytics/scheduled-refresh` API destination at
+`cron(0 2 * * ? *)` UTC. The ECS reconciler polls Glue and Athena, retries
+transient phase failures, and persists results through the existing analytics
+repository. No analytics Lambda artifacts or resources are part of this path.
+
+OpenTofu manages the Glue connection/job, Glue Catalog database and tables,
+Athena workgroup, S3 lifecycle rules, scheduler, and the shared private S3
+bucket. All analytics resources are gated by `enable_analytics_pipeline` and
+reuse the pre-created `LabRole`; no IAM roles are created. Source snapshots
+and manifests expire after 30 days, Athena results after 7 days, and Glue
+temporary files after 1 day. Destroy after a demo (`tofu destroy`); `End Lab`
+does not stop RDS or remove retained S3 objects unless force destroy is set.
+
+No analytics build step is required. Deploy with:
 
 ```sh
-cd backend
-pnpm build:analytics
-cd ../infras
 tofu plan
 tofu apply
 ```
 
-Use `GET /api/v1/admin/analytics` to verify fresh metrics after a refresh.
+Use `GET /api/v1/admin/analytics` and the Admin Center Analytics tab to verify
+fresh metrics, Glue job completion, and Athena query history. Cutover requires
+the Glue snapshot and four Athena queries to pass the parity checks in
+`docs/analytics/ATHENA_GLUE_MIGRATION.md` before applying infrastructure
+changes that remove the previous deployment state. After cutover, rollback is
+explicit and manual: restore the pre-cutover revision and reapply it from Git;
+there is no deployed analytics fallback path. The shared S3 bucket is retained
+across the cutover so existing analytics data can be inspected or removed by
+the normal teardown process.
 
 ### Troubleshoot `voc-cancel-cred` upload failures
 
