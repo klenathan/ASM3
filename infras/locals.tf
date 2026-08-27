@@ -17,6 +17,7 @@ locals {
   content_analysis_function  = var.enable_content_analysis_lambda ? try(aws_lambda_function.content_analysis[0].function_name, "") : ""
   content_analysis_qualifier = var.enable_content_analysis_lambda ? try(aws_lambda_alias.content_analysis[0].name, "") : ""
   content_analysis_model_id  = var.enable_content_analysis_lambda ? var.content_analysis_openrouter_model : ""
+  analytics_dump_function = var.enable_analytics_pipeline ? try(aws_lambda_function.analytics_dump_rds[0].function_name, "") : ""
 }
 
 data "aws_caller_identity" "current" {}

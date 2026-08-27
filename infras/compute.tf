@@ -45,7 +45,6 @@ resource "aws_instance" "ecs" {
 
   root_block_device {
     volume_type = "gp3"
-    # The current ECS-optimized AMI snapshot has a 30 GiB root volume.
     volume_size           = 30
     encrypted             = true
     delete_on_termination = true
@@ -58,6 +57,32 @@ resource "aws_eip" "ecs" {
   domain   = "vpc"
   instance = aws_instance.ecs.id
   tags     = { Name = "${local.name}-ecs" }
+}
+
+locals {
+  backend_env_vars = concat([
+    { name = "NODE_ENV", value = "production" },
+    { name = "HOST", value = "0.0.0.0" },
+    { name = "PORT", value = "3000" },
+    { name = "WEB_ORIGIN", value = local.web_origin },
+    { name = "DATABASE_SSL", value = "true" },
+    { name = "DATABASE_POOL_MAX", value = "5" },
+    { name = "AWS_REGION", value = var.aws_region },
+    { name = "MEDIA_BUCKET", value = aws_s3_bucket.media.bucket },
+    { name = "THREAD_EVENTS_QUEUE_URL", value = aws_sqs_queue.thread_events.url },
+    { name = "CONTENT_ANALYSIS_QUEUE_URL", value = aws_sqs_queue.content_analysis_reanalysis.url },
+    { name = "CONTENT_ANALYSIS_MODE", value = var.enable_content_analysis_lambda ? var.content_analysis_mode : "off" },
+    { name = "CONTENT_ANALYSIS_LAMBDA_FUNCTION", value = local.content_analysis_function },
+    { name = "CONTENT_ANALYSIS_LAMBDA_QUALIFIER", value = local.content_analysis_qualifier },
+    { name = "CONTENT_ANALYSIS_LAMBDA_ARN", value = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.content_analysis_function}:${local.content_analysis_qualifier}" },
+    { name = "CONTENT_ANALYSIS_POLICY_VERSION", value = "v2" },
+    { name = "CONTENT_ANALYSIS_PROMPT_VERSION", value = "v1" },
+    { name = "CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE", value = tostring(var.content_analysis_auto_remove_confidence) },
+    { name = "CONTENT_ANALYSIS_MODEL_ID", value = local.content_analysis_model_id },
+    { name = "ANALYSIS_MAX_COMMENTS", value = "40" },
+    { name = "ANALYSIS_TIMEOUT_MS", value = "50000" },
+    { name = "ANALYTICS_DUMP_LAMBDA_FUNCTION", value = local.analytics_dump_function },
+  ])
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -80,28 +105,7 @@ resource "aws_ecs_task_definition" "backend" {
       hostPort      = 3000
       protocol      = "tcp"
     }]
-    environment = [
-      { name = "NODE_ENV", value = "production" },
-      { name = "HOST", value = "0.0.0.0" },
-      { name = "PORT", value = "3000" },
-      { name = "WEB_ORIGIN", value = local.web_origin },
-      { name = "DATABASE_SSL", value = "true" },
-      { name = "DATABASE_POOL_MAX", value = "5" },
-      { name = "AWS_REGION", value = var.aws_region },
-      { name = "MEDIA_BUCKET", value = aws_s3_bucket.media.bucket },
-      { name = "THREAD_EVENTS_QUEUE_URL", value = aws_sqs_queue.thread_events.url },
-      { name = "CONTENT_ANALYSIS_QUEUE_URL", value = aws_sqs_queue.content_analysis_reanalysis.url },
-      { name = "CONTENT_ANALYSIS_MODE", value = var.enable_content_analysis_lambda ? var.content_analysis_mode : "off" },
-      { name = "CONTENT_ANALYSIS_LAMBDA_FUNCTION", value = local.content_analysis_function },
-      { name = "CONTENT_ANALYSIS_LAMBDA_QUALIFIER", value = local.content_analysis_qualifier },
-      { name = "CONTENT_ANALYSIS_LAMBDA_ARN", value = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.content_analysis_function}:${local.content_analysis_qualifier}" },
-      { name = "CONTENT_ANALYSIS_POLICY_VERSION", value = "v2" },
-      { name = "CONTENT_ANALYSIS_PROMPT_VERSION", value = "v1" },
-      { name = "CONTENT_ANALYSIS_AUTO_REMOVE_CONFIDENCE", value = tostring(var.content_analysis_auto_remove_confidence) },
-      { name = "CONTENT_ANALYSIS_MODEL_ID", value = local.content_analysis_model_id },
-      { name = "ANALYSIS_MAX_COMMENTS", value = "40" },
-      { name = "ANALYSIS_TIMEOUT_MS", value = "50000" },
-    ]
+    environment = local.backend_env_vars
     secrets = [{
       name      = "DATABASE_URL"
       valueFrom = aws_secretsmanager_secret.database_url.arn
@@ -171,5 +175,4 @@ resource "aws_ecs_service" "backend" {
 
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
-
 }
