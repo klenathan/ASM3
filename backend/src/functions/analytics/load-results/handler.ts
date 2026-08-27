@@ -121,8 +121,26 @@ export function outputPathFromEvent(event: Record<string, unknown>): string | un
   if (typeof event.outputPath === "string") return event.outputPath;
 
   const key = s3EventObjectKey(event);
-  const marker = "/metrics.jsonl/_SUCCESS";
-  return key?.endsWith(marker) ? key.slice(0, -marker.length) : undefined;
+  if (key === undefined) return undefined;
+
+  const sparkMarker = "/metrics.jsonl/_SUCCESS";
+  if (key.endsWith(sparkMarker)) {
+    return key.slice(0, -sparkMarker.length);
+  }
+
+  const genericMarker = "/_SUCCESS";
+  if (key.endsWith(genericMarker)) {
+    let path = key.slice(0, -genericMarker.length);
+    // If the generic _SUCCESS is directly under output/<ts>/_SUCCESS,
+    // path is already the timestamp prefix. If it were metrics.jsonl
+    // itself without subfolder, strip it.
+    if (path.endsWith("/metrics.jsonl")) {
+      path = path.slice(0, -"/metrics.jsonl".length);
+    }
+    return path;
+  }
+
+  return undefined;
 }
 
 function s3EventObjectKey(event: Record<string, unknown>): string | undefined {

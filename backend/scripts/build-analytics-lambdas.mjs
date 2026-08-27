@@ -6,11 +6,12 @@
  *
  * Output:
  *   backend/dist-function/analytics-dump-rds.zip
- *   backend/dist-function/analytics-start-emr.zip
+ *   backend/dist-function/analytics-start-emr.zip (compat alias)
+ *   backend/dist-function/analytics-start-serverless.zip
  *   backend/dist-function/analytics-load-results.zip
  */
 import { build } from "esbuild";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, copyFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,7 @@ const functions = [
 // AWS SDK v3 packages used by the analytics Lambdas
 const sdkExternals = [
   "@aws-sdk/client-emr",
+  "@aws-sdk/client-emr-serverless",
   "@aws-sdk/client-s3",
   "@aws-sdk/client-lambda",
 ];
@@ -57,6 +59,14 @@ for (const fn of functions) {
 
   execFileSync("zip", ["-r", zipPath, `${fn.name}.js`], { cwd: outDir, stdio: "inherit" });
   process.stdout.write(`Built ${zipPath}\n`);
+}
+
+// Compat: also publish analytics-start-serverless.zip as alias to start-emr
+const emrZip = join(outDir, "analytics-start-emr.zip");
+const serverlessZip = join(outDir, "analytics-start-serverless.zip");
+if (existsSync(emrZip)) {
+  copyFileSync(emrZip, serverlessZip);
+  process.stdout.write(`Aliased ${serverlessZip} from analytics-start-emr.zip\n`);
 }
 
 process.stdout.write("All analytics Lambda functions built.\n");

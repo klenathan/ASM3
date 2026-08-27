@@ -1,21 +1,24 @@
 # ---------------------------------------------------------------------------
-# Analytics pipeline: EMR-powered platform metrics
+# Analytics pipeline: EMR Serverless-powered platform metrics
 #
-# A nightly EMR pipeline that:
-#   1. dump-rds Lambda reads RDS and exports to S3
-#   2. start-emr Lambda starts transient EMR cluster with PySpark step
-#   3. load-results Lambda reads EMR output and upserts into analytics_metrics
+# A nightly EMR Serverless pipeline that:
+#   1. dump-rds Lambda reads RDS and exports JSONL to S3 (staging)
+#   2. start-serverless Lambda starts EMR Serverless Spark job (StartJobRun)
+#      polling GetJobRun every 30s with 900s timeout, CancelJobRun on timeout
+#   3. load-results Lambda reads EMR Serverless output and upserts into analytics_metrics
 #
 # GATE: Analytics is gated by enable_analytics_pipeline. The feature requires:
-#   - LabRole trust for lambda.amazonaws.com
-#   - EMR cluster capacity available (2× m5.large within 32 vCPU / 9 instance limits)
+#   - LabRole trust for lambda.amazonaws.com and emr-serverless.amazonaws.com
+#   - EMR Serverless available in us-east-1 (verified)
 #   - EventBridge can invoke Lambda
 # All three Lambdas reuse LabRole (no IAM role creation needed).
+# Cost: Serverless bills only for vCPU/memory seconds while Spark runs
+# (~3 vCPU: driver 1 vCPU/3GB + executor 2 vCPU/4GB x1), auto-stop 15m idle.
 # ---------------------------------------------------------------------------
 
 # ── Feature flag ──────────────────────────────────────────────────────────
 variable "enable_analytics_pipeline" {
-  description = "Deploy the EMR analytics pipeline (dump-rds, start-emr, load-results Lambda functions, EventBridge schedule, EMR cluster config)."
+  description = "Deploy the EMR Serverless analytics pipeline (dump-rds, start-serverless, load-results Lambda functions, EventBridge schedule, EMR Serverless app)."
   type        = bool
   default     = false
 }
@@ -27,9 +30,16 @@ variable "analytics_dump_rds_zip" {
 }
 
 variable "analytics_start_emr_zip" {
-  description = "Path to the built start-emr Lambda zip."
+  description = "Path to the built start-serverless Lambda zip (kept as analytics_start_emr_zip for backward compat; file is built as analytics-start-serverless.zip or analytics-start-emr.zip)."
   type        = string
   default     = "../backend/dist-function/analytics-start-emr.zip"
+}
+
+# New canonical variable for Serverless; if set, it overrides analytics_start_emr_zip
+variable "analytics_start_serverless_zip" {
+  description = "Path to the built start-serverless Lambda zip (preferred). If set, used instead of analytics_start_emr_zip."
+  type        = string
+  default     = null
 }
 
 variable "analytics_load_results_zip" {
@@ -42,6 +52,10 @@ variable "analytics_pyspark_script_path" {
   description = "Path to the PySpark script deployed to S3."
   type        = string
   default     = "../backend/src/functions/analytics/pyspark/compute_metrics.py"
+}
+
+locals {
+  analytics_start_zip = coalesce(var.analytics_start_serverless_zip, var.analytics_start_emr_zip)
 }
 
 # ── S3 bucket for analytics data ──────────────────────────────────────────
@@ -117,6 +131,32 @@ resource "aws_s3_object" "pyspark_script" {
   key    = "analytics/pyspark/compute_metrics.py"
   source = var.analytics_pyspark_script_path
   etag   = filemd5(var.analytics_pyspark_script_path)
+
+  tags = local.common_tags
+}
+
+# ── EMR Serverless application ────────────────────────────────────────────
+resource "aws_emrserverless_application" "analytics" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  name          = "${local.name}-analytics"
+  release_label = "emr-7.2.0"
+  type          = "SPARK"
+
+  maximum_capacity {
+    cpu    = "3 vCPU"
+    memory = "7 GB"
+    disk   = "20 GB"
+  }
+
+  auto_stop_configuration {
+    enabled              = true
+    idle_timeout_minutes = 15
+  }
+
+  auto_start_configuration {
+    enabled = true
+  }
 
   tags = local.common_tags
 }
@@ -211,38 +251,39 @@ resource "aws_cloudwatch_log_group" "analytics_dump_rds" {
   tags              = local.common_tags
 }
 
-# ── start-emr Lambda ──────────────────────────────────────────────────────
+# ── start-serverless Lambda ───────────────────────────────────────────────
 resource "aws_lambda_function" "analytics_start_emr" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
-  function_name    = "${local.name}-analytics-start-emr"
+  # Keep resource address analytics_start_emr for state compat; actual
+  # Lambda function name uses new Serverless naming.
+  function_name    = "${local.name}-analytics-start-serverless"
   role             = data.aws_iam_role.learner_lab.arn
   handler          = "index.handler"
   runtime          = "nodejs22.x"
-  filename         = var.analytics_start_emr_zip
-  source_code_hash = filebase64sha256(var.analytics_start_emr_zip)
+  filename         = local.analytics_start_zip
+  source_code_hash = filebase64sha256(local.analytics_start_zip)
   publish          = true
 
   architectures = ["x86_64"]
   memory_size   = 256
-  timeout       = 600 # 10 minutes for EMR cluster polling
+  timeout       = 900 # 15 minutes for Serverless job polling (900s timeout)
 
   environment {
     variables = {
-      STAGING_BUCKET           = aws_s3_bucket.analytics[0].bucket
-      STAGING_PREFIX           = "analytics/staging"
-      OUTPUT_BUCKET            = aws_s3_bucket.analytics[0].bucket
-      OUTPUT_PREFIX            = "analytics/output"
-      SCRIPT_BUCKET            = aws_s3_bucket.analytics[0].bucket
-      SCRIPT_KEY               = "analytics/pyspark/compute_metrics.py"
-      LOG_BUCKET               = aws_s3_bucket.analytics[0].bucket
-      LOG_PREFIX               = "analytics/emr-logs"
-      SUBNET_ID                = aws_subnet.public.id
-      EMR_SERVICE_ROLE         = "EMR_DefaultRole"
-      EMR_INSTANCE_PROFILE     = "EMR_EC2_DefaultRole"
-      CLUSTER_POLL_INTERVAL_MS = "30000"
-      CLUSTER_TIMEOUT_MS       = "600000"
-      LOG_LEVEL                = "info"
+      APPLICATION_ID       = aws_emrserverless_application.analytics[0].id
+      EXECUTION_ROLE_ARN   = data.aws_iam_role.learner_lab.arn
+      STAGING_BUCKET       = aws_s3_bucket.analytics[0].bucket
+      STAGING_PREFIX       = "analytics/staging"
+      OUTPUT_BUCKET        = aws_s3_bucket.analytics[0].bucket
+      OUTPUT_PREFIX        = "analytics/output"
+      SCRIPT_BUCKET        = aws_s3_bucket.analytics[0].bucket
+      SCRIPT_KEY           = "analytics/pyspark/compute_metrics.py"
+      LOG_BUCKET           = aws_s3_bucket.analytics[0].bucket
+      LOG_PREFIX           = "analytics/emr-serverless-logs"
+      JOB_POLL_INTERVAL_MS = "30000"
+      JOB_TIMEOUT_MS       = "900000"
+      LOG_LEVEL            = "info"
     }
   }
 
@@ -257,7 +298,7 @@ resource "aws_lambda_function" "analytics_start_emr" {
 resource "aws_cloudwatch_log_group" "analytics_start_emr" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
-  name              = "/aws/lambda/${local.name}-analytics-start-emr"
+  name              = "/aws/lambda/${local.name}-analytics-start-serverless"
   retention_in_days = var.log_retention_days
   tags              = local.common_tags
 }
@@ -335,6 +376,7 @@ resource "aws_lambda_permission" "analytics_start_emr_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.analytics_start_emr[0].function_name
   principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.analytics[0].arn
 }
 
 resource "aws_lambda_permission" "analytics_load_results_invoke" {
@@ -344,6 +386,7 @@ resource "aws_lambda_permission" "analytics_load_results_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.analytics_load_results[0].function_name
   principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.analytics[0].arn
 }
 
 # Chain pipeline stages only after each stage writes its completion marker.
@@ -401,6 +444,18 @@ output "analytics_start_emr_function" {
   value = try(aws_lambda_function.analytics_start_emr[0].function_name, null)
 }
 
+output "analytics_start_serverless_function" {
+  value = try(aws_lambda_function.analytics_start_emr[0].function_name, null)
+}
+
 output "analytics_load_results_function" {
   value = try(aws_lambda_function.analytics_load_results[0].function_name, null)
+}
+
+output "analytics_emr_serverless_application_id" {
+  value = try(aws_emrserverless_application.analytics[0].id, null)
+}
+
+output "analytics_emr_serverless_application_arn" {
+  value = try(aws_emrserverless_application.analytics[0].arn, null)
 }

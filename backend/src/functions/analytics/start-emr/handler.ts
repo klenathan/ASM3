@@ -1,24 +1,24 @@
 /**
- * Start-EMR Lambda: Triggered after dump completes (S3 put event or Lambda
- * chaining). Starts a transient EMR cluster (1 m5.large master + 1 m5.large
- * core), submits a PySpark step referencing the script in S3, and polls until
- * completion. Shuts down the cluster automatically.
+ * Start-Serverless Lambda: Triggered after dump completes (S3 put event on
+ * analytics/staging/_SUCCESS). Starts an EMR Serverless Spark job via
+ * StartJobRunCommand, polling GetJobRun every 30s with 900s timeout and
+ * CancelJobRun on timeout.
+ *
+ * Replaces classic EMR RunJobFlow / DescribeCluster / TerminateJobFlows.
  */
 import {
-  EMRClient,
-  RunJobFlowCommand,
-  DescribeClusterCommand,
-  TerminateJobFlowsCommand,
-} from "@aws-sdk/client-emr";
+  EMRServerlessClient,
+  StartJobRunCommand,
+  GetJobRunCommand,
+  CancelJobRunCommand,
+} from "@aws-sdk/client-emr-serverless";
 
 import { analyticsLogger as logger } from "../logger";
 
-export interface StartEmrConfig {
+export interface StartServerlessConfig {
   region: string;
-  subnetId: string;
-  emrServiceRole: string;
-  emrInstanceProfile: string;
-  ec2KeyName: string | undefined;
+  applicationId: string;
+  executionRoleArn: string;
   stagingBucket: string;
   stagingPrefix: string;
   outputBucket: string;
@@ -27,12 +27,17 @@ export interface StartEmrConfig {
   scriptKey: string;
   logBucket: string;
   logPrefix: string;
-  clusterPollIntervalMs: number;
-  clusterTimeoutMs: number;
+  jobPollIntervalMs: number;
+  jobTimeoutMs: number;
 }
 
-interface EmrResult {
+/** Kept as alias for backward compat with tests importing StartEmrConfig */
+export type StartEmrConfig = StartServerlessConfig;
+
+interface ServerlessResult {
   success: boolean;
+  applicationId: string | null;
+  jobRunId: string | null;
   clusterId: string | null;
   stepId: string | null;
   message: string;
@@ -40,13 +45,11 @@ interface EmrResult {
   completedAt: string | null;
 }
 
-function loadConfig(): StartEmrConfig {
+function loadConfig(): StartServerlessConfig {
   const required = {
     REGION: process.env.AWS_REGION ?? "us-east-1",
-    SUBNET_ID: process.env.SUBNET_ID,
-    EMR_SERVICE_ROLE: process.env.EMR_SERVICE_ROLE ?? "EMR_DefaultRole",
-    EMR_INSTANCE_PROFILE:
-      process.env.EMR_INSTANCE_PROFILE ?? "EMR_EC2_DefaultRole",
+    APPLICATION_ID: process.env.APPLICATION_ID,
+    EXECUTION_ROLE_ARN: process.env.EXECUTION_ROLE_ARN,
     STAGING_BUCKET: process.env.STAGING_BUCKET,
     OUTPUT_BUCKET: process.env.OUTPUT_BUCKET,
     SCRIPT_BUCKET: process.env.SCRIPT_BUCKET,
@@ -64,10 +67,8 @@ function loadConfig(): StartEmrConfig {
 
   return {
     region: required.REGION!,
-    subnetId: required.SUBNET_ID!,
-    emrServiceRole: required.EMR_SERVICE_ROLE!,
-    emrInstanceProfile: required.EMR_INSTANCE_PROFILE!,
-    ec2KeyName: process.env.EC2_KEY_NAME,
+    applicationId: required.APPLICATION_ID!,
+    executionRoleArn: required.EXECUTION_ROLE_ARN!,
     stagingBucket: required.STAGING_BUCKET!,
     stagingPrefix: process.env.STAGING_PREFIX ?? "analytics/staging",
     outputBucket: required.OUTPUT_BUCKET!,
@@ -75,11 +76,17 @@ function loadConfig(): StartEmrConfig {
     scriptBucket: required.SCRIPT_BUCKET!,
     scriptKey: required.SCRIPT_KEY!,
     logBucket: required.LOG_BUCKET!,
-    logPrefix: process.env.LOG_PREFIX ?? "analytics/emr-logs",
-    clusterPollIntervalMs: Number(
-      process.env.CLUSTER_POLL_INTERVAL_MS ?? 30_000,
+    logPrefix: process.env.LOG_PREFIX ?? "analytics/emr-serverless-logs",
+    jobPollIntervalMs: Number(
+      process.env.JOB_POLL_INTERVAL_MS ??
+        process.env.CLUSTER_POLL_INTERVAL_MS ??
+        30_000,
     ),
-    clusterTimeoutMs: Number(process.env.CLUSTER_TIMEOUT_MS ?? 600_000),
+    jobTimeoutMs: Number(
+      process.env.JOB_TIMEOUT_MS ??
+        process.env.CLUSTER_TIMEOUT_MS ??
+        900_000,
+    ),
   };
 }
 
@@ -114,130 +121,138 @@ function s3EventObjectKey(event: Record<string, unknown>): string | undefined {
   }
 }
 
-export async function handler(
-  event: Record<string, unknown>,
-): Promise<EmrResult> {
+export async function handler(event: Record<string, unknown>): Promise<ServerlessResult> {
   const config = loadConfig();
-  const emr = new EMRClient({ region: config.region });
+  const emrServerless = new EMRServerlessClient({ region: config.region });
   const startedAt = new Date().toISOString();
 
+  let jobRunId: string | null = null;
+
   try {
-    // 1. Find the latest staging path
+    // 1. Find the latest staging path and output path
     const stagingPath =
       stagingPathFromEvent(event) ??
       `${config.stagingPrefix}/${new Date().toISOString().replace(/[:-]/g, "").split(".")[0]!}`;
     const outputPath = `${config.outputPrefix}/${new Date().toISOString().replace(/[:-]/g, "").split(".")[0]!}`;
-    logger.info({ stagingPath, outputPath, trigger: event.Records ? "s3" : "direct" }, "analytics EMR start requested");
+    logger.info({ stagingPath, outputPath, trigger: event.Records ? "s3" : "direct" }, "analytics Serverless start requested");
 
-    // 2. Start transient EMR cluster
-    const runJobFlowResponse = await emr.send(
-      new RunJobFlowCommand({
-        Name: "rmit-society-analytics",
-        ReleaseLabel: "emr-7.2.0",
-        LogUri: `s3://${config.logBucket}/${config.logPrefix}`,
-        Instances: {
-          InstanceGroups: [
-            {
-              InstanceRole: "MASTER",
-              InstanceCount: 1,
-              InstanceType: "m5.large",
-              Market: "ON_DEMAND",
-            },
-            {
-              InstanceRole: "CORE",
-              InstanceCount: 1,
-              InstanceType: "m5.large",
-              Market: "ON_DEMAND",
-            },
-          ],
-          Ec2KeyName: config.ec2KeyName,
-          Ec2SubnetId: config.subnetId,
-          KeepJobFlowAliveWhenNoSteps: false,
-          TerminationProtected: false,
+    // 2. Start EMR Serverless job
+    const startResponse = await emrServerless.send(
+      new StartJobRunCommand({
+        applicationId: config.applicationId,
+        executionRoleArn: config.executionRoleArn,
+        jobDriver: {
+          sparkSubmit: {
+            entryPoint: `s3://${config.scriptBucket}/${config.scriptKey}`,
+            entryPointArguments: [
+              "--staging-bucket",
+              config.stagingBucket,
+              "--staging-path",
+              stagingPath,
+              "--output-bucket",
+              config.outputBucket,
+              "--output-path",
+              outputPath,
+            ],
+            sparkSubmitParameters:
+              "--conf spark.driver.cores=1 --conf spark.driver.memory=3g --conf spark.executor.cores=2 --conf spark.executor.memory=4g --conf spark.executor.instances=1",
+          },
         },
-        Applications: [{ Name: "Spark" }],
-        JobFlowRole: config.emrInstanceProfile,
-        ServiceRole: config.emrServiceRole,
-        VisibleToAllUsers: true,
-        Steps: [
-          {
-            Name: "Compute Analytics Metrics",
-            ActionOnFailure: "TERMINATE_CLUSTER",
-            HadoopJarStep: {
-              Jar: "command-runner.jar",
-              Args: [
-                "spark-submit",
-                "--deploy-mode",
-                "cluster",
-                `s3://${config.scriptBucket}/${config.scriptKey}`,
-                "--staging-bucket",
-                config.stagingBucket,
-                "--staging-path",
-                stagingPath,
-                "--output-bucket",
-                config.outputBucket,
-                "--output-path",
-                outputPath,
-              ],
+        configurationOverrides: {
+          monitoringConfiguration: {
+            s3MonitoringConfiguration: {
+              logUri: `s3://${config.logBucket}/${config.logPrefix}`,
             },
           },
-        ],
+        },
       }),
     );
 
-    const clusterId = runJobFlowResponse.JobFlowId;
-    if (!clusterId)
-      throw new Error("EMR cluster creation returned no JobFlowId");
-    logger.info({ clusterId, stagingPath, outputPath }, "analytics EMR cluster started");
+    jobRunId = startResponse.jobRunId ?? null;
+    if (!jobRunId) throw new Error("EMR Serverless StartJobRun returned no jobRunId");
+    logger.info({ applicationId: config.applicationId, jobRunId, stagingPath, outputPath }, "analytics Serverless job started");
 
-    // 3. Poll until cluster completes (WAITING or TERMINATED)
-    const deadline = Date.now() + config.clusterTimeoutMs;
-    let clusterState = "";
-    let previousClusterState = "";
+    // 3. Poll GetJobRun every 30s with 900s timeout; CancelJobRun on timeout
+    const deadline = Date.now() + config.jobTimeoutMs;
+    let jobState = "";
+    let previousJobState = "";
+
     do {
-      await sleep(config.clusterPollIntervalMs);
+      await sleep(config.jobPollIntervalMs);
 
       if (Date.now() > deadline) {
-        logger.error({ clusterId, timeoutMs: config.clusterTimeoutMs }, "analytics EMR cluster timed out");
-        await emr.send(
-          new TerminateJobFlowsCommand({ JobFlowIds: [clusterId] }),
-        );
+        logger.error({ applicationId: config.applicationId, jobRunId, timeoutMs: config.jobTimeoutMs }, "analytics Serverless job timed out");
+        try {
+          await emrServerless.send(
+            new CancelJobRunCommand({
+              applicationId: config.applicationId,
+              jobRunId,
+            }),
+          );
+        } catch (cancelError) {
+          logger.warn({ err: cancelError, jobRunId }, "analytics Serverless cancel failed");
+        }
         return {
           success: false,
-          clusterId,
+          applicationId: config.applicationId,
+          jobRunId,
+          clusterId: jobRunId,
           stepId: null,
-          message: "EMR cluster timed out and was terminated",
+          message: "EMR Serverless job timed out and was cancelled",
           startedAt,
           completedAt: new Date().toISOString(),
         };
       }
 
-      const describeResponse = await emr.send(
-        new DescribeClusterCommand({ ClusterId: clusterId }),
+      const describeResponse = await emrServerless.send(
+        new GetJobRunCommand({
+          applicationId: config.applicationId,
+          jobRunId,
+        }),
       );
-      clusterState = describeResponse.Cluster?.Status?.State ?? "UNKNOWN";
-      if (clusterState !== previousClusterState) {
-        logger.info({ clusterId, clusterState }, "analytics EMR cluster state changed");
-        previousClusterState = clusterState;
+      jobState = describeResponse.jobRun?.state ?? "UNKNOWN";
+      if (jobState !== previousJobState) {
+        logger.info({ applicationId: config.applicationId, jobRunId, jobState }, "analytics Serverless job state changed");
+        previousJobState = jobState;
       }
-    } while (clusterState !== "TERMINATED" && clusterState !== "WAITING");
 
-    // RunJobFlow does not return an ID for steps submitted with the request.
-    logger.info({ clusterId, clusterState, outputPath }, "analytics EMR cluster completed");
-    return {
-      success: clusterState === "TERMINATED",
-      clusterId,
-      stepId: null,
-      message: `EMR cluster ${clusterId} completed with state ${clusterState}`,
-      startedAt,
-      completedAt: new Date().toISOString(),
-    };
+      if (jobState === "SUCCESS") {
+        logger.info({ applicationId: config.applicationId, jobRunId, jobState, outputPath }, "analytics Serverless job completed");
+        return {
+          success: true,
+          applicationId: config.applicationId,
+          jobRunId,
+          clusterId: jobRunId,
+          stepId: null,
+          message: `EMR Serverless job ${jobRunId} succeeded`,
+          startedAt,
+          completedAt: new Date().toISOString(),
+        };
+      }
+
+      if (jobState === "FAILED" || jobState === "CANCELLED") {
+        const stateDetails = describeResponse.jobRun?.stateDetails ?? jobState;
+        logger.error({ applicationId: config.applicationId, jobRunId, jobState, stateDetails }, "analytics Serverless job failed");
+        return {
+          success: false,
+          applicationId: config.applicationId,
+          jobRunId,
+          clusterId: jobRunId,
+          stepId: null,
+          message: `EMR Serverless job ${jobRunId} ${jobState}: ${stateDetails}`,
+          startedAt,
+          completedAt: new Date().toISOString(),
+        };
+      }
+    } while (true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error({ err: error }, "analytics EMR start failed");
+    logger.error({ err: error, jobRunId }, "analytics Serverless start failed");
     return {
       success: false,
-      clusterId: null,
+      applicationId: null,
+      jobRunId,
+      clusterId: jobRunId,
       stepId: null,
       message,
       startedAt,
