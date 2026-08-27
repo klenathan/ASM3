@@ -14,7 +14,14 @@ import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
 import { createAuditModule } from "./modules/audit/index";
-import { createAnalyticsModule } from "./modules/analytics/index";
+import {
+  AnalyticsRefreshOrchestrator,
+  createAnalyticsModule,
+  DrizzleAnalyticsRepository,
+  InMemoryRefreshRunStore,
+  PlaceholderGlueGateway,
+  PlaceholderAthenaGateway,
+} from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
@@ -275,30 +282,89 @@ async function main(): Promise<void> {
   });
   audit.start();
 
-  // Analytics module: wire the refresh trigger to invoke the dump-rds Lambda
-  // when configured. In development, the callback is a no-op.
-  let analyticsRefreshTrigger: (() => Promise<void>) | undefined;
-  if (config.analyticsDumpLambdaFunction !== null && config.awsRegion !== null) {
-    const { LambdaClient, InvokeCommand } = await import("@aws-sdk/client-lambda");
-    const lambdaClient = new LambdaClient({ region: config.awsRegion });
-    analyticsRefreshTrigger = async () => {
-      await lambdaClient.send(
-        new InvokeCommand({
-          FunctionName: config.analyticsDumpLambdaFunction!,
-          InvocationType: "Event", // async, don't wait for response
-        }),
-      );
+  // Analytics module. When orchestration is configured (Glue job name +
+  // region), the admin refresh callback and the nightly scheduled-refresh
+  // route both funnel into the same in-process orchestrator; a bounded
+  // reconciler sweep advances unfinished runs (placeholder gateways complete
+  // instantly until real Glue/Athena adapters land via ticket #9). Without
+  // configuration, refresh remains an accepted no-op.
+  let analyticsRefreshOrchestrator:
+    | AnalyticsRefreshOrchestrator
+    | undefined;
+  const analyticsRepository = new DrizzleAnalyticsRepository(database.db);
+  if (config.analyticsGlueJobName !== null && config.awsRegion !== null) {
+    analyticsRefreshOrchestrator = new AnalyticsRefreshOrchestrator({
+      repository: analyticsRepository,
+      runStore: new InMemoryRefreshRunStore(),
+      glueGateway: new PlaceholderGlueGateway(),
+      athenaGateway: new PlaceholderAthenaGateway(),
+      logger,
+      maxPhaseRetries: config.analyticsRefreshMaxPhaseRetries,
+      staleAfterMs: config.analyticsRefreshStaleAfterMs,
+    });
+  }
+  let analyticsReconcileTimer: NodeJS.Timeout | undefined;
+  if (analyticsRefreshOrchestrator !== undefined) {
+    const tick = async () => {
+      try {
+        await analyticsRefreshOrchestrator!.reconcile();
+      } catch (error) {
+        logger.error(
+          { err: error },
+          "analytics refresh reconcile tick failed",
+        );
+      }
     };
+    const firstTick = setTimeout(tick, 1_000);
+    firstTick.unref();
+    analyticsReconcileTimer = setInterval(
+      tick,
+      config.analyticsRefreshReconcileIntervalMs,
+    );
+    analyticsReconcileTimer.unref();
+    logger.info(
+      {
+        intervalMs: config.analyticsRefreshReconcileIntervalMs,
+        maxPhaseRetries: config.analyticsRefreshMaxPhaseRetries,
+        staleAfterMs: config.analyticsRefreshStaleAfterMs,
+      },
+      "analytics refresh reconciler started",
+    );
   }
   const analytics = createAnalyticsModule({
     database: database.db,
     accountReader: identity.repository,
     membershipRepository: societies.membershipRepository,
-    onRefreshRequested: analyticsRefreshTrigger,
+    ...(analyticsRefreshOrchestrator !== undefined
+      ? {
+          onRefreshRequested: async () => {
+            await analyticsRefreshOrchestrator!.requestRefresh("admin");
+          },
+        }
+      : {}),
   });
 
   const app = createApp({
-    analytics,
+    analytics: {
+      analyticsService: analytics.analyticsService,
+      ...(config.analyticsSchedulerSecret !== null
+        ? { schedulerSecret: config.analyticsSchedulerSecret }
+        : {}),
+      ...(analyticsRefreshOrchestrator !== undefined
+        ? {
+            handleScheduledRefresh: async () => {
+              const result =
+                await analyticsRefreshOrchestrator!.requestRefresh("nightly");
+              return {
+                accepted: true,
+                message: result.coalesced
+                  ? "An analytics refresh run is already in progress."
+                  : "Scheduled analytics refresh started.",
+              };
+            },
+          }
+        : {}),
+    },
     config,
     logger,
     checkReadiness: database.checkConnection,
@@ -359,6 +425,9 @@ async function main(): Promise<void> {
       await database.close();
       if (analysisRetryTimer !== undefined) {
         clearInterval(analysisRetryTimer);
+      }
+      if (analyticsReconcileTimer !== undefined) {
+        clearInterval(analyticsReconcileTimer);
       }
       clearTimeout(forceShutdown);
       logger.info("shutdown complete");

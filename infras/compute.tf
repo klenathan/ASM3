@@ -81,8 +81,13 @@ locals {
     { name = "CONTENT_ANALYSIS_MODEL_ID", value = local.content_analysis_model_id },
     { name = "ANALYSIS_MAX_COMMENTS", value = "40" },
     { name = "ANALYSIS_TIMEOUT_MS", value = "50000" },
-    { name = "ANALYTICS_DUMP_LAMBDA_FUNCTION", value = local.analytics_dump_function },
-  ])
+    ], var.enable_analytics_pipeline ? [
+    { name = "ANALYTICS_GLUE_JOB_NAME", value = var.analytics_glue_job_name },
+    { name = "ANALYTICS_SCHEDULER_SECRET", value = random_password.analytics_scheduler_secret[0].result },
+    { name = "ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS", value = tostring(var.analytics_refresh_reconcile_interval_ms) },
+    { name = "ANALYTICS_REFRESH_MAX_PHASE_RETRIES", value = tostring(var.analytics_refresh_max_phase_retries) },
+    { name = "ANALYTICS_REFRESH_STALE_AFTER_MS", value = tostring(var.analytics_refresh_stale_after_ms) },
+  ] : [])
 }
 
 resource "aws_ecs_task_definition" "backend" {
