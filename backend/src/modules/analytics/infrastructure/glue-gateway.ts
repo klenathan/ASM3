@@ -42,17 +42,7 @@ export class GlueGatewayAdapter implements GlueGateway {
   }
 
   async startJobRun(input: GlueJobStartInput): Promise<string> {
-    const existing = await this.send(
-      new GetJobRunsCommand({ JobName: this.config.jobName, MaxResults: 100 }),
-    ) as { Jobs?: readonly { Id?: string; JobRunState?: string; Arguments?: Record<string, string> }[] };
-    const existingRun = existing.Jobs?.find(
-      (job) => job.Arguments?.["--refresh-run-id"] === input.runId &&
-        job.Id !== undefined &&
-        job.JobRunState !== "FAILED" &&
-        job.JobRunState !== "ERROR" &&
-        job.JobRunState !== "TIMEOUT" &&
-        job.JobRunState !== "STOPPED",
-    );
+    const existingRun = await this.findExistingRun(input.runId);
     if (existingRun?.Id !== undefined) return existingRun.Id;
 
     const response = await this.send(
@@ -66,6 +56,34 @@ export class GlueGatewayAdapter implements GlueGateway {
     ) as { JobRunId?: string };
     if (response.JobRunId === undefined) throw new Error("Glue did not return a job run id");
     return response.JobRunId;
+  }
+
+  private async findExistingRun(runId: string): Promise<{ Id?: string } | undefined> {
+    let nextToken: string | undefined;
+    do {
+      const response = await this.send(
+        new GetJobRunsCommand({
+          JobName: this.config.jobName,
+          MaxResults: 100,
+          ...(nextToken === undefined ? {} : { NextToken: nextToken }),
+        }),
+      ) as {
+        Jobs?: readonly { Id?: string; JobRunState?: string; Arguments?: Record<string, string> }[];
+        NextToken?: string;
+      };
+      const existingRun = response.Jobs?.find(
+        (job) => job.Arguments?.["--refresh-run-id"] === runId &&
+          job.Id !== undefined &&
+          job.JobRunState !== undefined &&
+          job.JobRunState !== "FAILED" &&
+          job.JobRunState !== "ERROR" &&
+          job.JobRunState !== "TIMEOUT" &&
+          job.JobRunState !== "STOPPED",
+      );
+      if (existingRun !== undefined) return existingRun;
+      nextToken = response.NextToken;
+    } while (nextToken !== undefined);
+    return undefined;
   }
 
   async getJobRunStatus(jobRunId: string): Promise<GlueJobRunStatus> {

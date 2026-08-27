@@ -1,4 +1,5 @@
 import { jsonb, pgTable, text, timestamp, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { societies } from "../../societies/infrastructure/society.tables";
 
@@ -23,13 +24,14 @@ export const analyticsMetrics = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("idx_analytics_metrics_unique").on(
+    uniqueIndex("idx_analytics_metrics_society_unique").on(
       table.metricType,
-      // Use COALESCE-like behavior: nullable column, but the unique constraint
-      // uses a partial expression. Drizzle can't express COALESCE in a unique
-      // index directly, so we handle it via the repository layer.
       table.societyId,
       table.periodStart,
-    ),
+    ).where(sql`${table.societyId} IS NOT NULL`),
+    uniqueIndex("idx_analytics_metrics_platform_unique").on(
+      table.metricType,
+      table.periodStart,
+    ).where(sql`${table.societyId} IS NULL`),
   ],
 );

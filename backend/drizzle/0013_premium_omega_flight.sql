@@ -1,0 +1,3 @@
+DROP INDEX "idx_analytics_metrics_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_analytics_metrics_society_unique" ON "analytics_metrics" USING btree ("metric_type","society_id","period_start") WHERE "analytics_metrics"."society_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_analytics_metrics_platform_unique" ON "analytics_metrics" USING btree ("metric_type","period_start") WHERE "analytics_metrics"."society_id" IS NULL;

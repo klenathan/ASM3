@@ -1,3 +1,4 @@
+import { METRIC_TYPES } from "../domain/analytics";
 import type { MetricSqlCatalog } from "../application/refresh-orchestrator.ports";
 
 const PERIOD_COLUMNS = `
@@ -153,9 +154,4 @@ SELECT
 FROM society_metrics`,
 };
 
-export const METRIC_SQL_TYPES = Object.freeze([
-  "user_growth",
-  "content_volume",
-  "top_societies",
-  "moderation",
-] as const);
+export const METRIC_SQL_TYPES = METRIC_TYPES;

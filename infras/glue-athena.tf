@@ -95,7 +95,7 @@ resource "aws_security_group" "analytics_glue" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${local.name}-analytics-glue" }
+  tags = merge(local.common_tags, { Name = "${local.name}-analytics-glue" })
 }
 
 resource "aws_security_group_rule" "analytics_glue_to_database" {
@@ -114,7 +114,7 @@ resource "aws_route_table" "analytics_private" {
   count  = var.enable_analytics_pipeline ? 1 : 0
   vpc_id = aws_vpc.this.id
 
-  tags = { Name = "${local.name}-analytics-private" }
+  tags = merge(local.common_tags, { Name = "${local.name}-analytics-private" })
 }
 
 resource "aws_route_table_association" "analytics_private" {
@@ -132,7 +132,7 @@ resource "aws_vpc_endpoint" "analytics_s3" {
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.analytics_private[0].id]
 
-  tags = { Name = "${local.name}-analytics-s3" }
+  tags = merge(local.common_tags, { Name = "${local.name}-analytics-s3" })
 }
 
 resource "aws_glue_connection" "analytics" {
@@ -151,6 +151,8 @@ resource "aws_glue_connection" "analytics" {
     subnet_id              = aws_subnet.database[0].id
     security_group_id_list = [aws_security_group.analytics_glue[0].id]
   }
+
+  tags = local.common_tags
 }
 
 resource "aws_s3_object" "analytics_glue_script" {
@@ -160,6 +162,7 @@ resource "aws_s3_object" "analytics_glue_script" {
   key    = "analytics/glue/export_rds.py"
   source = var.analytics_glue_script_path
   etag   = filemd5(var.analytics_glue_script_path)
+  tags   = local.common_tags
 }
 
 resource "aws_glue_catalog_database" "analytics" {
@@ -259,6 +262,7 @@ resource "aws_athena_workgroup" "analytics" {
   }
 
   force_destroy = true
+  tags          = local.common_tags
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "analytics_retention" {

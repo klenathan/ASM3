@@ -31,10 +31,6 @@ export interface RefreshRunRecord {
   readonly athenaQueryExecutionIds: Readonly<Partial<Record<MetricType, string>>>;
 }
 
-export interface ActiveRefreshRunQuery {
-  readonly unfinishedOnly?: boolean;
-}
-
 /**
  * Persistence contract for analytics refresh runs. The in-process store in
  * this module keeps runs alive between reconciler ticks but NOT across

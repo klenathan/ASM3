@@ -82,6 +82,20 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository {
     const now = new Date();
     const data = input.data as unknown as Record<string, unknown>;
 
+    const conflictTarget = input.societyId === null
+      ? {
+          target: [analyticsMetrics.metricType, analyticsMetrics.periodStart],
+          targetWhere: sql`${analyticsMetrics.societyId} IS NULL`,
+        }
+      : {
+          target: [
+            analyticsMetrics.metricType,
+            analyticsMetrics.societyId,
+            analyticsMetrics.periodStart,
+          ],
+          targetWhere: sql`${analyticsMetrics.societyId} IS NOT NULL`,
+        };
+
     const rows = await this.executor
       .insert(analyticsMetrics)
       .values({
@@ -95,11 +109,7 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository {
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: [
-          analyticsMetrics.metricType,
-          analyticsMetrics.societyId,
-          analyticsMetrics.periodStart,
-        ],
+        ...conflictTarget,
         set: {
           data,
           periodEnd: input.periodEnd,
