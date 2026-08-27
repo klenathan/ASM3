@@ -10,6 +10,10 @@ import {
   AnalyticsSocietyNotModeratedError,
 } from "../domain/analytics.errors";
 import type { AnalyticsRepository, AnalyticsQuery } from "./analytics.repository";
+import {
+  normalizeMetricPayload,
+  type AnalyticsMetricRecord,
+} from "../domain/analytics";
 import type {
   AnalyticsMetricDto,
   AnalyticsPageDto,
@@ -116,15 +120,13 @@ export class AnalyticsService {
   }
 }
 
-function toDto(
-  record: import("../domain/analytics").AnalyticsMetricRecord,
-): AnalyticsMetricDto {
+function toDto(record: AnalyticsMetricRecord): AnalyticsMetricDto {
   return {
     id: record.id,
     metricType: record.metricType,
     societyId: record.societyId,
     periodStart: record.periodStart.toISOString(),
     periodEnd: record.periodEnd.toISOString(),
-    data: record.data,
+    data: normalizeMetricPayload(record.data),
   };
 }

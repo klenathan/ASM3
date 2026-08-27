@@ -79,6 +79,58 @@ describe("AnalyticsService", () => {
     expect(result.metrics).toHaveLength(2);
   });
 
+  it("normalizes analytics payloads produced by the pipeline", async () => {
+    const repository = new FakeAnalyticsRepository();
+    repository.seed(platformMetric("user_growth", {
+      registrations: 10,
+      active_users: 8,
+      total_users: 20,
+      suspensions: 1,
+    } as unknown as MetricPayload));
+    repository.seed(platformMetric("top_societies", {
+      top_by_members: [{
+        society_id: societyId,
+        name: "Engineering",
+        member_count: 10,
+        thread_count: 3,
+      }],
+      top_by_threads: [],
+    } as unknown as MetricPayload));
+    repository.seed(platformMetric("moderation", {
+      pending_reports: 2,
+      resolved_today: 1,
+      avg_resolution_hours: 4.5,
+      total_reports: 3,
+    } as unknown as MetricPayload));
+
+    const service = createService(repository);
+    const result = await service.queryMetrics(admin, {});
+
+    expect(result.metrics.map((metric) => metric.data)).toEqual(expect.arrayContaining([
+      {
+        registrations: 10,
+        activeUsers: 8,
+        totalUsers: 20,
+        suspensions: 1,
+      },
+      {
+        topByMembers: [{
+          societyId,
+          name: "Engineering",
+          memberCount: 10,
+          threadCount: 3,
+        }],
+        topByThreads: [],
+      },
+      {
+        pendingReports: 2,
+        resolvedToday: 1,
+        avgResolutionHours: 4.5,
+        totalReports: 3,
+      },
+    ]));
+  });
+
   it("filters by metric_type", async () => {
     const repository = new FakeAnalyticsRepository();
     repository.seed(platformMetric("user_growth", {

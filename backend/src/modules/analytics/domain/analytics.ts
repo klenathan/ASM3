@@ -49,6 +49,23 @@ export interface ModerationData {
 
 export type MetricPayload = UserGrowthData | ContentVolumeData | TopSocietiesData | ModerationData;
 
+/** Convert persisted pipeline payload keys to API/domain camelCase keys. */
+export function normalizeMetricPayload(data: MetricPayload): MetricPayload {
+  return camelizeKeys(data) as MetricPayload;
+}
+
+function camelizeKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(camelizeKeys);
+  if (value === null || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+      camelizeKeys(entry),
+    ]),
+  );
+}
+
 export interface AnalyticsMetricRecord {
   readonly id: string;
   readonly metricType: MetricType;

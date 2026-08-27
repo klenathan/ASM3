@@ -6,6 +6,8 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
 
+import { analyticsLogger as logger } from "../logger";
+
 export interface DumpRdsConfig {
   databaseUrl: string;
   stagingBucket: string;
@@ -45,21 +47,58 @@ export async function handler(): Promise<DumpResult> {
   const pool = new Pool({ connectionString: config.databaseUrl });
   const timestamp = new Date().toISOString().replace(/[:-]/g, "").split(".")[0]!;
   const stagingPath = `${config.stagingPrefix}/${timestamp}`;
-  const tables = ["users", "threads", "comments", "memberships", "votes", "reports"];
+  const exports = [
+    {
+      key: "users",
+      query: `SELECT u.id, u.created_at, p.status
+              FROM auth_users u
+              INNER JOIN user_profiles p ON p.user_id = u.id`,
+    },
+    { key: "threads", query: "SELECT * FROM threads" },
+    {
+      key: "comments",
+      query: `SELECT c.*, t.society_id
+              FROM comments c
+              INNER JOIN threads t ON t.id = c.thread_id`,
+    },
+    { key: "memberships", query: "SELECT * FROM society_memberships" },
+    {
+      key: "votes",
+      query: `SELECT thread_id AS target_id, user_id, value, created_at FROM thread_votes
+              UNION ALL
+              SELECT comment_id AS target_id, user_id, value, created_at FROM comment_votes`,
+    },
+    { key: "reports", query: "SELECT * FROM reports" },
+  ] as const;
+  const tables = exports.map(({ key }) => key);
+  const startedAt = Date.now();
+  logger.info({ stagingPath, tableCount: tables.length }, "analytics dump started");
 
   try {
-    for (const table of tables) {
-      const rows = await pool.query(`SELECT * FROM ${table}`);
+    for (const { key, query } of exports) {
+      const rows = await pool.query(query);
       const jsonl = rows.rows.map((row) => JSON.stringify(row)).join("\n");
       await s3.send(
         new PutObjectCommand({
           Bucket: config.stagingBucket,
-          Key: `${stagingPath}/${table}.jsonl`,
+          Key: `${stagingPath}/${key}.jsonl`,
           Body: jsonl,
           ContentType: "application/jsonl",
         }),
       );
+      logger.info({ key, rowCount: rows.rowCount, byteCount: Buffer.byteLength(jsonl) }, "analytics table exported");
     }
+
+    // Signals that all table exports are present. S3 invokes start-emr from this marker.
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: config.stagingBucket,
+        Key: `${stagingPath}/_SUCCESS`,
+        Body: "",
+        ContentType: "text/plain",
+      }),
+    );
+    logger.info({ stagingPath, durationMs: Date.now() - startedAt }, "analytics dump completed; completion marker written");
 
     return {
       success: true,
@@ -69,6 +108,7 @@ export async function handler(): Promise<DumpResult> {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error({ err: error, stagingPath, durationMs: Date.now() - startedAt }, "analytics dump failed");
     return {
       success: false,
       tables,

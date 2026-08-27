@@ -132,10 +132,10 @@ resource "aws_security_group" "analytics_lambda" {
   vpc_id      = aws_vpc.this.id
 
   egress {
-    description = "RDS access via database security group"
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
+    description     = "RDS access via database security group"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
     security_groups = [aws_security_group.database.id]
   }
 
@@ -188,10 +188,10 @@ resource "aws_lambda_function" "analytics_dump_rds" {
 
   environment {
     variables = {
-      DATABASE_URL    = aws_secretsmanager_secret.database_url.name
-      STAGING_BUCKET  = aws_s3_bucket.analytics[0].bucket
-      STAGING_PREFIX  = "analytics/staging"
-      LOG_LEVEL       = "info"
+      DATABASE_URL   = aws_secretsmanager_secret.database_url.name
+      STAGING_BUCKET = aws_s3_bucket.analytics[0].bucket
+      STAGING_PREFIX = "analytics/staging"
+      LOG_LEVEL      = "info"
     }
   }
 
@@ -229,20 +229,20 @@ resource "aws_lambda_function" "analytics_start_emr" {
 
   environment {
     variables = {
-      STAGING_BUCKET        = aws_s3_bucket.analytics[0].bucket
-      STAGING_PREFIX        = "analytics/staging"
-      OUTPUT_BUCKET         = aws_s3_bucket.analytics[0].bucket
-      OUTPUT_PREFIX         = "analytics/output"
-      SCRIPT_BUCKET         = aws_s3_bucket.analytics[0].bucket
-      SCRIPT_KEY            = "analytics/pyspark/compute_metrics.py"
-      LOG_BUCKET            = aws_s3_bucket.analytics[0].bucket
-      LOG_PREFIX            = "analytics/emr-logs"
-      SUBNET_ID             = aws_subnet.public.id
-      EMR_SERVICE_ROLE      = "EMR_DefaultRole"
-      EMR_INSTANCE_PROFILE  = "EMR_EC2_DefaultRole"
+      STAGING_BUCKET           = aws_s3_bucket.analytics[0].bucket
+      STAGING_PREFIX           = "analytics/staging"
+      OUTPUT_BUCKET            = aws_s3_bucket.analytics[0].bucket
+      OUTPUT_PREFIX            = "analytics/output"
+      SCRIPT_BUCKET            = aws_s3_bucket.analytics[0].bucket
+      SCRIPT_KEY               = "analytics/pyspark/compute_metrics.py"
+      LOG_BUCKET               = aws_s3_bucket.analytics[0].bucket
+      LOG_PREFIX               = "analytics/emr-logs"
+      SUBNET_ID                = aws_subnet.public.id
+      EMR_SERVICE_ROLE         = "EMR_DefaultRole"
+      EMR_INSTANCE_PROFILE     = "EMR_EC2_DefaultRole"
       CLUSTER_POLL_INTERVAL_MS = "30000"
-      CLUSTER_TIMEOUT_MS    = "600000"
-      LOG_LEVEL             = "info"
+      CLUSTER_TIMEOUT_MS       = "600000"
+      LOG_LEVEL                = "info"
     }
   }
 
@@ -285,10 +285,10 @@ resource "aws_lambda_function" "analytics_load_results" {
 
   environment {
     variables = {
-      DATABASE_URL   = aws_secretsmanager_secret.database_url.name
-      OUTPUT_BUCKET  = aws_s3_bucket.analytics[0].bucket
-      OUTPUT_PREFIX  = "analytics/output"
-      LOG_LEVEL      = "info"
+      DATABASE_URL  = aws_secretsmanager_secret.database_url.name
+      OUTPUT_BUCKET = aws_s3_bucket.analytics[0].bucket
+      OUTPUT_PREFIX = "analytics/output"
+      LOG_LEVEL     = "info"
     }
   }
 
@@ -346,6 +346,31 @@ resource "aws_lambda_permission" "analytics_load_results_invoke" {
   principal     = "s3.amazonaws.com"
 }
 
+# Chain pipeline stages only after each stage writes its completion marker.
+resource "aws_s3_bucket_notification" "analytics" {
+  count  = var.enable_analytics_pipeline ? 1 : 0
+  bucket = aws_s3_bucket.analytics[0].id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.analytics_start_emr[0].arn
+    events              = ["s3:ObjectCreated:Put"]
+    filter_prefix       = "analytics/staging/"
+    filter_suffix       = "/_SUCCESS"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.analytics_load_results[0].arn
+    events              = ["s3:ObjectCreated:Put"]
+    filter_prefix       = "analytics/output/"
+    filter_suffix       = "/_SUCCESS"
+  }
+
+  depends_on = [
+    aws_lambda_permission.analytics_start_emr_invoke,
+    aws_lambda_permission.analytics_load_results_invoke,
+  ]
+}
+
 # ── Nightly EventBridge schedule ──────────────────────────────────────────
 resource "aws_cloudwatch_event_rule" "analytics_nightly" {
   count = var.enable_analytics_pipeline ? 1 : 0
@@ -359,8 +384,8 @@ resource "aws_cloudwatch_event_rule" "analytics_nightly" {
 resource "aws_cloudwatch_event_target" "analytics_nightly" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
-  rule  = aws_cloudwatch_event_rule.analytics_nightly[0].name
-  arn   = aws_lambda_function.analytics_dump_rds[0].arn
+  rule = aws_cloudwatch_event_rule.analytics_nightly[0].name
+  arn  = aws_lambda_function.analytics_dump_rds[0].arn
 }
 
 # ── Outputs ───────────────────────────────────────────────────────────────

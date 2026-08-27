@@ -11,6 +11,8 @@ import {
   TerminateJobFlowsCommand,
 } from "@aws-sdk/client-emr";
 
+import { analyticsLogger as logger } from "../logger";
+
 export interface StartEmrConfig {
   region: string;
   subnetId: string;
@@ -85,6 +87,33 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function stagingPathFromEvent(event: Record<string, unknown>): string | undefined {
+  if (typeof event.stagingPath === "string") return event.stagingPath;
+
+  const key = s3EventObjectKey(event);
+  return key?.endsWith("/_SUCCESS") ? key.slice(0, -"/_SUCCESS".length) : undefined;
+}
+
+function s3EventObjectKey(event: Record<string, unknown>): string | undefined {
+  const records = event.Records;
+  if (!Array.isArray(records) || records.length === 0) return undefined;
+
+  const record = records[0];
+  if (record === null || typeof record !== "object") return undefined;
+  const s3 = (record as { s3?: unknown }).s3;
+  if (s3 === null || typeof s3 !== "object") return undefined;
+  const object = (s3 as { object?: unknown }).object;
+  if (object === null || typeof object !== "object") return undefined;
+  const encodedKey = (object as { key?: unknown }).key;
+  if (typeof encodedKey !== "string") return undefined;
+
+  try {
+    return decodeURIComponent(encodedKey.replace(/\+/g, " "));
+  } catch {
+    return encodedKey;
+  }
+}
+
 export async function handler(
   event: Record<string, unknown>,
 ): Promise<EmrResult> {
@@ -95,9 +124,10 @@ export async function handler(
   try {
     // 1. Find the latest staging path
     const stagingPath =
-      (event.stagingPath as string) ??
+      stagingPathFromEvent(event) ??
       `${config.stagingPrefix}/${new Date().toISOString().replace(/[:-]/g, "").split(".")[0]!}`;
     const outputPath = `${config.outputPrefix}/${new Date().toISOString().replace(/[:-]/g, "").split(".")[0]!}`;
+    logger.info({ stagingPath, outputPath, trigger: event.Records ? "s3" : "direct" }, "analytics EMR start requested");
 
     // 2. Start transient EMR cluster
     const runJobFlowResponse = await emr.send(
@@ -158,14 +188,17 @@ export async function handler(
     const clusterId = runJobFlowResponse.JobFlowId;
     if (!clusterId)
       throw new Error("EMR cluster creation returned no JobFlowId");
+    logger.info({ clusterId, stagingPath, outputPath }, "analytics EMR cluster started");
 
     // 3. Poll until cluster completes (WAITING or TERMINATED)
     const deadline = Date.now() + config.clusterTimeoutMs;
     let clusterState = "";
+    let previousClusterState = "";
     do {
       await sleep(config.clusterPollIntervalMs);
 
       if (Date.now() > deadline) {
+        logger.error({ clusterId, timeoutMs: config.clusterTimeoutMs }, "analytics EMR cluster timed out");
         await emr.send(
           new TerminateJobFlowsCommand({ JobFlowIds: [clusterId] }),
         );
@@ -183,9 +216,14 @@ export async function handler(
         new DescribeClusterCommand({ ClusterId: clusterId }),
       );
       clusterState = describeResponse.Cluster?.Status?.State ?? "UNKNOWN";
+      if (clusterState !== previousClusterState) {
+        logger.info({ clusterId, clusterState }, "analytics EMR cluster state changed");
+        previousClusterState = clusterState;
+      }
     } while (clusterState !== "TERMINATED" && clusterState !== "WAITING");
 
     // RunJobFlow does not return an ID for steps submitted with the request.
+    logger.info({ clusterId, clusterState, outputPath }, "analytics EMR cluster completed");
     return {
       success: clusterState === "TERMINATED",
       clusterId,
@@ -196,6 +234,7 @@ export async function handler(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error({ err: error }, "analytics EMR start failed");
     return {
       success: false,
       clusterId: null,
