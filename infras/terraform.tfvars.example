@@ -33,6 +33,7 @@ force_destroy_buckets = false
 # (cd backend && pnpm build:analytics)
 # No Lambda build is needed for the Glue/Athena path.
 #   enable_analytics_pipeline = true
+#   enable_legacy_analytics_schedule = false
 #   analytics_dump_rds_zip         = "../backend/dist-function/analytics-dump-rds.zip"
 #   analytics_start_serverless_zip = "../backend/dist-function/analytics-start-serverless.zip"
 #   analytics_load_results_zip     = "../backend/dist-function/analytics-load-results.zip"

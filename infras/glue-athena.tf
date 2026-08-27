@@ -110,6 +110,31 @@ resource "aws_security_group_rule" "analytics_glue_to_database" {
   description              = "Glue analytics export PostgreSQL access"
 }
 
+resource "aws_route_table" "analytics_private" {
+  count  = var.enable_analytics_pipeline ? 1 : 0
+  vpc_id = aws_vpc.this.id
+
+  tags = { Name = "${local.name}-analytics-private" }
+}
+
+resource "aws_route_table_association" "analytics_private" {
+  count = var.enable_analytics_pipeline ? 2 : 0
+
+  subnet_id      = aws_subnet.database[count.index].id
+  route_table_id = aws_route_table.analytics_private[0].id
+}
+
+resource "aws_vpc_endpoint" "analytics_s3" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.analytics_private[0].id]
+
+  tags = { Name = "${local.name}-analytics-s3" }
+}
+
 resource "aws_glue_connection" "analytics" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
@@ -184,6 +209,42 @@ resource "aws_glue_catalog_table" "analytics" {
   }
 }
 
+resource "aws_glue_catalog_table" "analytics_snapshot_manifest" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  name          = "snapshot_manifest"
+  database_name = aws_glue_catalog_database.analytics[0].name
+  table_type    = "EXTERNAL_TABLE"
+
+  storage_descriptor {
+    location      = "s3://${aws_s3_bucket.analytics[0].id}/analytics/manifest/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      name                  = "snapshot-manifest-parquet"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    }
+
+    columns {
+      name = "snapshot_at"
+      type = "string"
+    }
+    columns {
+      name = "snapshot_id"
+      type = "string"
+    }
+    columns {
+      name = "completed_at"
+      type = "timestamp"
+    }
+  }
+
+  parameters = {
+    classification = "parquet"
+  }
+}
+
 resource "aws_athena_workgroup" "analytics" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
@@ -208,6 +269,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "analytics_retention" {
     id     = "expire-analytics-snapshots"
     status = "Enabled"
     filter { prefix = "analytics/source/" }
+    expiration { days = 30 }
+  }
+
+  rule {
+    id     = "expire-analytics-manifest"
+    status = "Enabled"
+    filter { prefix = "analytics/manifest/" }
     expiration { days = 30 }
   }
 

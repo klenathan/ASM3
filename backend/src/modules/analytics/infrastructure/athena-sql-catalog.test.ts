@@ -11,6 +11,7 @@ describe("ATHENA_METRIC_SQL", () => {
       expect(sql).toContain("period_start");
       expect(sql).toContain("period_end");
       expect(sql).toContain(" AS data");
+      expect(sql).toContain("snapshot_manifest");
     }
   });
 });

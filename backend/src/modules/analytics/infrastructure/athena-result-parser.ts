@@ -1,4 +1,11 @@
 import type { AthenaMetricRow } from "../application/refresh-orchestrator.ports";
+import type {
+  ContentVolumeData,
+  MetricPayload,
+  ModerationData,
+  TopSocietiesData,
+  UserGrowthData,
+} from "../domain/analytics";
 import { assertMetricType } from "../domain/analytics";
 
 export type AthenaResultRow = readonly (string | null | undefined)[];
@@ -32,13 +39,14 @@ export function parseAthenaResultRows(
     if (data === null || typeof data !== "object" || Array.isArray(data)) {
       throw new Error(`Athena result row ${index + 1} data must be a JSON object`);
     }
+    const payload = validatePayload(metricType, data as Record<string, unknown>, index);
 
     return {
       metricType,
       societyId: optionalValue(row, indexes.get("society_id")!) || null,
       periodStart,
       periodEnd,
-      data: data as AthenaMetricRow["data"],
+      data: payload,
     };
   });
 }
@@ -69,4 +77,72 @@ function parseDate(value: string, column: string): Date {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new Error(`Athena result has invalid ${column}: ${value}`);
   return date;
+}
+
+function validatePayload(
+  metricType: AthenaMetricRow["metricType"],
+  data: Record<string, unknown>,
+  rowIndex: number,
+): MetricPayload {
+  switch (metricType) {
+    case "user_growth":
+      return numericPayload<UserGrowthData>(data, [
+        "registrations",
+        "active_users",
+        "total_users",
+        "suspensions",
+      ], rowIndex);
+    case "content_volume":
+      return numericPayload<ContentVolumeData>(data, [
+        "threads",
+        "comments",
+        "votes",
+        "reports",
+      ], rowIndex);
+    case "moderation":
+      return numericPayload<ModerationData>(data, [
+        "pending_reports",
+        "resolved_today",
+        "avg_resolution_hours",
+        "total_reports",
+      ], rowIndex);
+    case "top_societies":
+      return topSocietiesPayload(data, rowIndex);
+  }
+}
+
+function numericPayload<T extends object>(
+  data: Record<string, unknown>,
+  fields: readonly string[],
+  rowIndex: number,
+): T {
+  for (const field of fields) {
+    if (typeof data[field] !== "number" || !Number.isFinite(data[field])) {
+      throw new Error(`Athena result row ${rowIndex + 1} has invalid data field: ${field}`);
+    }
+  }
+  return data as T;
+}
+
+function topSocietiesPayload(data: Record<string, unknown>, rowIndex: number): TopSocietiesData {
+  for (const field of ["top_by_members", "top_by_threads"]) {
+    const entries = data[field];
+    if (!Array.isArray(entries)) {
+      throw new Error(`Athena result row ${rowIndex + 1} has invalid data field: ${field}`);
+    }
+    for (const entry of entries) {
+      if (
+        entry === null ||
+        typeof entry !== "object" ||
+        Array.isArray(entry) ||
+        typeof entry.society_id !== "string" ||
+        typeof entry.name !== "string" ||
+        typeof entry.member_count !== "number" ||
+        typeof entry.thread_count !== "number"
+      ) {
+        throw new Error(`Athena result row ${rowIndex + 1} has invalid society entry`);
+      }
+    }
+  }
+  return data as unknown as TopSocietiesData;
 }

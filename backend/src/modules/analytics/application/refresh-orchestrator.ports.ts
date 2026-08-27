@@ -64,11 +64,7 @@ export type GlueJobRunStatus =
   | "CANCELLED";
 
 export interface GlueGateway {
-  /**
-   * Real adapters must forward `runId` as the job's idempotency token (or as
-   * a job argument consumed by the ETL script) so a replayed start after a
-   * crash resolves to the same job run instead of launching a duplicate.
-   */
+  /** Real adapters must use the run argument to resolve replayed starts. */
   startJobRun(input: GlueJobStartInput): Promise<string>;
   getJobRunStatus(jobRunId: string): Promise<GlueJobRunStatus>;
 }

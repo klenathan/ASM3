@@ -12,10 +12,11 @@ const PERIOD_COLUMNS = `
 export const ATHENA_METRIC_SQL: MetricSqlCatalog = {
   user_growth: `
 WITH latest AS (
-  SELECT max(snapshot_at) AS snapshot_at FROM analytics.users
+  SELECT snapshot_at, snapshot_id FROM analytics.snapshot_manifest
+  ORDER BY completed_at DESC LIMIT 1
 ), current_users AS (
   SELECT u.* FROM analytics.users u
-  JOIN latest l ON u.snapshot_at = l.snapshot_at
+  JOIN latest l ON u.snapshot_at = l.snapshot_at AND u.snapshot_id = l.snapshot_id
 )
 SELECT
   'user_growth' AS metric_type,
@@ -30,18 +31,21 @@ SELECT
 FROM current_users`,
 
   content_volume: `
-WITH latest_threads AS (
+WITH latest AS (
+  SELECT snapshot_at, snapshot_id FROM analytics.snapshot_manifest
+  ORDER BY completed_at DESC LIMIT 1
+), latest_threads AS (
   SELECT t.* FROM analytics.threads t
-  WHERE t.snapshot_at = (SELECT max(snapshot_at) FROM analytics.threads)
+  JOIN latest l ON t.snapshot_at = l.snapshot_at AND t.snapshot_id = l.snapshot_id
 ), latest_comments AS (
   SELECT c.* FROM analytics.comments c
-  WHERE c.snapshot_at = (SELECT max(snapshot_at) FROM analytics.comments)
+  JOIN latest l ON c.snapshot_at = l.snapshot_at AND c.snapshot_id = l.snapshot_id
 ), latest_votes AS (
   SELECT v.* FROM analytics.votes v
-  WHERE v.snapshot_at = (SELECT max(snapshot_at) FROM analytics.votes)
+  JOIN latest l ON v.snapshot_at = l.snapshot_at AND v.snapshot_id = l.snapshot_id
 ), latest_reports AS (
   SELECT r.* FROM analytics.reports r
-  WHERE r.snapshot_at = (SELECT max(snapshot_at) FROM analytics.reports)
+  JOIN latest l ON r.snapshot_at = l.snapshot_at AND r.snapshot_id = l.snapshot_id
 ), society_counts AS (
   SELECT society_id, count(*) AS threads, 0 AS comments, 0 AS votes, 0 AS reports
   FROM latest_threads GROUP BY society_id
@@ -71,9 +75,12 @@ FROM society_counts
 GROUP BY society_id`,
 
   top_societies: `
-WITH latest_societies AS (
+WITH latest AS (
+  SELECT snapshot_at, snapshot_id FROM analytics.snapshot_manifest
+  ORDER BY completed_at DESC LIMIT 1
+), latest_societies AS (
   SELECT s.* FROM analytics.societies s
-  WHERE s.snapshot_at = (SELECT max(snapshot_at) FROM analytics.societies)
+  JOIN latest l ON s.snapshot_at = l.snapshot_at AND s.snapshot_id = l.snapshot_id
 ), society_stats AS (
   SELECT
     s.id AS society_id,
@@ -84,10 +91,12 @@ WITH latest_societies AS (
   LEFT JOIN analytics.memberships m
     ON m.society_id = s.id
    AND m.status = 'active'
-   AND m.snapshot_at = (SELECT max(snapshot_at) FROM analytics.memberships)
+   AND m.snapshot_at = (SELECT snapshot_at FROM latest)
+   AND m.snapshot_id = (SELECT snapshot_id FROM latest)
   LEFT JOIN analytics.threads t
     ON t.society_id = s.id
-   AND t.snapshot_at = (SELECT max(snapshot_at) FROM analytics.threads)
+   AND t.snapshot_at = (SELECT snapshot_at FROM latest)
+   AND t.snapshot_id = (SELECT snapshot_id FROM latest)
   GROUP BY s.id, s.name
 ), top_members AS (
   SELECT * FROM society_stats ORDER BY member_count DESC, society_id LIMIT 10
@@ -108,9 +117,12 @@ SELECT
   ) AS ROW(top_by_members JSON, top_by_threads JSON)) AS JSON)) AS data`,
 
   moderation: `
-WITH latest AS (
+WITH latest_snapshot AS (
+  SELECT snapshot_at, snapshot_id FROM analytics.snapshot_manifest
+  ORDER BY completed_at DESC LIMIT 1
+), latest AS (
   SELECT r.* FROM analytics.reports r
-  WHERE r.snapshot_at = (SELECT max(snapshot_at) FROM analytics.reports)
+  JOIN latest_snapshot l ON r.snapshot_at = l.snapshot_at AND r.snapshot_id = l.snapshot_id
 ), society_metrics AS (
   SELECT
     society_id,

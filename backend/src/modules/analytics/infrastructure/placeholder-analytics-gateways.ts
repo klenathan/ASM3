@@ -9,8 +9,8 @@ import type {
 
 /**
  * Placeholder adapters used until the real AWS SDK implementations land
- * (ticket #9 owns the @aws-sdk/client-glue / client-athena adapters that
- * implement the same ports). They complete instantly with zero output so a
+ * (the production adapters use @aws-sdk/client-glue / client-athena). They
+ * complete instantly with zero output so a
  * configured environment exercises the full run lifecycle end-to-end without
  * touching data.
  */

@@ -23,6 +23,12 @@ variable "enable_analytics_pipeline" {
   default     = false
 }
 
+variable "enable_legacy_analytics_schedule" {
+  description = "Keep the pre-migration EMR/Lambda nightly trigger available for rollback."
+  type        = bool
+  default     = false
+}
+
 variable "analytics_dump_rds_zip" {
   description = "Path to the built dump-rds Lambda zip."
   type        = string
@@ -351,7 +357,7 @@ resource "aws_cloudwatch_log_group" "analytics_load_results" {
 
 # ── Lambda permissions (LabRole invoke) ───────────────────────────────────
 resource "aws_lambda_permission" "analytics_dump_rds_invoke" {
-  count = var.enable_analytics_pipeline ? 1 : 0
+  count = var.enable_legacy_analytics_schedule ? 1 : 0
 
   statement_id  = "AllowEventBridgeDump"
   action        = "lambda:InvokeFunction"
@@ -416,7 +422,7 @@ resource "aws_s3_bucket_notification" "analytics" {
 
 # ── Nightly EventBridge schedule ──────────────────────────────────────────
 resource "aws_cloudwatch_event_rule" "analytics_nightly" {
-  count = var.enable_analytics_pipeline ? 1 : 0
+  count = var.enable_legacy_analytics_schedule ? 1 : 0
 
   name                = "${local.name}-analytics-nightly"
   description         = "Trigger analytics dump-rds Lambda nightly at 2 AM"
@@ -425,7 +431,7 @@ resource "aws_cloudwatch_event_rule" "analytics_nightly" {
 }
 
 resource "aws_cloudwatch_event_target" "analytics_nightly" {
-  count = var.enable_analytics_pipeline ? 1 : 0
+  count = var.enable_legacy_analytics_schedule ? 1 : 0
 
   rule = aws_cloudwatch_event_rule.analytics_nightly[0].name
   arn  = aws_lambda_function.analytics_dump_rds[0].arn

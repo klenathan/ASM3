@@ -19,7 +19,7 @@ describe("parseAthenaResultRows", () => {
         "",
         "2026-08-27T00:00:00.000Z",
         "2026-08-27T23:59:59.999Z",
-        '{"registrations":12,"activeUsers":10,"totalUsers":30,"suspensions":1}',
+        '{"registrations":12,"active_users":10,"total_users":30,"suspensions":1}',
       ],
     ];
 
@@ -31,8 +31,8 @@ describe("parseAthenaResultRows", () => {
         periodEnd: new Date("2026-08-27T23:59:59.999Z"),
         data: {
           registrations: 12,
-          activeUsers: 10,
-          totalUsers: 30,
+          active_users: 10,
+          total_users: 30,
           suspensions: 1,
         },
       },
@@ -45,5 +45,17 @@ describe("parseAthenaResultRows", () => {
         ["unknown_metric", "", "2026-08-27", "2026-08-27", "{}"],
       ]),
     ).toThrow("Invalid metric type");
+  });
+
+  it("rejects a payload that does not match its metric group", () => {
+    expect(() =>
+      parseAthenaResultRows(columns, [[
+        "user_growth",
+        "",
+        "2026-08-27",
+        "2026-08-27",
+        '{"registrations":1}',
+      ]]),
+    ).toThrow("active_users");
   });
 });

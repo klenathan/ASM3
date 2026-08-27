@@ -1,4 +1,9 @@
-import { GetJobRunCommand, GlueClient, StartJobRunCommand } from "@aws-sdk/client-glue";
+import {
+  GetJobRunCommand,
+  GetJobRunsCommand,
+  GlueClient,
+  StartJobRunCommand,
+} from "@aws-sdk/client-glue";
 
 import type {
   GlueGateway,
@@ -11,7 +16,7 @@ export interface GlueGatewayConfig {
   readonly jobName: string;
 }
 
-type GlueCommand = StartJobRunCommand | GetJobRunCommand;
+type GlueCommand = StartJobRunCommand | GetJobRunCommand | GetJobRunsCommand;
 type SendGlueCommand = (command: GlueCommand) => Promise<unknown>;
 
 const STATUS_MAP: Readonly<Record<string, GlueJobRunStatus>> = {
@@ -37,6 +42,19 @@ export class GlueGatewayAdapter implements GlueGateway {
   }
 
   async startJobRun(input: GlueJobStartInput): Promise<string> {
+    const existing = await this.send(
+      new GetJobRunsCommand({ JobName: this.config.jobName, MaxResults: 100 }),
+    ) as { Jobs?: readonly { Id?: string; JobRunState?: string; Arguments?: Record<string, string> }[] };
+    const existingRun = existing.Jobs?.find(
+      (job) => job.Arguments?.["--refresh-run-id"] === input.runId &&
+        job.Id !== undefined &&
+        job.JobRunState !== "FAILED" &&
+        job.JobRunState !== "ERROR" &&
+        job.JobRunState !== "TIMEOUT" &&
+        job.JobRunState !== "STOPPED",
+    );
+    if (existingRun?.Id !== undefined) return existingRun.Id;
+
     const response = await this.send(
       new StartJobRunCommand({
         JobName: this.config.jobName,

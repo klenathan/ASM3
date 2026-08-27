@@ -36,29 +36,35 @@ consistent PostgreSQL snapshot to these locations:
 
 ```text
 s3://<analytics-bucket>/analytics/source/table=users/
-  snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
+snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
 s3://<analytics-bucket>/analytics/source/table=societies/
   snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
 ...
 s3://<analytics-bucket>/analytics/query-results/<athena-query-files>
 s3://<analytics-bucket>/analytics/glue-temp/<temporary-files>
+s3://<analytics-bucket>/analytics/manifest/part-*.parquet
 ```
 
 The source dataset contains `users`, `societies`, `threads`, `comments`,
-`memberships`, `votes`, and `reports`. `society_id` is retained where the
+`memberships`, `votes`, and `reports`, plus a `snapshot_manifest` metadata
+table. `society_id` is retained where the
 source or join supplies it; votes remain a platform-wide count, matching the
 current metric behavior. `snapshot_at` and `snapshot_id` are partition keys.
-The timestamp lets Athena select the newest complete snapshot while the run
-ID prevents same-day manual refreshes from overwriting one another.
+The Glue job reads all seven source tables in one PostgreSQL repeatable-read
+transaction. It writes the manifest only after every table succeeds. Athena
+selects the newest manifest row and joins every source table to that exact
+`snapshot_at`/`snapshot_id` pair, so a partial or mixed snapshot cannot become
+the dashboard input. The run ID prevents same-day manual refreshes from
+overwriting one another.
 
-Only the source data is retained for 30 days. Athena result files are retained
+Only the source data and snapshot manifest are retained for 30 days. Athena result files are retained
 for 7 days and Glue temporary files for 1 day. `analytics_metrics` in RDS is
 the durable dashboard history and is not subject to the S3 lifecycle rules.
 
 ### Glue Catalog
 
 Glue owns one database, `analytics`, with one external Parquet table for each
-source table. Every table has its source columns plus the partition keys
+source table and an unpartitioned `snapshot_manifest` table. Every source table has its source columns plus the partition keys
 `snapshot_at string` and `snapshot_id string`; the table location is the
 corresponding `analytics/source/table=<name>/` prefix. The export job updates
 the catalog partitions as it writes each table. No crawler is required, which
@@ -190,8 +196,10 @@ AWS-side dedupe below, so replaying unfinished runs cannot duplicate work.
 - **Glue start:** retries are bounded by `maxPhaseRetries` (env
   `ANALYTICS_REFRESH_MAX_PHASE_RETRIES`, default 3); start failures increment
   the attempt counter and stay non-terminal so the reconciler retries. Real
-  adapter must pass the run id as the job's idempotency token / argument
-  (`--refresh-run-id`) so a replayed `StartJobRun` resolves to the same run.
+  adapter passes the run ID as `--refresh-run-id`, checks recent Glue runs for
+  that argument before calling `StartJobRun`, and returns the existing run ID
+  on replay. Glue has no native client idempotency token, so this lookup plus
+  the deterministic snapshot manifest is the idempotency boundary.
 - **Glue failure states** (`FAILED/ERROR/TIMEOUT/CANCELLED`) reset the run to
   `requested` up to the cap, then fail terminally.
 - **Athena queries:** started once per metric group with

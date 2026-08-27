@@ -116,6 +116,8 @@ class FakeAthenaGateway implements AthenaGateway {
 
 const SQL_CATALOG = {
   user_growth: "SELECT * FROM metric_user_growth",
+  content_volume: "SELECT * FROM metric_content_volume",
+  top_societies: "SELECT * FROM metric_top_societies",
   moderation: "SELECT * FROM metric_moderation",
 };
 
@@ -178,12 +180,9 @@ describe("AnalyticsRefreshOrchestrator", () => {
     // Force the initial export start to fail once to also cover the
     // reconciler's retry path.
     glue.failStarts = true;
-    try {
-      await orchestrator.requestRefresh("admin");
-      throw new Error("expected export start failure");
-    } catch {
-      // recorded as transient error on the requested run
-    }
+    const result = await orchestrator.requestRefresh("admin");
+    expect(result.coalesced).toBe(false);
+    expect((await soleRun(runStore)).status).toBe("requested");
     glue.failStarts = false;
 
     await orchestrator.reconcile();
@@ -201,12 +200,14 @@ describe("AnalyticsRefreshOrchestrator", () => {
     await orchestrator.reconcile();
     expect(athena.startedQueries.map((q) => q.clientRequestToken)).toEqual([
       `${stored.runId}:user_growth`,
+      `${stored.runId}:content_volume`,
+      `${stored.runId}:top_societies`,
       `${stored.runId}:moderation`,
     ]);
 
     stored = await soleRun(runStore);
     expect(stored.status).toBe("completed");
-    expect(repository.upserts).toHaveLength(4);
+    expect(repository.upserts).toHaveLength(8);
     const growthRow = repository.upserts.find(
       (row) => row.metricType === "user_growth",
     )!;
@@ -237,12 +238,7 @@ describe("AnalyticsRefreshOrchestrator", () => {
     failing.failStarts = true;
     const orchestrator = createOrchestrator({ glue: failing, maxPhaseRetries: 2 });
 
-    try {
-      await orchestrator.requestRefresh("admin");
-      throw new Error("expected export start failure");
-    } catch (error) {
-      expect((error as Error).message).toBe("glue unavailable");
-    }
+    await orchestrator.requestRefresh("admin");
 
     await orchestrator.reconcile();
     await orchestrator.reconcile();
@@ -264,19 +260,27 @@ describe("AnalyticsRefreshOrchestrator", () => {
 
     let stored = await soleRun(runStore);
     expect(stored.status).toBe("querying");
-    const [growthQuery, moderationQuery] = Object.values(
+    const [growthQuery, contentQuery, topSocietiesQuery, moderationQuery] = Object.values(
       stored.athenaQueryExecutionIds,
     );
     expect(growthQuery).toBeDefined();
+    expect(contentQuery).toBeDefined();
+    expect(topSocietiesQuery).toBeDefined();
     expect(moderationQuery).toBeDefined();
 
     athena.setStatus(growthQuery!, "SUCCEEDED");
+    athena.setStatus(contentQuery!, "SUCCEEDED");
+    athena.setStatus(topSocietiesQuery!, "SUCCEEDED");
     athena.setStatus(moderationQuery!, "FAILED");
 
     await orchestrator.reconcile();
     stored = await soleRun(runStore);
     expect(stored.attempts).toBe(1);
-    expect(Object.keys(stored.athenaQueryExecutionIds)).toEqual(["user_growth"]);
+    expect(Object.keys(stored.athenaQueryExecutionIds)).toEqual([
+      "user_growth",
+      "content_volume",
+      "top_societies",
+    ]);
 
     athena.defaultStatus = "SUCCEEDED";
     await orchestrator.reconcile();
@@ -284,6 +288,8 @@ describe("AnalyticsRefreshOrchestrator", () => {
     expect(stored.status).toBe("completed");
     expect(Object.keys(stored.athenaQueryExecutionIds)).toEqual([
       "user_growth",
+      "content_volume",
+      "top_societies",
       "moderation",
     ]);
     expect(repository.upserts.length).toBeGreaterThan(0);
