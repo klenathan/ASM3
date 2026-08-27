@@ -33,6 +33,16 @@ export interface SocietyPage {
   readonly hasMore: boolean
 }
 
+export interface ThreadLocation {
+  readonly name: string
+  readonly mapboxId: string
+  readonly placeType: string | null
+  readonly latitude: number
+  readonly longitude: number
+  readonly address: Record<string, unknown> | null
+  readonly meta?: Record<string, unknown> | null
+}
+
 export interface Thread {
   readonly id: string
   readonly societyId: string
@@ -52,6 +62,7 @@ export interface Thread {
   readonly analysisDecision?: 'allow' | 'review' | null
   readonly analysisFailed?: boolean
   readonly analysisOverride?: 'accept' | 'reject' | null
+  readonly location: ThreadLocation | null
 }
 
 export interface ThreadPage {
@@ -82,16 +93,27 @@ export interface CommentPage {
   readonly hasMore: boolean
 }
 
+export interface ThreadLocationInput {
+  readonly mapboxId: string
+  readonly name?: string
+  readonly latitude?: number
+  readonly longitude?: number
+  readonly placeType?: string | null
+  readonly address?: Record<string, unknown> | null
+}
+
 export interface CreateThreadInput {
   readonly title: string
   readonly body: string
   readonly mediaIds?: readonly string[]
+  readonly location?: ThreadLocationInput | null
 }
 
 export interface CreateThreadDraft {
   readonly title: string
   readonly body: string
   readonly images: readonly File[]
+  readonly location?: ThreadLocationInput | null
 }
 
 export interface SocietyMembership {

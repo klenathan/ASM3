@@ -1,10 +1,13 @@
 import { ArrowBigUp, MessageCircle, Share2 } from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { cn } from "../../lib/utils";
 import { ThreadMedia } from "../media/thread-media";
 import { timeAgo } from "./use-thread-vote";
 import { AnalysisBadge } from "./analysis-badge";
+import { LocationPill } from "../location/location-pill";
+import { LocationModal } from "../location/location-modal";
 import type { DiscussionItem } from "./types";
 
 export function DiscussionCard({
@@ -17,6 +20,7 @@ export function DiscussionCard({
   readonly showSociety?: boolean;
 }) {
   const navigate = useNavigate();
+  const [locationOpen, setLocationOpen] = useState(false);
   const liked = item.myVote === 1;
   const threadUrl =
     item.societySlug === null ? null : `/s/${item.societySlug}/t/${item.id}`;
@@ -88,6 +92,11 @@ export function DiscussionCard({
             <ThreadMedia mediaIds={item.mediaIds} size="md" />
           </div>
         )}
+        {item.location && (
+          <div className="mt-2">
+            <LocationPill location={item.location} onClick={() => setLocationOpen(true)} />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-5 text-xs font-medium text-muted-foreground">
@@ -139,6 +148,9 @@ export function DiscussionCard({
           <Share2 aria-hidden="true" className="size-4" strokeWidth={2} />
         </span>
       </div>
+      {item.location && (
+        <LocationModal location={item.location} open={locationOpen} onOpenChange={setLocationOpen} />
+      )}
     </div>
   );
 }

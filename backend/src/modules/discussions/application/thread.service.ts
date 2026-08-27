@@ -38,6 +38,7 @@ import {
   normalizeThreadBody,
   normalizeThreadTitle,
 } from "../domain/discussion";
+import type { PlacesPort } from "../../places/application/places.port";
 
 export interface AnalysisModerationPort {
   override(
@@ -56,6 +57,7 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly profile: DiscussionProfilePort;
   readonly media: ThreadMediaPort;
   readonly events: ThreadEventPublisher;
+  readonly placesPort?: PlacesPort;
   /**
    * Optional read-only source of the latest automated content-analysis outcome
    * for a thread, used to surface a verification badge.
@@ -92,6 +94,7 @@ export class ThreadService {
   private readonly analysisModeration: AnalysisModerationPort | undefined;
   private readonly analysisDecisionReader: AnalysisDecisionReader | undefined;
   private readonly threadAnalysisReader: ThreadAnalysisDetailsReader | undefined;
+  private readonly placesPort: PlacesPort | undefined;
 
   constructor(dependencies: ThreadServiceDependencies) {
     this.repository = dependencies.repository;
@@ -105,6 +108,7 @@ export class ThreadService {
     this.analysisModeration = dependencies.analysisModeration;
     this.analysisDecisionReader = dependencies.analysisDecisionReader;
     this.threadAnalysisReader = dependencies.threadAnalysisReader;
+    this.placesPort = dependencies.placesPort;
   }
 
   async createThread(
@@ -116,6 +120,7 @@ export class ThreadService {
     const societyId = society.id;
     await requireActiveMember(this.authorization, principal, societyId);
     const now = this.clock.now();
+    const location = await this.resolveLocation(command.location);
     const input: CreateThreadInput = {
       id: randomUUID(),
       societyId,
@@ -124,6 +129,7 @@ export class ThreadService {
       body: normalizeThreadBody(command.body),
       createdAt: now,
       updatedAt: now,
+      location,
     };
     const mediaIds = normalizeMediaIds(command.mediaIds);
     await this.media.assertReadyThreadAttachments(principal.userId, mediaIds);
@@ -192,10 +198,12 @@ export class ThreadService {
     }
 
     const now = this.clock.now();
+    const locationInput = await this.resolveLocationUpdate(command.location);
     const input: UpdateThreadInput = {
       updatedAt: now,
       ...(command.title === undefined ? {} : { title: normalizeThreadTitle(command.title) }),
       ...(command.body === undefined ? {} : { body: normalizeThreadBody(command.body) }),
+      ...locationInput,
     };
     const mediaIds = command.mediaIds === undefined ? undefined : normalizeMediaIds(command.mediaIds);
     if (mediaIds !== undefined) {
@@ -383,6 +391,46 @@ export class ThreadService {
     const states = await this.analysisDecisionReader.findLatestAnalysisStatesByThreads([threadId]);
     return states.get(threadId) ?? null;
   }
+
+  private async resolveLocation(location: CreateThreadCommand["location"]): Promise<LocationSnapshot> {
+    if (location === undefined) return undefined;
+    if (location === null) return null;
+    if (!location.mapboxId) throw new ApplicationError("VALIDATION_ERROR", "Location mapboxId is required");
+    if (this.placesPort === undefined) {
+      throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
+    }
+    const details = await this.placesPort.retrieve(location.mapboxId, null);
+    return {
+      name: details.name,
+      mapboxId: details.mapboxId,
+      placeType: details.placeType,
+      latitude: details.latitude,
+      longitude: details.longitude,
+      address: details.address,
+      meta: details.meta,
+    };
+  }
+
+  private async resolveLocationUpdate(location: UpdateThreadCommand["location"]): Promise<Partial<UpdateThreadInput>> {
+    if (location === undefined) return {};
+    if (location === null) return { clearLocation: true };
+    if (!location.mapboxId) throw new ApplicationError("VALIDATION_ERROR", "Location mapboxId is required");
+    if (this.placesPort === undefined) {
+      throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
+    }
+    const details = await this.placesPort.retrieve(location.mapboxId, null);
+    return {
+      location: {
+        name: details.name,
+        mapboxId: details.mapboxId,
+        placeType: details.placeType,
+        latitude: details.latitude,
+        longitude: details.longitude,
+        address: details.address,
+        meta: details.meta,
+      },
+    };
+  }
 }
 
 function normalizeMediaIds(mediaIds: readonly string[] | undefined): readonly string[] {
@@ -393,6 +441,8 @@ function normalizeMediaIds(mediaIds: readonly string[] | undefined): readonly st
 
   return [...mediaIds];
 }
+
+type LocationSnapshot = CreateThreadInput["location"];
 
 export function normalizeThreadPageLimit(limit: number | undefined): number {
   return normalizePageSize(limit);

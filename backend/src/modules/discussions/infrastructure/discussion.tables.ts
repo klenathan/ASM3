@@ -1,8 +1,10 @@
 import { desc, sql } from "drizzle-orm";
 import {
   check,
+  doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   smallint,
@@ -40,6 +42,13 @@ export const threads = pgTable(
       .notNull()
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
+    locationName: text("location_name"),
+    locationMapboxId: text("location_mapbox_id"),
+    locationPlaceType: text("location_place_type"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    locationAddress: jsonb("location_address").$type<Record<string, unknown> | null>(),
+    locationMeta: jsonb("location_meta").$type<Record<string, unknown> | null>(),
   },
   (table) => [
     index("threads_society_status_created_id_idx").on(
@@ -54,8 +63,15 @@ export const threads = pgTable(
       desc(table.createdAt),
       desc(table.id),
     ),
+    index("threads_location_mapbox_id_idx").on(table.locationMapboxId),
     check("threads_status_check", sql`${table.status} in ('published', 'removed', 'deleted')`),
     check("threads_comment_count_non_negative_check", sql`${table.commentCount} >= 0`),
+    check(
+      "threads_location_all_or_nothing_check",
+      sql`(${table.locationName} IS NULL) = (${table.latitude} IS NULL) AND (${table.latitude} IS NULL) = (${table.longitude} IS NULL) AND (${table.latitude} IS NULL) = (${table.locationMapboxId} IS NULL)`,
+    ),
+    check("threads_lat_range_check", sql`${table.latitude} IS NULL OR ${table.latitude} BETWEEN -90 AND 90`),
+    check("threads_lng_range_check", sql`${table.longitude} IS NULL OR ${table.longitude} BETWEEN -180 AND 180`),
   ],
 );
 

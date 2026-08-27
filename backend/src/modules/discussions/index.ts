@@ -28,6 +28,7 @@ export interface DiscussionsModuleDependencies {
   readonly analysisDecisionReader?: AnalysisDecisionReader;
   readonly threadAnalysisReader?: ThreadAnalysisDetailsReader;
   readonly analysisModeration?: AnalysisModerationPort;
+  readonly placesPort?: import("../places/application/places.port").PlacesPort;
 }
 
 export function createDiscussionsModule(dependencies: DiscussionsModuleDependencies) {
@@ -57,6 +58,9 @@ export function createDiscussionsModule(dependencies: DiscussionsModuleDependenc
       : {}),
     ...(dependencies.analysisModeration !== undefined
       ? { analysisModeration: dependencies.analysisModeration }
+      : {}),
+    ...(dependencies.placesPort !== undefined
+      ? { placesPort: dependencies.placesPort }
       : {}),
     ...authorization,
   });

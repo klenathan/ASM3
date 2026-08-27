@@ -214,7 +214,23 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
   }
 
   async createThread(input: CreateThreadInput): Promise<ThreadRecord> {
-    const rows = await this.executor.insert(threads).values(input).returning();
+    const values = {
+      id: input.id,
+      societyId: input.societyId,
+      authorId: input.authorId,
+      title: input.title,
+      body: input.body,
+      createdAt: input.createdAt,
+      updatedAt: input.updatedAt,
+      locationName: input.location?.name ?? null,
+      locationMapboxId: input.location?.mapboxId ?? null,
+      locationPlaceType: input.location?.placeType ?? null,
+      latitude: input.location?.latitude ?? null,
+      longitude: input.location?.longitude ?? null,
+      locationAddress: input.location?.address ?? null,
+      locationMeta: input.location?.meta ?? null,
+    };
+    const rows = await this.executor.insert(threads).values(values).returning();
     const row = rows[0];
     if (row === undefined) {
       throw new ApplicationError("DISCUSSION_DATA_INVALID", "The thread could not be created");
@@ -223,18 +239,41 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
   }
 
   async updateThread(threadId: string, input: UpdateThreadInput): Promise<ThreadRecord | null> {
-    const values: {
-      readonly title?: string;
-      readonly body?: string;
-      readonly updatedAt: Date;
-    } = {
+    const values: Record<string, unknown> = {
       updatedAt: input.updatedAt,
       ...(input.title === undefined ? {} : { title: input.title }),
       ...(input.body === undefined ? {} : { body: input.body }),
     };
+    if (input.clearLocation) {
+      values["locationName"] = null;
+      values["locationMapboxId"] = null;
+      values["locationPlaceType"] = null;
+      values["latitude"] = null;
+      values["longitude"] = null;
+      values["locationAddress"] = null;
+      values["locationMeta"] = null;
+    } else if (input.location !== undefined) {
+      if (input.location === null) {
+        values["locationName"] = null;
+        values["locationMapboxId"] = null;
+        values["locationPlaceType"] = null;
+        values["latitude"] = null;
+        values["longitude"] = null;
+        values["locationAddress"] = null;
+        values["locationMeta"] = null;
+      } else {
+        values["locationName"] = input.location.name;
+        values["locationMapboxId"] = input.location.mapboxId;
+        values["locationPlaceType"] = input.location.placeType;
+        values["latitude"] = input.location.latitude;
+        values["longitude"] = input.location.longitude;
+        values["locationAddress"] = input.location.address;
+        values["locationMeta"] = input.location.meta;
+      }
+    }
     const rows = await this.executor
       .update(threads)
-      .set(values)
+      .set(values as never)
       .where(eq(threads.id, threadId))
       .returning();
     const row = rows[0];
@@ -610,6 +649,7 @@ function cursorDate(value: string | number): Date {
 }
 
 function toThread(row: typeof threads.$inferSelect): ThreadRecord {
+  const hasLocation = row.locationName !== null && row.latitude !== null && row.longitude !== null && row.locationMapboxId !== null;
   return {
     id: row.id,
     societyId: row.societyId,
@@ -622,6 +662,17 @@ function toThread(row: typeof threads.$inferSelect): ThreadRecord {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
+    location: hasLocation
+      ? {
+          name: row.locationName as string,
+          mapboxId: row.locationMapboxId as string,
+          placeType: (row.locationPlaceType as string | null) ?? null,
+          latitude: row.latitude as number,
+          longitude: row.longitude as number,
+          address: (row.locationAddress as Record<string, unknown> | null) ?? null,
+          meta: (row.locationMeta as Record<string, unknown> | null) ?? null,
+        }
+      : null,
   };
 }
 

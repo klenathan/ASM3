@@ -43,6 +43,17 @@ export function toThreadDto(
     analysisDecision,
     analysisFailed,
     analysisOverride,
+    location: record.location
+      ? {
+          name: record.location.name,
+          mapboxId: record.location.mapboxId,
+          placeType: record.location.placeType,
+          latitude: record.location.latitude,
+          longitude: record.location.longitude,
+          address: record.location.address,
+          meta: record.location.meta,
+        }
+      : null,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     deletedAt: record.deletedAt?.toISOString() ?? null,

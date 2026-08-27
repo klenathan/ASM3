@@ -443,6 +443,7 @@ function toModerationAction(row: typeof moderationActions.$inferSelect): Moderat
 }
 
 function toThread(row: typeof threads.$inferSelect): ThreadRecord {
+  const hasLocation = (row as unknown as { locationName: string | null }).locationName !== null && (row as unknown as { latitude: number | null }).latitude !== null;
   return {
     id: row.id,
     societyId: row.societyId,
@@ -455,6 +456,7 @@ function toThread(row: typeof threads.$inferSelect): ThreadRecord {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
+    location: hasLocation ? { name: (row as unknown as { locationName: string }).locationName, mapboxId: (row as unknown as { locationMapboxId: string }).locationMapboxId, placeType: (row as unknown as { locationPlaceType: string | null }).locationPlaceType ?? null, latitude: (row as unknown as { latitude: number }).latitude, longitude: (row as unknown as { longitude: number }).longitude, address: (row as unknown as { locationAddress: Record<string, unknown> | null }).locationAddress ?? null, meta: (row as unknown as { locationMeta: Record<string, unknown> | null }).locationMeta ?? null } : null,
   };
 }
 

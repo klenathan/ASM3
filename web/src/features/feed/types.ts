@@ -1,3 +1,5 @@
+import type { ThreadLocation } from "../societies/types";
+
 export interface HomeFeedThread {
   readonly id: string
   readonly societyId: string
@@ -19,6 +21,7 @@ export interface HomeFeedThread {
   readonly analysisDecision?: 'allow' | 'review' | null
   readonly analysisFailed?: boolean
   readonly analysisOverride?: 'accept' | 'reject' | null
+  readonly location: ThreadLocation | null
 }
 
 export interface HomeFeedPage {

@@ -5,6 +5,16 @@ export type CommentStatus = "published" | "removed" | "deleted";
 
 export const MAX_COMMENT_DEPTH = 3;
 
+export interface ThreadLocation {
+  readonly name: string;
+  readonly mapboxId: string;
+  readonly placeType: string | null;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly address: Record<string, unknown> | null;
+  readonly meta: Record<string, unknown> | null;
+}
+
 export interface ThreadRecord {
   readonly id: string;
   readonly societyId: string;
@@ -17,6 +27,7 @@ export interface ThreadRecord {
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly deletedAt: Date | null;
+  readonly location: ThreadLocation | null;
 }
 
 export interface CommentRecord {

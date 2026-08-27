@@ -46,6 +46,7 @@ const thread: ThreadRecord = {
   createdAt: now,
   updatedAt: now,
   deletedAt: null,
+      location: null,
 };
 const reporter: RequestPrincipal = { userId: "reporter-id", platformRole: "student" };
 const moderator: RequestPrincipal = { userId: "moderator-id", platformRole: "student" };

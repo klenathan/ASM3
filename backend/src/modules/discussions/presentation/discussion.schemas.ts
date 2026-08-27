@@ -13,6 +13,18 @@ export const errorSchema = z
 
 const isoDate = z.string().datetime();
 
+export const threadLocationSchema = z
+  .object({
+    name: z.string(),
+    mapboxId: z.string(),
+    placeType: z.string().nullable(),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    address: z.record(z.string(), z.unknown()).nullable(),
+    meta: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .openapi("ThreadLocation");
+
 export const threadSchema = z
   .object({
     id: z.string().uuid(),
@@ -33,6 +45,7 @@ export const threadSchema = z
     analysisDecision: z.enum(["allow", "review"]).nullable(),
     analysisFailed: z.boolean(),
     analysisOverride: z.enum(["accept", "reject"]).nullable(),
+    location: threadLocationSchema.nullable(),
   })
   .openapi("Thread");
 
@@ -129,6 +142,7 @@ export const homeFeedThreadSchema = z
     analysisDecision: z.enum(["allow", "review"]).nullable(),
     analysisFailed: z.boolean(),
     analysisOverride: z.enum(["accept", "reject"]).nullable(),
+    location: threadLocationSchema.nullable(),
   })
   .openapi("HomeFeedThread");
 
@@ -166,11 +180,23 @@ export const commentPageSchema = z
   })
   .openapi("CommentPage");
 
+export const threadLocationInputSchema = z
+  .object({
+    mapboxId: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(300).optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    placeType: z.string().trim().max(100).optional().nullable(),
+    address: z.record(z.string(), z.unknown()).optional().nullable(),
+  })
+  .openapi("ThreadLocationInput");
+
 export const createThreadRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(300),
     body: z.string().trim().min(1).max(100_000),
     mediaIds: z.array(z.string().uuid()).max(20).optional(),
+    location: threadLocationInputSchema.nullable().optional(),
   })
   .openapi("CreateThreadRequest");
 
@@ -179,6 +205,7 @@ export const updateThreadRequestSchema = z
     title: z.string().trim().min(1).max(300).optional(),
     body: z.string().trim().min(1).max(100_000).optional(),
     mediaIds: z.array(z.string().uuid()).max(20).optional(),
+    location: threadLocationInputSchema.nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, "At least one thread field is required")
   .openapi("UpdateThreadRequest");
@@ -228,6 +255,7 @@ export const userThreadActivitySchema = z
     myVote: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
     analysisDecision: z.enum(["allow", "review"]).nullable(),
     analysisOverride: z.enum(["accept", "reject"]).nullable(),
+    location: threadLocationSchema.nullable().optional(),
   })
   .openapi("UserThreadActivity");
 

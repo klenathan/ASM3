@@ -20,12 +20,31 @@ export interface CreateThreadInput {
   readonly body: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  readonly location?: {
+    readonly name: string;
+    readonly mapboxId: string;
+    readonly placeType: string | null;
+    readonly latitude: number;
+    readonly longitude: number;
+    readonly address: Record<string, unknown> | null;
+    readonly meta: Record<string, unknown> | null;
+  } | null | undefined;
 }
 
 export interface UpdateThreadInput {
   readonly title?: string;
   readonly body?: string;
   readonly updatedAt: Date;
+  readonly location?: {
+    readonly name: string;
+    readonly mapboxId: string;
+    readonly placeType: string | null;
+    readonly latitude: number;
+    readonly longitude: number;
+    readonly address: Record<string, unknown> | null;
+    readonly meta: Record<string, unknown> | null;
+  } | null;
+  readonly clearLocation?: boolean;
 }
 
 export interface CreateCommentInput {

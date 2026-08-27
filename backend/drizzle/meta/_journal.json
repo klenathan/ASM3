@@ -85,6 +85,13 @@
       "when": 1787822685141,
       "tag": "0011_past_mystique",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787831575652,
+      "tag": "0012_add_thread_location",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,9 @@ import type { AuditRouteDependencies } from "./modules/audit";
 import { registerAuditRoutes } from "./modules/audit";
 import type { AnalyticsRouteDependencies } from "./modules/analytics";
 import { registerAnalyticsRoutes } from "./modules/analytics";
+import type { PlacesPort } from "./modules/places/application/places.port";
+import { createPlacesController } from "./modules/places/presentation/places.controller";
+import { registerPlacesRoutes } from "./modules/places/presentation/places.routes";
 import type { AppConfig } from "./config/env";
 import {
   OPENAPI_CONFIG,
@@ -52,6 +55,7 @@ interface AppDependencies {
   readonly media?: MediaRouteDependencies;
   readonly audit?: AuditRouteDependencies;
   readonly analytics?: AnalyticsRouteDependencies;
+  readonly placesPort?: PlacesPort;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -180,6 +184,7 @@ export function createApp(dependencies: AppDependencies) {
         authService: dependencies.identity.authService,
       });
       app.use("/api/v1/admin/audit", principalMiddleware);
+      app.use("/api/v1/admin/audit/*", principalMiddleware);
     }
     registerAuditRoutes(app, dependencies.audit);
   }
@@ -193,6 +198,18 @@ export function createApp(dependencies: AppDependencies) {
       app.use("/api/v1/admin/analytics/*", principalMiddleware);
     }
     registerAnalyticsRoutes(app, dependencies.analytics);
+  }
+
+  if (dependencies.placesPort !== undefined) {
+    if (dependencies.identity !== undefined) {
+      const principalMiddleware = sessionPrincipalMiddleware({
+        authService: dependencies.identity.authService,
+      });
+      app.use("/api/v1/places", principalMiddleware);
+      app.use("/api/v1/places/*", principalMiddleware);
+    }
+    const controller = createPlacesController({ placesPort: dependencies.placesPort });
+    registerPlacesRoutes(app, controller);
   }
 
   app.doc(OPENAPI_PATH, OPENAPI_CONFIG);

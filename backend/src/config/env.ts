@@ -82,6 +82,8 @@ const environmentSchema = z
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
     ANALYTICS_DUMP_LAMBDA_FUNCTION: z.string().trim().min(1).optional(),
+    MAPBOX_SECRET_TOKEN: z.string().trim().min(1).optional(),
+    MAPBOX_PUBLIC_TOKEN: z.string().trim().min(1).optional(),
   })
   .superRefine((value, context) => {
     if (
@@ -196,6 +198,8 @@ export interface AppConfig {
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
   readonly analyticsDumpLambdaFunction: string | null;
+  readonly mapboxSecretToken: string | null;
+  readonly mapboxPublicToken: string | null;
 }
 
 export function loadConfig(
@@ -243,5 +247,7 @@ export function loadConfig(
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,
     analyticsDumpLambdaFunction: result.data.ANALYTICS_DUMP_LAMBDA_FUNCTION ?? null,
+    mapboxSecretToken: result.data.MAPBOX_SECRET_TOKEN ?? null,
+    mapboxPublicToken: result.data.MAPBOX_PUBLIC_TOKEN ?? null,
   };
 }

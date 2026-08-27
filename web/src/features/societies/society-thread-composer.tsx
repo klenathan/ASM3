@@ -12,6 +12,9 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Textarea } from "../../components/ui/textarea";
+import { LocationPreview } from "../location/location-preview";
+import { LocationSearchInput } from "../location/location-search-input";
+import type { PickedLocation } from "../location/types";
 import type { CreateThreadDraft } from "./types";
 
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -65,6 +68,7 @@ export function SocietyThreadComposer({
   const [errors, setErrors] = useState<ComposerErrors>({});
   const [published, setPublished] = useState(false);
   const [unexpectedError, setUnexpectedError] = useState<string>();
+  const [pickedLocation, setPickedLocation] = useState<PickedLocation | null>(null);
 
   if (access === "loading") {
     return (
@@ -131,10 +135,16 @@ export function SocietyThreadComposer({
     }
 
     try {
-      await onCreate({ title: title.trim(), body: body.trim(), images });
+      await onCreate({
+        title: title.trim(),
+        body: body.trim(),
+        images,
+        ...(pickedLocation ? { location: { mapboxId: pickedLocation.mapboxId, name: pickedLocation.name, latitude: pickedLocation.latitude, longitude: pickedLocation.longitude, placeType: pickedLocation.placeType, address: pickedLocation.address } } : {}),
+      });
       setTitle("");
       setBody("");
       setImages([]);
+      setPickedLocation(null);
       setErrors({});
       setIsOpen(false);
       setPublished(true);
@@ -310,6 +320,19 @@ export function SocietyThreadComposer({
             <p id={bodyErrorId} className="mt-2 text-sm text-destructive">
               {errors.body}
             </p>
+          )}
+        </div>
+
+        <div className="border-t border-foreground/15 pt-5">
+          <p className="text-sm font-semibold">Location (optional)</p>
+          <p className="mt-1 text-xs text-muted-foreground">Add a verified place. Search Mapbox, pick one, drag pin to fine-tune.</p>
+          <div className="mt-3">
+            <LocationSearchInput picked={pickedLocation} onPick={setPickedLocation} onClear={() => setPickedLocation(null)} disabled={isSubmitting} />
+          </div>
+          {pickedLocation && (
+            <div className="mt-3">
+              <LocationPreview location={pickedLocation} onUpdate={setPickedLocation} />
+            </div>
           )}
         </div>
 

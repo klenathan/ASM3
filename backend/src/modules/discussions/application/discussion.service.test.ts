@@ -353,6 +353,7 @@ class FakeDiscussionRepository implements DiscussionRepository {
       score: 0,
       commentCount: 0,
       deletedAt: null,
+      location: null,
     };
     this.threads.set(thread.id, thread);
     return thread;

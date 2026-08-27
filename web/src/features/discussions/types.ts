@@ -1,3 +1,5 @@
+import type { ThreadLocation } from "../societies/types";
+
 export interface DiscussionItem {
   readonly id: string
   readonly title: string
@@ -14,4 +16,5 @@ export interface DiscussionItem {
    readonly analysisDecision?: "allow" | "review" | null
    readonly analysisFailed?: boolean
    readonly analysisOverride?: "accept" | "reject" | null
+  readonly location?: ThreadLocation | null
 }

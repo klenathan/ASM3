@@ -26,6 +26,8 @@ import {
 import { MarkdownContent } from "../../features/discussions/markdown-content";
 import { ThreadMedia } from "../../features/media/thread-media";
 import { AuthorLink } from "../../features/profile/author-link";
+import { LocationModal } from "../../features/location/location-modal";
+import { LocationPill } from "../../features/location/location-pill";
 import {
   useCommentVote,
   useCreateComment,
@@ -57,6 +59,7 @@ export function ThreadPage() {
   const voteComment = useCommentVote(id);
   const join = useJoinSociety(slug);
   const [sort, setSort] = useState<CommentSort>("best");
+  const [locationOpen, setLocationOpen] = useState(false);
 
   const society = societyQuery.data;
   const thread = threadQuery.data;
@@ -183,6 +186,19 @@ export function ThreadPage() {
                         className="mt-7"
                       />
                     )}
+                  {(thread as unknown as { location: import("../../features/societies/types").ThreadLocation | null }).location && (
+                    <div className="mt-4">
+                      <LocationPill
+                        location={(thread as unknown as { location: import("../../features/societies/types").ThreadLocation }).location!}
+                        onClick={() => setLocationOpen(true)}
+                      />
+                      <LocationModal
+                        location={(thread as unknown as { location: import("../../features/societies/types").ThreadLocation | null }).location}
+                        open={locationOpen}
+                        onOpenChange={setLocationOpen}
+                      />
+                    </div>
+                  )}
                   <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-foreground/15 pt-4">
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
                       <MessageCircle aria-hidden="true" className="size-4" />{" "}

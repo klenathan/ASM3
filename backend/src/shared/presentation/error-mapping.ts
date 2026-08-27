@@ -27,6 +27,9 @@ const statusByCode: Readonly<Record<string, number>> = {
   CONFLICT: 409,
   INVALID_CURSOR: 400,
   VALIDATION_ERROR: 400,
+  LOCATION_NOT_FOUND: 400,
+  PLACES_UNAVAILABLE: 503,
+  RATE_LIMITED: 429,
 };
 
 export function mapError(error: unknown, requestId: string): ErrorResponse {

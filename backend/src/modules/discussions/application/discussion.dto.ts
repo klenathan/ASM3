@@ -1,5 +1,15 @@
 import type { PageResult } from "../../../shared/application/pagination";
 
+export interface ThreadLocationDto {
+  readonly name: string;
+  readonly mapboxId: string;
+  readonly placeType: string | null;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly address: Record<string, unknown> | null;
+  readonly meta?: Record<string, unknown> | null;
+}
+
 export interface ThreadDto {
   readonly id: string;
   readonly societyId: string;
@@ -20,6 +30,7 @@ export interface ThreadDto {
   readonly analysisDecision: "allow" | "review" | null;
   readonly analysisFailed: boolean;
   readonly analysisOverride: "accept" | "reject" | null;
+  readonly location: ThreadLocationDto | null;
 }
 
 export type ThreadPageDto = PageResult<ThreadDto>;
@@ -116,16 +127,27 @@ export interface UserCommentActivityDto {
 
 export type UserCommentActivityPageDto = PageResult<UserCommentActivityDto>;
 
+export interface ThreadLocationInput {
+  readonly mapboxId: string;
+  readonly name?: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly placeType?: string | null;
+  readonly address?: Record<string, unknown> | null;
+}
+
 export interface CreateThreadCommand {
   readonly title: string;
   readonly body: string;
   readonly mediaIds?: readonly string[];
+  readonly location?: ThreadLocationInput | null;
 }
 
 export interface UpdateThreadCommand {
   readonly title?: string;
   readonly body?: string;
   readonly mediaIds?: readonly string[];
+  readonly location?: ThreadLocationInput | null;
 }
 
 export interface CreateCommentCommand {

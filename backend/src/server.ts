@@ -31,6 +31,7 @@ import {
   ThreadAnalysisContextAdapter,
 } from "./modules/content-analysis/index";
 import { systemClock } from "./shared/application/clock";
+import { MapboxPlacesAdapter } from "./modules/places/index";
 
 /** Global community policy used when no `community_policy` config row is set. */
 const DEFAULT_GLOBAL_POLICY =
@@ -44,6 +45,7 @@ async function main(): Promise<void> {
   const logger = createLogger(config);
   const database = createDatabase(config, logger);
   const societies = createSocietyModule({ database: database.db });
+  const placesPort = config.mapboxSecretToken ? new MapboxPlacesAdapter(config.mapboxSecretToken) : undefined;
   // ECS resolves its LabRole through the AWS SDK credential provider chain.
   // Never inject temporary Learner Lab user credentials into the task.
   const s3Storage = config.awsRegion === null || config.mediaBucket === null
@@ -92,6 +94,7 @@ async function main(): Promise<void> {
     events: threadEventPublisher,
     analysisDecisionReader: contentAnalysisRepository,
     threadAnalysisReader: contentAnalysisRepository,
+    ...(placesPort !== undefined ? { placesPort } : {}),
     onThreadCreated: (threadId) => {
       void contentAnalysisService?.analyzeNewThread(threadId);
     },
@@ -306,6 +309,7 @@ async function main(): Promise<void> {
     platform,
     media,
     audit,
+    ...(placesPort !== undefined ? { placesPort } : {}),
   });
 
   const server = serve(

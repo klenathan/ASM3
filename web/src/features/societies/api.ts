@@ -63,6 +63,7 @@ export async function createSocietyThreadFromDraft(
       title: draft.title,
       body: draft.body,
       ...(uploadedIds.length === 0 ? {} : { mediaIds: uploadedIds }),
+      ...(draft.location === undefined ? {} : { location: draft.location }),
     })
   } catch (error) {
     await Promise.allSettled(uploadedIds.map(deleteMediaUpload))
