@@ -368,6 +368,14 @@ class FakeAnalyticsRepository implements AnalyticsRepository {
     return record;
   }
 
+  async upsertMetrics(
+    inputs: readonly UpsertAnalyticsMetricInput[],
+  ): Promise<readonly AnalyticsMetricRecord[]> {
+    const records: AnalyticsMetricRecord[] = [];
+    for (const input of inputs) records.push(await this.upsertMetric(input));
+    return records;
+  }
+
   async findLatestPeriod(): Promise<Date | null> {
     if (this.records.length === 0) return null;
     return this.records.reduce((latest, r) =>

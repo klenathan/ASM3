@@ -211,7 +211,11 @@ export class AnalyticsRefreshOrchestrator {
     if (!TERMINAL_GLUE_STATUSES.has(status)) return;
 
     if (status === "SUCCEEDED") {
-      await this.updateRun(run, { status: "querying", lastError: null });
+      await this.updateRun(run, {
+        status: "querying",
+        attempts: 0,
+        lastError: null,
+      });
       await this.pollAthena((await this.requireRun(run.runId)));
       return;
     }
@@ -291,8 +295,7 @@ export class AnalyticsRefreshOrchestrator {
       rows.push(...(await this.athenaGateway.getResults(queryExecutionId!)));
     }
     const now = this.clock.now();
-    for (const row of rows) {
-      await this.repository.upsertMetric({
+    await this.repository.upsertMetrics(rows.map((row) => ({
         id: randomUUID(),
         metricType: row.metricType,
         societyId: row.societyId,
@@ -301,8 +304,7 @@ export class AnalyticsRefreshOrchestrator {
         data: row.data,
         createdAt: now,
         updatedAt: now,
-      } satisfies UpsertAnalyticsMetricInput);
-    }
+      } satisfies UpsertAnalyticsMetricInput)));
     await this.updateRun(current, {
       status: "completed",
       lastError: null,
