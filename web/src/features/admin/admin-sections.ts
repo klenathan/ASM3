@@ -85,8 +85,8 @@ export const adminSections: AdminSection[] = [
     label: "Analytics",
     heading: "Analytics",
     icon: BarChart3,
-    blurb: "Usage metrics (deferred to the analytics milestone).",
-    pending: true,
+    blurb: "Usage metrics computed nightly via the EMR pipeline.",
+    pending: false,
   },
 ];
 

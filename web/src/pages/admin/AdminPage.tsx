@@ -5,8 +5,8 @@ import {
   getSection,
   type AdminSectionId,
 } from "../../features/admin/admin-sections";
+import { AnalyticsSection } from "../../features/analytics/analytics-section";
 import { PendingSection } from "../../features/admin/pending-section";
-
 import { UsersSection } from "../../features/admin/users-section";
 import { ModerationSection } from "../../features/admin/moderation-section";
 import { ContentReviewSection } from "../../features/admin/content-review-section";
@@ -25,7 +25,7 @@ export function AdminPage() {
     health: () => <HealthSection />,
     audit: () => <AuditSection />,
     config: () => <ConfigSection />,
-    analytics: () => <PendingSection section={section} />,
+    analytics: () => <AnalyticsSection />,
   };
 
   return (
