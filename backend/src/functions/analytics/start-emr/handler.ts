@@ -244,6 +244,7 @@ export async function handler(event: Record<string, unknown>): Promise<Serverles
           completedAt: new Date().toISOString(),
         };
       }
+      // eslint-disable-next-line no-constant-condition
     } while (true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
