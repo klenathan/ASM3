@@ -2,7 +2,10 @@ import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 
 import type { AppEnvironment } from "../../../app-types";
 import type { AnalyticsService } from "../application/analytics.service";
-import { createAnalyticsController } from "./analytics.controller";
+import {
+  createAnalyticsController,
+  SCHEDULER_SECRET_HEADER,
+} from "./analytics.controller";
 import {
   analyticsPageSchema,
   errorSchema,
@@ -43,15 +46,50 @@ const refreshRoute = createRoute({
   },
 });
 
+const scheduledRefreshRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/analytics/scheduled-refresh",
+  tags: ["Analytics"],
+  summary:
+    "Internal nightly refresh entry point invoked by EventBridge Scheduler via an API destination; authenticated with a shared secret header",
+  responses: {
+    202: {
+      description: "Scheduled refresh accepted",
+      content: { "application/json": { schema: refreshResponseSchema } },
+    },
+    401: {
+      description: "A valid scheduler secret header is required",
+      content: { "application/json": { schema: errorSchema } },
+    },
+  },
+});
+
 export interface AnalyticsRouteDependencies {
   readonly analyticsService: AnalyticsService;
+  readonly schedulerSecret?: string | undefined;
+  readonly handleScheduledRefresh?:
+    | (() => Promise<{ accepted: boolean; message: string }>)
+    | undefined;
 }
 
 export function registerAnalyticsRoutes(
   app: OpenAPIHono<AppEnvironment>,
   dependencies: AnalyticsRouteDependencies,
 ): void {
-  const controller = createAnalyticsController(dependencies);
+  const controller = createAnalyticsController({
+    analyticsService: dependencies.analyticsService,
+    ...(dependencies.schedulerSecret !== undefined
+      ? { schedulerSecret: dependencies.schedulerSecret }
+      : {}),
+    ...(dependencies.handleScheduledRefresh !== undefined
+      ? { handleScheduledRefresh: dependencies.handleScheduledRefresh }
+      : {}),
+  });
   app.openapi(queryMetricsRoute, (context) => controller.queryMetrics(context) as never);
   app.openapi(refreshRoute, (context) => controller.refresh(context) as never);
+  app.openapi(scheduledRefreshRoute, (context) =>
+    controller.scheduledRefresh(context) as never,
+  );
 }
+
+export { SCHEDULER_SECRET_HEADER };

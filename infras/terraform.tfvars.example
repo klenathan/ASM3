@@ -35,3 +35,8 @@ force_destroy_buckets = false
 #   analytics_dump_rds_zip           = "../backend/dist-function/analytics-dump-rds.zip"
 #   analytics_start_serverless_zip   = "../backend/dist-function/analytics-start-serverless.zip"
 #   analytics_load_results_zip       = "../backend/dist-function/analytics-load-results.zip"
+# Nightly refresh orchestration (Lambda-free): set the Glue job name that the
+# backend orchestrator should start; EventBridge Scheduler + API destination
+# then hit POST /api/v1/admin/analytics/scheduled-refresh with a generated
+# shared secret. See infras/scheduling.tf.
+#   analytics_glue_job_name = "asm3-prod-analytics-metrics-export"

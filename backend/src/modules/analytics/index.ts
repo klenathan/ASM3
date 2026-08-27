@@ -29,9 +29,30 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
 
 export { AnalyticsService } from "./application/analytics.service";
 export type { AnalyticsServiceDependencies } from "./application/analytics.service";
+export { AnalyticsRefreshOrchestrator } from "./application/refresh-orchestrator";
+export { InMemoryRefreshRunStore } from "./application/refresh-run.store";
+export {
+  PlaceholderGlueGateway,
+  PlaceholderAthenaGateway,
+} from "./infrastructure/placeholder-analytics-gateways";
+export type {
+  AthenaGateway,
+  AthenaMetricRow,
+  AthenaQueryInput,
+  AthenaQueryStatus,
+  GlueGateway,
+  GlueJobRunStatus,
+  MetricSqlCatalog,
+  RefreshOrchestratorOptions,
+  RefreshRunRecord,
+  RefreshRunStatus,
+  RefreshRunStore,
+  RefreshRunTrigger,
+} from "./application/refresh-orchestrator.ports";
 export { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
 export type { AnalyticsRepository } from "./application/analytics.repository";
 export {
   registerAnalyticsRoutes,
+  SCHEDULER_SECRET_HEADER,
   type AnalyticsRouteDependencies,
 } from "./presentation/analytics.routes";
