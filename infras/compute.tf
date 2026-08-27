@@ -87,7 +87,6 @@ locals {
     { name = "ANALYTICS_ATHENA_CATALOG", value = "AwsDataCatalog" },
     { name = "ANALYTICS_ATHENA_WORKGROUP", value = aws_athena_workgroup.analytics[0].name },
     { name = "ANALYTICS_ATHENA_OUTPUT_LOCATION", value = "s3://${aws_s3_bucket.analytics[0].id}/analytics/query-results/" },
-    { name = "ANALYTICS_SCHEDULER_SECRET", value = random_password.analytics_scheduler_secret[0].result },
     { name = "ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS", value = tostring(var.analytics_refresh_reconcile_interval_ms) },
     { name = "ANALYTICS_REFRESH_MAX_PHASE_RETRIES", value = tostring(var.analytics_refresh_max_phase_retries) },
     { name = "ANALYTICS_REFRESH_STALE_AFTER_MS", value = tostring(var.analytics_refresh_stale_after_ms) },
@@ -115,10 +114,15 @@ resource "aws_ecs_task_definition" "backend" {
       protocol      = "tcp"
     }]
     environment = local.backend_env_vars
-    secrets = [{
-      name      = "DATABASE_URL"
-      valueFrom = aws_secretsmanager_secret.database_url.arn
-    }]
+    secrets = concat([
+      {
+        name      = "DATABASE_URL"
+        valueFrom = aws_secretsmanager_secret.database_url.arn
+      }
+      ], var.enable_analytics_pipeline ? [{
+        name      = "ANALYTICS_SCHEDULER_SECRET"
+        valueFrom = aws_secretsmanager_secret.analytics_scheduler_secret[0].arn
+    }] : [])
     healthCheck = {
       command     = ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
       interval    = 30

@@ -55,9 +55,13 @@ def main() -> None:
         """,
         "memberships": "SELECT society_id, user_id, role, status, joined_at FROM society_memberships",
         "votes": """
-          SELECT thread_id AS target_id, user_id, value, created_at FROM thread_votes
-          UNION ALL
-          SELECT comment_id AS target_id, user_id, value, created_at FROM comment_votes
+           SELECT v.thread_id AS target_id, v.user_id, v.value, v.created_at, t.society_id
+           FROM thread_votes v INNER JOIN threads t ON t.id = v.thread_id
+           UNION ALL
+           SELECT v.comment_id AS target_id, v.user_id, v.value, v.created_at, t.society_id
+           FROM comment_votes v
+           INNER JOIN comments c ON c.id = v.comment_id
+           INNER JOIN threads t ON t.id = c.thread_id
         """,
         "reports": """
           SELECT id, society_id, status, created_at, resolved_at FROM reports
@@ -124,7 +128,7 @@ def schema_for(table: str):
         "threads": [("id", string), ("society_id", string), ("author_id", string), ("status", string), ("created_at", timestamp)],
         "comments": [("id", string), ("thread_id", string), ("author_id", string), ("status", string), ("created_at", timestamp), ("society_id", string)],
         "memberships": [("society_id", string), ("user_id", string), ("role", string), ("status", string), ("joined_at", timestamp)],
-        "votes": [("target_id", string), ("user_id", string), ("value", T.LongType()), ("created_at", timestamp)],
+         "votes": [("target_id", string), ("user_id", string), ("value", T.LongType()), ("created_at", timestamp), ("society_id", string)],
         "reports": [("id", string), ("society_id", string), ("status", string), ("created_at", timestamp), ("resolved_at", timestamp)],
     }
     return T.StructType([T.StructField(name, data_type, True) for name, data_type in schemas[table]])

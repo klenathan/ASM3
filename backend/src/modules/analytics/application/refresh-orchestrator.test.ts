@@ -122,12 +122,12 @@ class FakeAthenaGateway implements AthenaGateway {
   }
 }
 
-const SQL_CATALOG = {
-  user_growth: "SELECT * FROM metric_user_growth",
-  content_volume: "SELECT * FROM metric_content_volume",
-  top_societies: "SELECT * FROM metric_top_societies",
-  moderation: "SELECT * FROM metric_moderation",
-};
+const SQL_CATALOG = (snapshotId: string) => ({
+  user_growth: `SELECT '${snapshotId}' AS snapshot_id`,
+  content_volume: `SELECT '${snapshotId}' AS snapshot_id`,
+  top_societies: `SELECT '${snapshotId}' AS snapshot_id`,
+  moderation: `SELECT '${snapshotId}' AS snapshot_id`,
+});
 
 describe("AnalyticsRefreshOrchestrator", () => {
   let repository: FakeAnalyticsRepository;
@@ -158,18 +158,18 @@ describe("AnalyticsRefreshOrchestrator", () => {
     });
   }
 
-  it("creates a run and starts the Glue export", async () => {
+  it("records a run without waiting for Glue", async () => {
     const result = await createOrchestrator().requestRefresh("admin");
 
     expect(result.coalesced).toBe(false);
-    expect(glue.startCalls).toBe(1);
+    expect(glue.startCalls).toBe(0);
 
     const runs = await allStoredRuns(runStore);
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({
       trigger: "admin",
-      status: "exporting",
-      glueJobRunId: `jobrun-${runs[0]!.runId}`,
+      status: "requested",
+      glueJobRunId: null,
     });
   });
 
@@ -179,7 +179,7 @@ describe("AnalyticsRefreshOrchestrator", () => {
 
     expect(second.coalesced).toBe(true);
     expect(second.runId).toBe(first.runId);
-    expect(glue.startCalls).toBe(1);
+    expect(glue.startCalls).toBe(0);
   });
 
   it("advances glue success into athena queries and persists their results", async () => {
@@ -196,7 +196,7 @@ describe("AnalyticsRefreshOrchestrator", () => {
     await orchestrator.reconcile();
     let stored = await soleRun(runStore);
     expect(stored.status).toBe("exporting");
-    expect(stored.attempts).toBe(1);
+    expect(stored.attempts).toBe(0);
 
     // Glue still RUNNING → nothing changes.
     await orchestrator.reconcile();
@@ -230,6 +230,7 @@ describe("AnalyticsRefreshOrchestrator", () => {
   it("does not restart already-started athena queries when resuming", async () => {
     const orchestrator = createOrchestrator();
     const { runId } = await orchestrator.requestRefresh("nightly");
+    await orchestrator.reconcile();
     glue.statuses.set(await glueJobRunIdFor(runStore, runId), "SUCCEEDED");
     await orchestrator.reconcile();
 
@@ -262,6 +263,7 @@ describe("AnalyticsRefreshOrchestrator", () => {
   it("retries failed athena groups while preserving completed groups", async () => {
     const orchestrator = createOrchestrator({ maxPhaseRetries: 2 });
     const { runId } = await orchestrator.requestRefresh("admin");
+    await orchestrator.reconcile();
     athena.defaultStatus = "RUNNING";
     glue.statuses.set(await glueJobRunIdFor(runStore, runId), "SUCCEEDED");
     await orchestrator.reconcile();

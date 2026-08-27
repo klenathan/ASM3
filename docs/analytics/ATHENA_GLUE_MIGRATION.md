@@ -13,7 +13,8 @@ The ECS backend owns the complete analytics refresh lifecycle:
 2. EventBridge Scheduler calls
    `POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
    authenticated by `x-analytics-scheduler-secret`.
-3. `AnalyticsRefreshOrchestrator` coalesces concurrent requests, starts and
+3. `AnalyticsRefreshOrchestrator` coalesces concurrent requests into a durable
+   PostgreSQL run and returns before AWS work starts. Its reconciler starts and
    reconciles one Glue export, starts four Athena queries, and persists their
    rows through `AnalyticsRepository`.
 
@@ -38,9 +39,10 @@ s3://<analytics-bucket>/analytics/glue-temp/<temporary-files>
 ```
 
 The source dataset contains `users`, `societies`, `threads`, `comments`,
-`memberships`, `votes`, and `reports`. The manifest is written only after all
-seven tables succeed. Athena uses the newest complete manifest identity and
-the matching `snapshot_at`/`snapshot_id` partitions for every join.
+`memberships`, `votes`, and `reports`. The votes export includes the resolved
+`society_id` for both thread and comment votes. The manifest is written only
+after all seven tables succeed. Athena is passed the current run ID and uses
+only its matching `snapshot_at`/`snapshot_id` partitions for every join.
 
 The Glue Catalog database is `analytics`. It contains one external Parquet
 table per source table and an unpartitioned `snapshot_manifest` table. Source
@@ -54,9 +56,10 @@ is durable dashboard history and is not covered by those lifecycle rules.
 
 ## Athena Contract
 
-The static SQL catalog at
+The SQL catalog factory at
 `backend/src/modules/analytics/infrastructure/athena-sql-catalog.ts` contains
-one query for each existing metric group. Each query returns zero or more rows
+one query for each existing metric group and binds the current UUID snapshot
+ID. Each query returns zero or more rows
 with exactly:
 
 | Column | Athena type | Meaning |
@@ -79,8 +82,9 @@ remain unchanged.
 `infras/glue-athena.tf` owns the Glue connection, export script object, Glue
 Catalog, Glue job, Athena workgroup, VPC access, and retention rules.
 `infras/scheduling.tf` owns the gated EventBridge Scheduler, API destination,
-and generated shared secret. The pre-created `LabRole` is reused; no IAM roles
-or users are created.
+generated shared secret, retry policy, and SQS DLQ. The pre-created `LabRole` is
+reused; no IAM roles or users are created. OpenTofu fails closed unless the
+active LabRole trust and required permissions have been verified explicitly.
 
 The complete analytics deployment is disabled by default. Setting
 `enable_analytics_pipeline = true` enables all of these resources and wires

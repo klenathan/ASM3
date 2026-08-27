@@ -87,3 +87,32 @@ resource "aws_sqs_queue_policy" "content_analysis_reanalysis" {
   queue_url = aws_sqs_queue.content_analysis_reanalysis.url
   policy    = data.aws_iam_policy_document.content_analysis_reanalysis_queue.json
 }
+
+resource "aws_sqs_queue" "analytics_scheduler_dlq" {
+  count                     = var.enable_analytics_pipeline ? 1 : 0
+  name                      = "${local.name}-analytics-scheduler-dlq"
+  message_retention_seconds = 1209600
+  sqs_managed_sse_enabled   = true
+  tags                      = local.common_tags
+}
+
+data "aws_iam_policy_document" "analytics_scheduler_dlq" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  statement {
+    effect    = "Allow"
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.analytics_scheduler_dlq[0].arn]
+
+    principals {
+      type        = "AWS"
+      identifiers = [data.aws_iam_role.learner_lab.arn]
+    }
+  }
+}
+
+resource "aws_sqs_queue_policy" "analytics_scheduler_dlq" {
+  count     = var.enable_analytics_pipeline ? 1 : 0
+  queue_url = aws_sqs_queue.analytics_scheduler_dlq[0].url
+  policy    = data.aws_iam_policy_document.analytics_scheduler_dlq[0].json
+}

@@ -27,9 +27,11 @@ Admin refresh or EventBridge Scheduler
 The ECS process is the only pipeline command owner. The scheduler calls
 `POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
 using the generated `x-analytics-scheduler-secret` header. The orchestrator
-starts one Glue run, waits for completion, starts one Athena query for each
+records one durable PostgreSQL refresh run and returns immediately; its
+reconciler starts Glue, waits for completion, starts one Athena query for each
 metric group, consumes all result pages, and persists valid rows atomically
-through the existing repository boundary.
+through the existing repository boundary. The run store and active-run unique
+index allow unfinished work to resume after an ECS restart.
 
 No analytics-specific Lambda, S3 event chain, or separate analytics artifact
 build is used. The content-analysis Lambda is a separate moderation workflow
@@ -40,8 +42,9 @@ and is not part of this pipeline.
 Glue reads `users`, `societies`, `threads`, `comments`, `memberships`, `votes`,
 and `reports` from one PostgreSQL repeatable-read transaction. It writes
 Parquet partitions identified by `snapshot_at` and `snapshot_id`, then appends
-the manifest only after all source tables succeed. Athena selects one manifest
-identity and joins every source table to that exact snapshot.
+the manifest only after all source tables succeed. Athena receives the
+immutable refresh run ID and selects only that manifest identity, so an
+overlapping or stale run cannot query another run's snapshot.
 
 The Glue Catalog database is `analytics`. It contains one external table per
 source table plus the unpartitioned `snapshot_manifest` table. The Athena SQL
@@ -50,7 +53,7 @@ catalog in
 the existing four metric groups:
 
 - `user_growth`: registrations, active users, total users, and suspensions
-- `content_volume`: threads, comments, votes, and reports
+- `content_volume`: platform totals plus society-scoped threads, comments, votes, and reports
 - `top_societies`: top societies by members and threads
 - `moderation`: pending reports, resolved reports, average resolution hours, and total reports
 
@@ -63,7 +66,9 @@ and rejects malformed rows before persistence.
 
 The `enable_analytics_pipeline` flag defaults to `false` and gates the shared
 analytics S3 bucket as well as Glue, Catalog, Athena, VPC, lifecycle, and
-Scheduler resources. The bucket is private and uses SSE-S3. Retention is 30
+Scheduler resources. Scheduler retries use an SQS DLQ. The generated scheduler
+secret is stored in Secrets Manager and injected into ECS without exposing it
+in the task environment. The bucket is private and uses SSE-S3. Retention is 30
 days for source snapshots and manifests, 7 days for Athena result files, and
 1 day for Glue temporary files. RDS `analytics_metrics` is the durable
 dashboard history and is not subject to those S3 lifecycle rules.
@@ -95,8 +100,10 @@ the durable handoff boundary; no automatic fallback deployment is maintained.
 
 ## Operations
 
-1. Set `enable_analytics_pipeline = true` and, for deployed scheduling, set
-   `analytics_glue_job_name` in `infras/terraform.tfvars`.
+1. Verify the active LabRole trust and permissions, then set
+   `enable_analytics_pipeline = true`,
+   `analytics_scheduler_permissions_confirmed = true`, and, for deployed
+   scheduling, set `analytics_glue_job_name` in `infras/terraform.tfvars`.
 2. Run `tofu plan` and `tofu apply` from `infras/`.
 3. Trigger the Admin Center refresh or call the admin refresh endpoint.
 4. Verify `GET /api/v1/admin/analytics`, Glue job history, Athena query history,

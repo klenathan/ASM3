@@ -29,6 +29,7 @@ force_destroy_buckets = false
 # Enable the gated Glue + Athena analytics pipeline (Analytics AWS category).
 # No analytics Lambda build is needed.
 #   enable_analytics_pipeline = true
+#   analytics_scheduler_permissions_confirmed = true
 # Nightly refresh orchestration (Lambda-free): set the Glue job name that the
 # backend orchestrator should start; EventBridge Scheduler + API destination
 # then hit POST /api/v1/admin/analytics/scheduled-refresh with a generated

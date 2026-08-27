@@ -52,10 +52,39 @@ variable "analytics_refresh_stale_after_ms" {
   default     = 2700000
 }
 
+resource "terraform_data" "analytics_scheduler_permissions" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  input = var.analytics_scheduler_permissions_confirmed
+
+  lifecycle {
+    precondition {
+      condition = var.analytics_scheduler_permissions_confirmed && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "scheduler.amazonaws.com",
+      )
+      error_message = "Analytics scheduling is disabled: verify the active LabRole trust includes scheduler.amazonaws.com and its permissions include events:InvokeApiDestination and sqs:SendMessage, then set analytics_scheduler_permissions_confirmed=true."
+    }
+  }
+}
+
 resource "random_password" "analytics_scheduler_secret" {
   count   = var.enable_analytics_pipeline ? 1 : 0
   length  = 40
   special = false
+}
+
+resource "aws_secretsmanager_secret" "analytics_scheduler_secret" {
+  count       = var.enable_analytics_pipeline ? 1 : 0
+  name_prefix = "${local.name}-analytics-scheduler-"
+  description = "Shared secret for the internal analytics scheduler API destination"
+  tags        = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "analytics_scheduler_secret" {
+  count         = var.enable_analytics_pipeline ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.analytics_scheduler_secret[0].id
+  secret_string = random_password.analytics_scheduler_secret[0].result
 }
 
 resource "aws_cloudwatch_event_connection" "analytics_scheduler" {
@@ -103,6 +132,10 @@ resource "aws_scheduler_schedule" "analytics_nightly_refresh" {
     role_arn = data.aws_iam_role.learner_lab.arn
 
     input = jsonencode({})
+
+    dead_letter_config {
+      arn = aws_sqs_queue.analytics_scheduler_dlq[0].arn
+    }
 
     retry_policy {
       maximum_retry_attempts       = 3

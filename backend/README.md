@@ -2,7 +2,7 @@
 
 Node.js 22 backend for RMIT Society. Built with Hono, TypeScript 7, Drizzle ORM, and PostgreSQL 17.
 
-Accepted modular-monolith structure, DDD layer boundaries, logical data model, and implementation order are documented in [`../docs/backend-architecture/BACKEND_ARCHITECTURE.md`](../docs/backend-architecture/BACKEND_ARCHITECTURE.md). Product schema migrations remain deferred until implementation of each tested vertical slice.
+Accepted modular-monolith structure, DDD layer boundaries, logical data model, and implementation order are documented in [`../docs/backend-architecture/BACKEND_ARCHITECTURE.md`](../docs/backend-architecture/BACKEND_ARCHITECTURE.md). Product schema migrations are generated from the Drizzle schema and applied by the database bootstrap task.
 
 ## Phase-one scope
 
@@ -85,7 +85,9 @@ share the dev password `SeedPass123!` (change logins via the existing auth flow
 in a real deployment). Re-running the seed restores the admin's email, password,
 role, and active status.
 
-No migration exists yet because phase one intentionally contains no product schema.
+Committed migrations include the analytics metric and refresh-run tables. The
+bootstrap migration command also normalizes legacy nullable platform metric
+duplicates before applying the generated platform uniqueness migration.
 
 ## Configuration
 

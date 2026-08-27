@@ -64,6 +64,7 @@ locals {
         { name = "user_id", type = "string" },
         { name = "value", type = "bigint" },
         { name = "created_at", type = "timestamp" },
+        { name = "society_id", type = "string" },
       ]
     }
     reports = {

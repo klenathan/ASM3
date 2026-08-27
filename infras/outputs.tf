@@ -92,3 +92,8 @@ output "openrouter_api_key_secret_arn" {
   description = "Secrets Manager ARN that must contain the OpenRouter API key when content analysis is enabled."
   value       = try(aws_secretsmanager_secret.openrouter_api_key[0].arn, null)
 }
+
+output "analytics_scheduler_dlq_url" {
+  description = "SQS DLQ for failed EventBridge analytics refresh deliveries."
+  value       = try(aws_sqs_queue.analytics_scheduler_dlq[0].url, null)
+}

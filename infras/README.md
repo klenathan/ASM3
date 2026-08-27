@@ -56,6 +56,12 @@ tofu apply deployment.tfplan
 
 The initial `app_desired_count = 0` is intentional because the backend ECR repository is empty. It does not stop EC2, RDS, EIP, Amplify, and storage charges; destroy the root stack whenever the demo is not in active use. The Amplify site proxies API requests through its own origin, so session cookies remain first-party.
 
+The bootstrap migration command performs a narrow preflight for migration 0013:
+when the legacy nullable platform index is still absent, it retains the newest
+row for each `(metric_type, period_start)` platform key before Drizzle creates
+the generated unique index. This makes the index safe for existing valid
+historical data without editing generated migration SQL.
+
 ## 3. Publish application artifacts
 
 Build and publish the frontend artifact to the Amplify production branch:
@@ -164,6 +170,11 @@ authenticated `/api/v1/admin/analytics/scheduled-refresh` API destination at
 `cron(0 2 * * ? *)` UTC. The ECS reconciler polls Glue and Athena, retries
 transient phase failures, and persists results through the existing analytics
 repository. No analytics Lambda artifacts or resources are part of this path.
+Scheduler delivery retries for one hour and sends exhausted events to the
+analytics scheduler SQS DLQ. Before enabling the pipeline, verify the active
+Learner Lab `LabRole` allows `events:InvokeApiDestination` and
+`sqs:SendMessage`, then set `analytics_scheduler_permissions_confirmed = true`;
+OpenTofu otherwise fails closed. No custom IAM role is created.
 
 OpenTofu manages the Glue connection/job, Glue Catalog database and tables,
 Athena workgroup, S3 lifecycle rules, scheduler, and the shared private S3

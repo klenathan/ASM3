@@ -31,12 +31,7 @@ export interface RefreshRunRecord {
   readonly athenaQueryExecutionIds: Readonly<Partial<Record<MetricType, string>>>;
 }
 
-/**
- * Persistence contract for analytics refresh runs. The in-process store in
- * this module keeps runs alive between reconciler ticks but NOT across
- * process restarts; ticket #7 owns the PostgreSQL-backed implementation of
- * this port so runs survive restarts and resume idempotently.
- */
+/** Persistence contract for refresh runs, including restart recovery. */
 export interface RefreshRunStore {
   findActiveRun(): Promise<RefreshRunRecord | null>;
   get(runId: string): Promise<RefreshRunRecord | null>;
@@ -60,7 +55,7 @@ export type GlueJobRunStatus =
   | "CANCELLED";
 
 export interface GlueGateway {
-  /** Real adapters must use the run argument to resolve replayed starts. */
+  /** Adapters use the run argument to resolve replayed starts; Glue has no native idempotency token. */
   startJobRun(input: GlueJobStartInput): Promise<string>;
   getJobRunStatus(jobRunId: string): Promise<GlueJobRunStatus>;
 }
@@ -101,13 +96,14 @@ export interface AthenaGateway {
 }
 
 export type MetricSqlCatalog = Readonly<Partial<Record<MetricType, string>>>;
+export type MetricSqlCatalogFactory = (snapshotId: string) => MetricSqlCatalog;
 
 export interface RefreshOrchestratorOptions {
   readonly repository: AnalyticsRepository;
   readonly runStore: RefreshRunStore;
   readonly glueGateway?: GlueGateway | undefined;
   readonly athenaGateway?: AthenaGateway | undefined;
-  readonly sqlByMetricType?: MetricSqlCatalog | undefined;
+  readonly sqlByMetricType?: MetricSqlCatalogFactory | undefined;
   readonly clock?: Clock | undefined;
   readonly logger?: Logger | undefined;
   readonly maxPhaseRetries?: number | undefined;

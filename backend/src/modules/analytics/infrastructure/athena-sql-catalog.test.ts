@@ -1,17 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { ATHENA_METRIC_SQL, METRIC_SQL_TYPES } from "./athena-sql-catalog";
+import { createAthenaMetricSqlCatalog, METRIC_SQL_TYPES } from "./athena-sql-catalog";
 
 describe("ATHENA_METRIC_SQL", () => {
   it("defines one query for every persisted metric group", () => {
-    expect(Object.keys(ATHENA_METRIC_SQL).sort()).toEqual([...METRIC_SQL_TYPES].sort());
-    for (const sql of Object.values(ATHENA_METRIC_SQL)) {
+    const snapshotId = "123e4567-e89b-12d3-a456-426614174000";
+    const catalog = createAthenaMetricSqlCatalog(snapshotId);
+    expect(Object.keys(catalog).sort()).toEqual([...METRIC_SQL_TYPES].sort());
+    for (const sql of Object.values(catalog)) {
       expect(sql).toContain("metric_type");
       expect(sql).toContain("society_id");
       expect(sql).toContain("period_start");
       expect(sql).toContain("period_end");
       expect(sql).toContain(" AS data");
-      expect(sql).toContain("snapshot_manifest");
+      expect(sql).toContain(`WHERE snapshot_id = CAST('${snapshotId}' AS varchar)`);
     }
+  });
+
+  it("rejects an unsafe snapshot id before constructing SQL", () => {
+    expect(() => createAthenaMetricSqlCatalog("' OR 1 = 1 --")).toThrow(/UUID/);
+  });
+
+  it("includes society dimensions for every content-volume source", () => {
+    const sql = createAthenaMetricSqlCatalog("123e4567-e89b-12d3-a456-426614174000").content_volume!;
+    expect(sql).toContain("FROM latest_votes GROUP BY society_id");
+    expect(sql).toContain("FROM latest_reports GROUP BY society_id");
   });
 });

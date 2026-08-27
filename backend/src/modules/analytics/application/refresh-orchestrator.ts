@@ -11,12 +11,12 @@ import type {
   AthenaGateway,
   GlueGateway,
   GlueJobRunStatus,
-  MetricSqlCatalog,
   RefreshOrchestratorOptions,
   RefreshRunRecord,
   RefreshRunStatus,
   RefreshRunStore,
   RefreshRunTrigger,
+  MetricSqlCatalogFactory,
 } from "./refresh-orchestrator.ports";
 import type { AthenaQueryStatus } from "./refresh-orchestrator.ports";
 
@@ -60,7 +60,7 @@ export class AnalyticsRefreshOrchestrator {
   private readonly runStore: RefreshRunStore;
   private readonly glueGateway: GlueGateway | undefined;
   private readonly athenaGateway: AthenaGateway | undefined;
-  private readonly sqlByMetricType: MetricSqlCatalog | undefined;
+  private readonly sqlByMetricType: MetricSqlCatalogFactory | undefined;
   private readonly clock: Clock;
   private readonly logger: Logger | undefined;
   private readonly maxPhaseRetries: number;
@@ -101,12 +101,15 @@ export class AnalyticsRefreshOrchestrator {
 
   private async createRefreshRun(trigger: RefreshRunTrigger): Promise<RequestRefreshResult> {
     const existing = await this.runStore.findActiveRun();
-    if (existing !== null && !this.isStale(existing)) {
-      return { runId: existing.runId, coalesced: true };
+    if (existing !== null) {
+      if (!this.isStale(existing)) {
+        return { runId: existing.runId, coalesced: true };
+      }
+      await this.markFailed(existing, "run exceeded stale threshold");
     }
 
     const now = this.clock.now();
-    let run: RefreshRunRecord = {
+    const run: RefreshRunRecord = {
       runId: randomUUID(),
       trigger,
       createdAt: now,
@@ -117,16 +120,11 @@ export class AnalyticsRefreshOrchestrator {
       glueJobRunId: null,
       athenaQueryExecutionIds: {},
     };
-    run = await this.runStore.save(run);
-
-    try {
-      await this.startGlueExport(run);
-    } catch (error) {
-      // Keep the run non-terminal; the reconciler retries the export start
-      // up to maxPhaseRetries before failing the run.
-      await this.recordTransientError(run, error);
-    }
-    return { runId: run.runId, coalesced: false };
+    const saved = await this.runStore.save(run);
+    return {
+      runId: saved.runId,
+      coalesced: saved.runId !== run.runId,
+    };
   }
 
   async reconcile(): Promise<void> {
@@ -236,9 +234,8 @@ export class AnalyticsRefreshOrchestrator {
     if (this.athenaGateway === undefined) {
       throw new Error("analytics refresh orchestration is not configured");
     }
-    const sqlByMetricType = this.requiredSqlCatalog();
-
     let current = run;
+    const sqlByMetricType = this.requiredSqlCatalog(current.runId);
     for (const metricType of Object.keys(sqlByMetricType) as MetricType[]) {
       if (current.athenaQueryExecutionIds[metricType] !== undefined) continue;
       const queryExecutionId = await this.athenaGateway.startQuery({
@@ -315,15 +312,16 @@ export class AnalyticsRefreshOrchestrator {
     );
   }
 
-  private requiredSqlCatalog(): Record<MetricType, string> {
+  private requiredSqlCatalog(snapshotId: string): Record<MetricType, string> {
     if (this.sqlByMetricType === undefined) {
       throw new Error("no Athena SQL catalog configured for analytics refresh");
     }
-    const missing = METRIC_TYPES.filter((metricType) => this.sqlByMetricType?.[metricType] === undefined);
+    const sqlByMetricType = this.sqlByMetricType(snapshotId);
+    const missing = METRIC_TYPES.filter((metricType) => sqlByMetricType[metricType] === undefined);
     if (missing.length > 0) {
       throw new Error(`Athena SQL catalog is missing metric group(s): ${missing.join(", ")}`);
     }
-    return this.sqlByMetricType as Record<MetricType, string>;
+    return sqlByMetricType as Record<MetricType, string>;
   }
 
   private isStale(run: RefreshRunRecord): boolean {

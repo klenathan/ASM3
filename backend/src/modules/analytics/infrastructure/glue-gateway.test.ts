@@ -64,4 +64,31 @@ describe("GlueGatewayAdapter", () => {
     await expect(gateway.startJobRun({ runId: "run-1" })).resolves.toBe("existing-run");
     expect(startCalled).toBe(false);
   });
+
+  it("coalesces concurrent starts for the same refresh id", async () => {
+    let getJobRunsCalls = 0;
+    let resolveStart: ((value: unknown) => void) | undefined;
+    const startBlocked = new Promise<unknown>((resolve) => {
+      resolveStart = resolve;
+    });
+    const gateway = new GlueGatewayAdapter(
+      { region: "us-east-1", jobName: "analytics-export" },
+      async (command) => {
+        if (command.constructor.name === "GetJobRunsCommand") {
+          getJobRunsCalls++;
+          await startBlocked;
+          return { Jobs: [] };
+        }
+        return { JobRunId: "only-run" };
+      },
+    );
+
+    const first = gateway.startJobRun({ runId: "run-1" });
+    const second = gateway.startJobRun({ runId: "run-1" });
+    expect(getJobRunsCalls).toBe(1);
+    resolveStart!({});
+
+    await expect(Promise.all([first, second])).resolves.toEqual(["only-run", "only-run"]);
+    expect(getJobRunsCalls).toBe(1);
+  });
 });

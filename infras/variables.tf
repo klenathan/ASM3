@@ -43,6 +43,12 @@ variable "learner_lab_instance_profile_name" {
   default     = "LabInstanceProfile"
 }
 
+variable "analytics_scheduler_permissions_confirmed" {
+  description = "Set true only after verifying LabRole can invoke the API destination and send failed scheduler events to its DLQ. No custom IAM role is created."
+  type        = bool
+  default     = false
+}
+
 variable "api_custom_domain_name" {
   description = "Optional DNS name for the HTTPS API Gateway endpoint, such as community.example.com."
   type        = string

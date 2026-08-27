@@ -34,6 +34,7 @@ const STATUS_MAP: Readonly<Record<string, GlueJobRunStatus>> = {
 export class GlueGatewayAdapter implements GlueGateway {
   private readonly config: GlueGatewayConfig;
   private readonly send: SendGlueCommand;
+  private readonly startLocks = new Map<string, Promise<string>>();
 
   constructor(config: GlueGatewayConfig, send?: SendGlueCommand) {
     this.config = config;
@@ -42,6 +43,22 @@ export class GlueGatewayAdapter implements GlueGateway {
   }
 
   async startJobRun(input: GlueJobStartInput): Promise<string> {
+    const inFlight = this.startLocks.get(input.runId);
+    if (inFlight !== undefined) return inFlight;
+
+    const start = this.startJobRunOnce(input);
+    this.startLocks.set(input.runId, start);
+    try {
+      return await start;
+    } finally {
+      if (this.startLocks.get(input.runId) === start) this.startLocks.delete(input.runId);
+    }
+  }
+
+  private async startJobRunOnce(input: GlueJobStartInput): Promise<string> {
+    // Glue StartJobRun has no client idempotency token. The lookup closes the
+    // restart gap and startLocks close concurrent calls in this ECS process;
+    // two independent processes can still race at the AWS API boundary.
     const existingRun = await this.findExistingRun(input.runId);
     if (existingRun?.Id !== undefined) return existingRun.Id;
 

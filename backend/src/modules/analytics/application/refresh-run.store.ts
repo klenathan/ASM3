@@ -5,13 +5,7 @@ import type {
 
 const UNFINISHED_STATUSES = new Set(["requested", "exporting", "querying"]);
 
-/**
- * In-process reference implementation of RefreshRunStore. Runs survive
- * between reconciler ticks but NOT process restarts; ticket #7 owns the
- * PostgreSQL-backed store. Idempotent resume after a restart relies on the
- * DB-backed implementation replaying unfinished runs, with AWS-side
- * dedupe (Glue idempotency token, Athena ClientRequestToken).
- */
+/** In-process implementation retained for focused orchestrator tests. */
 export class InMemoryRefreshRunStore implements RefreshRunStore {
   private readonly runs = new Map<string, RefreshRunRecord>();
 

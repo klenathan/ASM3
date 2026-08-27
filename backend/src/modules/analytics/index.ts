@@ -3,6 +3,7 @@ import type { IdentityRepository } from "../identity/application/identity.reposi
 import type { MembershipRepository } from "../societies/application/membership.repository";
 import { AnalyticsService } from "./application/analytics.service";
 import { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
+import { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
 
 export interface AnalyticsModuleDependencies {
   readonly database: Database;
@@ -13,6 +14,7 @@ export interface AnalyticsModuleDependencies {
 
 export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies) {
   const repository = new DrizzleAnalyticsRepository(dependencies.database);
+  const refreshRunStore = new DrizzleRefreshRunStore(dependencies.database);
 
   const analyticsService = new AnalyticsService({
     repository,
@@ -23,6 +25,7 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
 
   return {
     repository,
+    refreshRunStore,
     analyticsService,
   };
 }
@@ -31,9 +34,13 @@ export { AnalyticsService } from "./application/analytics.service";
 export type { AnalyticsServiceDependencies } from "./application/analytics.service";
 export { AnalyticsRefreshOrchestrator } from "./application/refresh-orchestrator";
 export { InMemoryRefreshRunStore } from "./application/refresh-run.store";
+export { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
 export { AthenaGatewayAdapter } from "./infrastructure/athena-gateway";
 export { GlueGatewayAdapter } from "./infrastructure/glue-gateway";
-export { ATHENA_METRIC_SQL } from "./infrastructure/athena-sql-catalog";
+export {
+  createAthenaMetricSqlCatalog,
+  METRIC_SQL_TYPES,
+} from "./infrastructure/athena-sql-catalog";
 export {
   PlaceholderGlueGateway,
   PlaceholderAthenaGateway,
@@ -46,6 +53,7 @@ export type {
   GlueGateway,
   GlueJobRunStatus,
   MetricSqlCatalog,
+  MetricSqlCatalogFactory,
   RefreshOrchestratorOptions,
   RefreshRunRecord,
   RefreshRunStatus,

@@ -17,11 +17,9 @@ import { createAuditModule } from "./modules/audit/index";
 import {
   AnalyticsRefreshOrchestrator,
   createAnalyticsModule,
-  DrizzleAnalyticsRepository,
-  InMemoryRefreshRunStore,
   AthenaGatewayAdapter,
   GlueGatewayAdapter,
-  ATHENA_METRIC_SQL,
+  createAthenaMetricSqlCatalog,
 } from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
@@ -283,19 +281,26 @@ async function main(): Promise<void> {
   });
   audit.start();
 
-  // Analytics module. When orchestration is configured (Glue job name +
-  // region), the admin refresh callback and the nightly scheduled-refresh
-  // route both funnel into the same in-process orchestrator; a bounded
-  // reconciler sweep advances unfinished runs. Without
-  // configuration, refresh remains an accepted no-op.
   let analyticsRefreshOrchestrator:
     | AnalyticsRefreshOrchestrator
     | undefined;
-  const analyticsRepository = new DrizzleAnalyticsRepository(database.db);
+  const analytics = createAnalyticsModule({
+    database: database.db,
+    accountReader: identity.repository,
+    membershipRepository: societies.membershipRepository,
+    onRefreshRequested: async () => {
+      if (analyticsRefreshOrchestrator !== undefined) {
+        await analyticsRefreshOrchestrator.requestRefresh("admin");
+      }
+    },
+  });
+
+  // Analytics orchestration is driven by the durable PostgreSQL run store.
+  // Requests only record/coalesce work; the reconciler performs AWS calls.
   if (config.analyticsGlueJobName !== null && config.awsRegion !== null) {
     analyticsRefreshOrchestrator = new AnalyticsRefreshOrchestrator({
-      repository: analyticsRepository,
-      runStore: new InMemoryRefreshRunStore(),
+      repository: analytics.repository,
+      runStore: analytics.refreshRunStore,
       glueGateway: new GlueGatewayAdapter({
         region: config.awsRegion,
         jobName: config.analyticsGlueJobName,
@@ -309,7 +314,7 @@ async function main(): Promise<void> {
           ? {}
           : { outputLocation: config.analyticsAthenaOutputLocation }),
       }),
-      sqlByMetricType: ATHENA_METRIC_SQL,
+      sqlByMetricType: createAthenaMetricSqlCatalog,
       logger,
       maxPhaseRetries: config.analyticsRefreshMaxPhaseRetries,
       staleAfterMs: config.analyticsRefreshStaleAfterMs,
@@ -343,19 +348,6 @@ async function main(): Promise<void> {
       "analytics refresh reconciler started",
     );
   }
-  const analytics = createAnalyticsModule({
-    database: database.db,
-    accountReader: identity.repository,
-    membershipRepository: societies.membershipRepository,
-    ...(analyticsRefreshOrchestrator !== undefined
-      ? {
-          onRefreshRequested: async () => {
-            await analyticsRefreshOrchestrator!.requestRefresh("admin");
-          },
-        }
-      : {}),
-  });
-
   const app = createApp({
     analytics: {
       analyticsService: analytics.analyticsService,
