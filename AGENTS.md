@@ -103,3 +103,17 @@
 3. Reliable deployment and repeatable demo data.
 4. Clear evidence that each AWS service is invoked automatically by UI operations or application code.
 5. Add deferred assessment categories only when their product purpose and demo path are defined.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues on `klenathan/ASM3`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses the five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout. See `docs/agents/domain.md`.
