@@ -19,8 +19,9 @@ import {
   createAnalyticsModule,
   DrizzleAnalyticsRepository,
   InMemoryRefreshRunStore,
-  PlaceholderGlueGateway,
-  PlaceholderAthenaGateway,
+  AthenaGatewayAdapter,
+  GlueGatewayAdapter,
+  ATHENA_METRIC_SQL,
 } from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
@@ -285,8 +286,7 @@ async function main(): Promise<void> {
   // Analytics module. When orchestration is configured (Glue job name +
   // region), the admin refresh callback and the nightly scheduled-refresh
   // route both funnel into the same in-process orchestrator; a bounded
-  // reconciler sweep advances unfinished runs (placeholder gateways complete
-  // instantly until real Glue/Athena adapters land via ticket #9). Without
+  // reconciler sweep advances unfinished runs. Without
   // configuration, refresh remains an accepted no-op.
   let analyticsRefreshOrchestrator:
     | AnalyticsRefreshOrchestrator
@@ -296,8 +296,20 @@ async function main(): Promise<void> {
     analyticsRefreshOrchestrator = new AnalyticsRefreshOrchestrator({
       repository: analyticsRepository,
       runStore: new InMemoryRefreshRunStore(),
-      glueGateway: new PlaceholderGlueGateway(),
-      athenaGateway: new PlaceholderAthenaGateway(),
+      glueGateway: new GlueGatewayAdapter({
+        region: config.awsRegion,
+        jobName: config.analyticsGlueJobName,
+      }),
+      athenaGateway: new AthenaGatewayAdapter({
+        region: config.awsRegion,
+        database: config.analyticsAthenaDatabase,
+        catalog: config.analyticsAthenaCatalog,
+        workGroup: config.analyticsAthenaWorkGroup,
+        ...(config.analyticsAthenaOutputLocation === null
+          ? {}
+          : { outputLocation: config.analyticsAthenaOutputLocation }),
+      }),
+      sqlByMetricType: ATHENA_METRIC_SQL,
       logger,
       maxPhaseRetries: config.analyticsRefreshMaxPhaseRetries,
       staleAfterMs: config.analyticsRefreshStaleAfterMs,

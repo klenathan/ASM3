@@ -21,6 +21,116 @@ Decisions resolve in tickets #9, #11, #7, #8; this document accumulates them.
 
 Per-ticket decisions are appended below as they land on this branch.
 
+## Ticket #9 — Glue dataset and Athena metric contract
+
+Resolves [klenathan/ASM3#9](https://github.com/klenathan/ASM3/issues/9).
+The contract keeps the four existing metric groups and the existing
+`analytics_metrics` repository boundary. Glue and Athena are data-plane
+services; the ECS orchestrator remains responsible for starting jobs, polling
+completion, and persisting result rows.
+
+### S3 layout and retention
+
+The analytics bucket is private and uses SSE-S3. A Glue run writes one
+consistent PostgreSQL snapshot to these locations:
+
+```text
+s3://<analytics-bucket>/analytics/source/table=users/
+  snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
+s3://<analytics-bucket>/analytics/source/table=societies/
+  snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
+...
+s3://<analytics-bucket>/analytics/query-results/<athena-query-files>
+s3://<analytics-bucket>/analytics/glue-temp/<temporary-files>
+```
+
+The source dataset contains `users`, `societies`, `threads`, `comments`,
+`memberships`, `votes`, and `reports`. `society_id` is retained where the
+source or join supplies it; votes remain a platform-wide count, matching the
+current metric behavior. `snapshot_at` and `snapshot_id` are partition keys.
+The timestamp lets Athena select the newest complete snapshot while the run
+ID prevents same-day manual refreshes from overwriting one another.
+
+Only the source data is retained for 30 days. Athena result files are retained
+for 7 days and Glue temporary files for 1 day. `analytics_metrics` in RDS is
+the durable dashboard history and is not subject to the S3 lifecycle rules.
+
+### Glue Catalog
+
+Glue owns one database, `analytics`, with one external Parquet table for each
+source table. Every table has its source columns plus the partition keys
+`snapshot_at string` and `snapshot_id string`; the table location is the
+corresponding `analytics/source/table=<name>/` prefix. The export job updates
+the catalog partitions as it writes each table. No crawler is required, which
+keeps the daily path deterministic and avoids an additional scheduled service.
+
+The dataset is deliberately not one wide denormalized table. The six joins
+needed by the metric groups are small in the coursework deployment, and
+separate tables preserve source-column meaning and make future metric queries
+local. Partitioning is limited to snapshot identity: partitioning by society,
+status, or individual event dates would create small-file and high-partition
+overhead for a full daily export.
+
+### Athena query contract
+
+The ECS service runs one static query per metric group from
+`backend/src/modules/analytics/infrastructure/athena-sql-catalog.ts`. Each
+query selects the greatest `snapshot_at` for every source table and returns
+zero or more rows with exactly these columns:
+
+| Column | Athena type | Meaning |
+| --- | --- | --- |
+| `metric_type` | `varchar` | One of the four metric group names |
+| `society_id` | `varchar` nullable | Empty/null for platform-wide rows |
+| `period_start` | `timestamp` | UTC start of the daily metric period |
+| `period_end` | `timestamp` | UTC inclusive end of the daily metric period |
+| `data` | `varchar` | JSON object containing the group payload |
+
+The adapter converts this string result into the application row
+`{metricType, societyId, periodStart, periodEnd, data}`. Athena's header row is
+ignored, all result pages are consumed, empty `society_id` values become
+`null`, and malformed metric/date/JSON values fail the refresh rather than
+being partially persisted. The existing service converts payload keys to the
+API's camelCase form.
+
+The payloads retain these fields:
+
+- `user_growth`: `registrations`, `active_users`, `total_users`, `suspensions`
+- `content_volume`: `threads`, `comments`, `votes`, `reports`
+- `top_societies`: `top_by_members` and `top_by_threads` entries containing society ID, name, member count, and thread count
+- `moderation`: `pending_reports`, `resolved_today`, `avg_resolution_hours`, `total_reports`
+
+Athena uses the configured `analytics` workgroup and its S3 result location.
+Every query includes the `ClientRequestToken` `<run-id>:<metric-type>` so a
+reconciler retry reuses the same Athena execution.
+
+### Metric-parity acceptance criteria
+
+Ticket #9 is accepted when a Glue snapshot and the four Athena queries satisfy
+all of the following against the same RDS fixture and UTC date:
+
+1. The snapshot contains all seven source tables, every table has matching
+   row counts and required columns, and every partition points to the same
+   `snapshot_at`/`snapshot_id` pair.
+2. One platform-wide row exists for each metric group, with the four current
+   payload shapes and the expected daily period.
+3. `content_volume` and `moderation` also return one row per represented
+   society, without changing the existing platform-wide totals.
+4. `top_societies` returns the same top-ten ordering by active members and
+   threads, with society IDs and names stable under ties.
+5. Re-running the same run ID is idempotent: Athena reuses its query token and
+   persistence updates the same `(metric_type, society_id, period_start)`
+   record rather than creating a duplicate.
+6. A paginated Athena response produces the same rows as an unpaginated
+   response, and an invalid row prevents any rows from that refresh from being
+   persisted.
+7. The admin API and dashboard still expose `user_growth`, `content_volume`,
+   `top_societies`, and `moderation` without a response-schema change.
+
+The migration is not considered cut over until these checks pass and ticket
+#8 removes the old EMR Serverless/Lambda resources with a documented rollback
+boundary.
+
 ## Ticket #11 — Lambda-free refresh orchestration
 
 Resolves [klenathan/ASM3#11](https://github.com/klenathan/ASM3/issues/11) per decision #10.
@@ -136,10 +246,10 @@ AWS-side dedupe below, so replaying unfinished runs cannot duplicate work.
 - **SQS-polling worker pattern**: unused queue constant cost and delayed
   delivery timers are worse fit than a direct HTTPS ping for a once-a-day job.
 
-### Expected gateway interfaces (contract for ticket #9's adapters)
+### Gateway interfaces implemented by ticket #9
 
-#9's real adapters (using `@aws-sdk/client-glue` / `@aws-sdk/client-athena`)
-must implement these application-layer ports exactly
+The real adapters (using `@aws-sdk/client-glue` / `@aws-sdk/client-athena`)
+implement these application-layer ports exactly
 (`application/refresh-orchestrator.ports.ts`):
 
 ```ts
@@ -165,9 +275,8 @@ interface AthenaGateway {
 }
 ```
 
-Interim placeholders (`infrastructure/placeholder-analytics-gateways.ts`)
-complete instantly with zero rows so configured environments exercise the full
-lifecycle without touching data until #9 lands.
+The placeholder gateways remain available for isolated local wiring tests, but
+the production composition root uses the real adapters and the SQL catalog.
 
 Env contract (all optional, checked by `config/env.ts`):
 `ANALYTICS_GLUE_JOB_NAME` (+ required `AWS_REGION`) enables the orchestrator

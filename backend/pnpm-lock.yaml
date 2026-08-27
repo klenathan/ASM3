@@ -8,10 +8,16 @@ importers:
 
   .:
     dependencies:
+      '@aws-sdk/client-athena':
+        specifier: ^3.1119.0
+        version: 3.1119.0
       '@aws-sdk/client-emr':
         specifier: ^3.1119.0
         version: 3.1119.0
       '@aws-sdk/client-emr-serverless':
+        specifier: ^3.1119.0
+        version: 3.1119.0
+      '@aws-sdk/client-glue':
         specifier: ^3.1119.0
         version: 3.1119.0
       '@aws-sdk/client-lambda':
@@ -93,12 +99,20 @@ packages:
     resolution: {integrity: sha512-7TWLjypP8kk3savsDBRuhZJx7mBuFFA2136BQhwwLllsAnO4Tmq/p+SXZaNxbuulkzUFz3BZzj0bb4YzexZcNQ==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/client-athena@3.1119.0':
+    resolution: {integrity: sha512-ZoDk1QH1HnCPub67M4oT9iHYVGiw6/VPHpBsS3g2wjMxBOSIiWZg6qXm3kAXataZy3NYvXMJGoz+Z5gmQEzivw==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-emr-serverless@3.1119.0':
     resolution: {integrity: sha512-C+by9eSWQbIa5ecYOV1A6w9g2FGUhZuls3xgdxE4F1+6n03tNIoxdUH5xDF6keyAWMTaVDP0Oup+GQWgR74rMQ==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-emr@3.1119.0':
     resolution: {integrity: sha512-SZMpx9s52t64/nQffvGkFnCu+162IZ42NEZ/aBiwpJiabOzY+eG0RaDfHqrg0dLvTkfQoQZwc5tLmATilKxmJA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-glue@3.1119.0':
+    resolution: {integrity: sha512-/lINH83HP0N3Vu6vvKwEUBIY4Mqm0Udm+oSkpDAQEoErix1b5S+tYJiXrbh0ktNA3R5breYm2l74ErI6dG9GSA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-lambda@3.1101.0':
@@ -1714,6 +1728,17 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
+  '@aws-sdk/client-athena@3.1119.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.9
+      '@aws-sdk/credential-provider-node': 3.972.81
+      '@aws-sdk/types': 3.974.5
+      '@smithy/core': 3.33.3
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.3
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
   '@aws-sdk/client-emr-serverless@3.1119.0':
     dependencies:
       '@aws-sdk/core': 3.977.9
@@ -1726,6 +1751,17 @@ snapshots:
       tslib: 2.8.1
 
   '@aws-sdk/client-emr@3.1119.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.9
+      '@aws-sdk/credential-provider-node': 3.972.81
+      '@aws-sdk/types': 3.974.5
+      '@smithy/core': 3.33.3
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.3
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/client-glue@3.1119.0':
     dependencies:
       '@aws-sdk/core': 3.977.9
       '@aws-sdk/credential-provider-node': 3.972.81

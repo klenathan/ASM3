@@ -82,6 +82,10 @@ const environmentSchema = z
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
     ANALYTICS_GLUE_JOB_NAME: z.string().trim().min(1).optional(),
+    ANALYTICS_ATHENA_DATABASE: z.string().trim().min(1).default("analytics"),
+    ANALYTICS_ATHENA_CATALOG: z.string().trim().min(1).default("AwsDataCatalog"),
+    ANALYTICS_ATHENA_WORKGROUP: z.string().trim().min(1).default("analytics"),
+    ANALYTICS_ATHENA_OUTPUT_LOCATION: z.string().trim().min(1).optional(),
     ANALYTICS_SCHEDULER_SECRET: z.string().trim().min(1).optional(),
     ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS: z.coerce
       .number()
@@ -231,6 +235,10 @@ export interface AppConfig {
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
   readonly analyticsGlueJobName: string | null;
+  readonly analyticsAthenaDatabase: string;
+  readonly analyticsAthenaCatalog: string;
+  readonly analyticsAthenaWorkGroup: string;
+  readonly analyticsAthenaOutputLocation: string | null;
   readonly analyticsSchedulerSecret: string | null;
   readonly analyticsRefreshReconcileIntervalMs: number;
   readonly analyticsRefreshMaxPhaseRetries: number;
@@ -284,6 +292,10 @@ export function loadConfig(
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,
     analyticsGlueJobName: result.data.ANALYTICS_GLUE_JOB_NAME ?? null,
+    analyticsAthenaDatabase: result.data.ANALYTICS_ATHENA_DATABASE,
+    analyticsAthenaCatalog: result.data.ANALYTICS_ATHENA_CATALOG,
+    analyticsAthenaWorkGroup: result.data.ANALYTICS_ATHENA_WORKGROUP,
+    analyticsAthenaOutputLocation: result.data.ANALYTICS_ATHENA_OUTPUT_LOCATION ?? null,
     analyticsSchedulerSecret: result.data.ANALYTICS_SCHEDULER_SECRET ?? null,
     analyticsRefreshReconcileIntervalMs:
       result.data.ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS,

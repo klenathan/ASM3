@@ -37,6 +37,20 @@ describe("environment configuration", () => {
     })).toThrow("AWS_REGION and MEDIA_BUCKET must be configured together");
   });
 
+  it("loads Athena defaults and accepts the deployed result location", () => {
+    expect(loadConfig({
+      DATABASE_URL: databaseUrl,
+      AWS_REGION: "us-east-1",
+      MEDIA_BUCKET: "rmit-society-media",
+      ANALYTICS_ATHENA_OUTPUT_LOCATION: "s3://analytics/query-results/",
+    })).toMatchObject({
+      analyticsAthenaDatabase: "analytics",
+      analyticsAthenaCatalog: "AwsDataCatalog",
+      analyticsAthenaWorkGroup: "analytics",
+      analyticsAthenaOutputLocation: "s3://analytics/query-results/",
+    });
+  });
+
   it("requires remote media storage in production", () => {
     expect(() => loadConfig({
       DATABASE_URL: databaseUrl,

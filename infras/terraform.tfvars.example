@@ -25,16 +25,17 @@ force_destroy_buckets = false
 # high-severity finding (default 0.90; no effect in off/shadow mode).
 # content_analysis_auto_remove_confidence = 0.90
 
-# ---- Analytics EMR Serverless pipeline (gated) -----------------------------
-# Enable the EMR Serverless analytics pipeline (Analytics AWS category).
-# Requires LabRole trust for emr-serverless.amazonaws.com and
-# lambda.amazonaws.com. Billed only for Spark job seconds
-# (driver 1 vCPU/3GB + executor 2 vCPU/4GB, auto-stop 15m).
-# Build zips first: (cd backend && pnpm build:analytics)
+# ---- Analytics Glue + Athena pipeline (gated) -------------------------------
+# Enable the Glue + Athena analytics pipeline (Analytics AWS category).
+# The old EMR/Lambda resources remain declared until the ticket #8 cutover;
+# this flag also provisions the new catalog and Glue export job.
+# Until that cutover, build the legacy Lambda artifacts as well:
+# (cd backend && pnpm build:analytics)
+# No Lambda build is needed for the Glue/Athena path.
 #   enable_analytics_pipeline = true
-#   analytics_dump_rds_zip           = "../backend/dist-function/analytics-dump-rds.zip"
-#   analytics_start_serverless_zip   = "../backend/dist-function/analytics-start-serverless.zip"
-#   analytics_load_results_zip       = "../backend/dist-function/analytics-load-results.zip"
+#   analytics_dump_rds_zip         = "../backend/dist-function/analytics-dump-rds.zip"
+#   analytics_start_serverless_zip = "../backend/dist-function/analytics-start-serverless.zip"
+#   analytics_load_results_zip     = "../backend/dist-function/analytics-load-results.zip"
 # Nightly refresh orchestration (Lambda-free): set the Glue job name that the
 # backend orchestrator should start; EventBridge Scheduler + API destination
 # then hit POST /api/v1/admin/analytics/scheduled-refresh with a generated

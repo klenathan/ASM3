@@ -1,10 +1,10 @@
-# Analytics — EMR Serverless Pipeline
+# Analytics — Glue + Athena Pipeline
 
 ## Purpose (Analytics AWS category)
 
-Assessment 3 requires an **Analytics**-category AWS service invoked automatically by application/UI code. The analytics pipeline satisfies this: a System Admin triggers `POST /api/v1/admin/analytics/refresh` (202 Accepted, `system_admin` only) or EventBridge cron `0 2 * * ? *` triggers the nightly run; S3 `_SUCCESS` chaining invokes the remaining stages automatically. Evidence is the UI action → Lambda → EMR Serverless → S3 → RDS metric upsert, plus CloudWatch logs and S3 `emr-serverless-logs`.
+Assessment 3 requires an **Analytics**-category AWS service invoked automatically by application/UI code. The replacement pipeline satisfies this: a System Admin triggers `POST /api/v1/admin/analytics/refresh` (202 Accepted, `system_admin` only) or EventBridge Scheduler cron `0 2 * * ? *` triggers the nightly run; the ECS backend starts Glue, queries Athena, and persists the results. The legacy EMR Serverless/Lambda chain remains provisioned only as a temporary rollback path until ticket #8's cutover.
 
-## Architecture
+## Legacy Rollback Architecture
 
 ```
 POST /api/v1/admin/analytics/refresh (system_admin)
@@ -21,7 +21,25 @@ POST /api/v1/admin/analytics/refresh (system_admin)
 
 - **S3 seams:** same bucket `${project}-analytics-${accountId}`, prefixes `analytics/staging/<ts>/`, `analytics/output/<ts>/`, `analytics/pyspark/compute_metrics.py`, `analytics/emr-serverless-logs`.
 - **Polling:** `GetJobRun` every 30s, 900s timeout, `CancelJobRun` on timeout; `SUCCESS`→ success, `FAILED`/`CANCELLED`→ failure (no output `_SUCCESS`, no load).
-- **Gate:** `enable_analytics_pipeline` (default `false`) controls the application + 3 Lambdas + notifications + EventBridge; destroy after demo (`tofu destroy`) since `End Lab` does not stop Serverless apps.
+- **Gate:** `enable_analytics_pipeline` (default `false`) controls the legacy rollback resources and the replacement Glue/Catalog/Athena resources; destroy after demo (`tofu destroy`) since `End Lab` does not stop AWS jobs or RDS.
+
+## Glue + Athena contract
+
+Ticket #9 adds the replacement data plane before the ticket #8 cutover. The
+ECS backend starts the Glue export job and runs four Athena queries; no result
+Lambda is involved in the new path. Glue writes seven source tables as
+Parquet beneath `analytics/source/table=<name>/snapshot_at=<utc>/snapshot_id=<run-id>/`.
+The Glue Catalog database is `analytics`, with one external table per source
+table and `snapshot_at`/`snapshot_id` partitions. S3 retention is 30 days for
+source snapshots, 7 days for Athena result files, and 1 day for Glue temp
+files.
+
+Each Athena query returns `metric_type`, nullable `society_id`, UTC
+`period_start`, UTC inclusive `period_end`, and JSON-object `data`. The
+adapter consumes paginated results and maps them to
+`AnalyticsRepository.upsertMetric`; the four metric groups and API response
+shape remain unchanged. See `ATHENA_GLUE_MIGRATION.md` for the SQL contract,
+parity criteria, and cutover boundary.
 
 ## Cost saving vs classic EMR
 
@@ -37,8 +55,7 @@ No baseline proof is required; the migration is done directly for cost saving. P
 
 ## Ops
 
-- Build: `cd backend && pnpm build:analytics` (produces `analytics-dump-rds.zip`, `analytics-start-serverless.zip` (alias `analytics-start-emr.zip`), `analytics-load-results.zip`)
+- Build: the Glue script is uploaded by OpenTofu; until ticket #8 removes the rollback path, `cd backend && pnpm build:analytics` also produces its three legacy Lambda zips.
 - Deploy: `tofu plan/apply` with `enable_analytics_pipeline = true` (see `infras/terraform.tfvars.example`)
-- Verify: trigger refresh via Admin Center Analytics tab or `POST /api/v1/admin/analytics/refresh` → check `GET /api/v1/admin/analytics` and CloudWatch `/aws/lambda/*analytics*` (7-day retention)
+- Verify: trigger refresh via Admin Center Analytics tab or `POST /api/v1/admin/analytics/refresh` → check `GET /api/v1/admin/analytics`, Glue job history, and Athena query history.
 - Teardown: `tofu destroy` (or disable flag); `End Lab` stops EC2 but not RDS/Serverless
-

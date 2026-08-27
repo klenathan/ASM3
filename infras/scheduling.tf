@@ -72,7 +72,6 @@ resource "aws_cloudwatch_event_connection" "analytics_scheduler" {
     }
   }
 
-  tags = local.common_tags
 }
 
 resource "aws_cloudwatch_event_api_destination" "analytics_scheduled_refresh" {
@@ -84,7 +83,6 @@ resource "aws_cloudwatch_event_api_destination" "analytics_scheduled_refresh" {
   http_method         = "POST"
   connection_arn      = aws_cloudwatch_event_connection.analytics_scheduler[0].arn
 
-  tags = local.common_tags
 }
 
 resource "aws_scheduler_schedule" "analytics_nightly_refresh" {
@@ -112,5 +110,4 @@ resource "aws_scheduler_schedule" "analytics_nightly_refresh" {
     }
   }
 
-  tags = local.common_tags
 }

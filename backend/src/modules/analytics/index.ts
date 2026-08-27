@@ -31,6 +31,9 @@ export { AnalyticsService } from "./application/analytics.service";
 export type { AnalyticsServiceDependencies } from "./application/analytics.service";
 export { AnalyticsRefreshOrchestrator } from "./application/refresh-orchestrator";
 export { InMemoryRefreshRunStore } from "./application/refresh-run.store";
+export { AthenaGatewayAdapter } from "./infrastructure/athena-gateway";
+export { GlueGatewayAdapter } from "./infrastructure/glue-gateway";
+export { ATHENA_METRIC_SQL } from "./infrastructure/athena-sql-catalog";
 export {
   PlaceholderGlueGateway,
   PlaceholderAthenaGateway,
