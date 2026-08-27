@@ -21,3 +21,4 @@ export {
 export { platformConfig } from "../modules/platform/infrastructure/platform.tables";
 export { contentAnalysisRuns } from "../modules/content-analysis/infrastructure/content-analysis.tables";
 export { contentAnalysisOverrides } from "../modules/content-analysis/infrastructure/content-analysis.tables";
+export { analyticsMetrics } from "../modules/analytics/infrastructure/analytics.tables";

@@ -14,6 +14,7 @@ import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
 import { createAuditModule } from "./modules/audit/index";
+import { createAnalyticsModule } from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
@@ -270,7 +271,31 @@ async function main(): Promise<void> {
     logger,
   });
   audit.start();
+
+  // Analytics module: wire the refresh trigger to invoke the dump-rds Lambda
+  // when configured. In development, the callback is a no-op.
+  let analyticsRefreshTrigger: (() => Promise<void>) | undefined;
+  if (config.analyticsDumpLambdaFunction !== null && config.awsRegion !== null) {
+    const { LambdaClient, InvokeCommand } = await import("@aws-sdk/client-lambda");
+    const lambdaClient = new LambdaClient({ region: config.awsRegion });
+    analyticsRefreshTrigger = async () => {
+      await lambdaClient.send(
+        new InvokeCommand({
+          FunctionName: config.analyticsDumpLambdaFunction!,
+          InvocationType: "Event", // async, don't wait for response
+        }),
+      );
+    };
+  }
+  const analytics = createAnalyticsModule({
+    database: database.db,
+    accountReader: identity.repository,
+    membershipRepository: societies.membershipRepository,
+    onRefreshRequested: analyticsRefreshTrigger,
+  });
+
   const app = createApp({
+    analytics,
     config,
     logger,
     checkReadiness: database.checkConnection,

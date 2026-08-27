@@ -81,6 +81,7 @@ const environmentSchema = z
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
+    ANALYTICS_DUMP_LAMBDA_FUNCTION: z.string().trim().min(1).optional(),
   })
   .superRefine((value, context) => {
     if (
@@ -194,6 +195,7 @@ export interface AppConfig {
   readonly analysisMaxImages: number;
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
+  readonly analyticsDumpLambdaFunction: string | null;
 }
 
 export function loadConfig(
@@ -240,5 +242,6 @@ export function loadConfig(
     analysisMaxImages: result.data.ANALYSIS_MAX_IMAGES,
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,
+    analyticsDumpLambdaFunction: result.data.ANALYTICS_DUMP_LAMBDA_FUNCTION ?? null,
   };
 }
