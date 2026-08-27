@@ -400,12 +400,13 @@ export class ThreadService {
       throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
     }
     const details = await this.placesPort.retrieve(location.mapboxId, null);
+    const finetune = isFinetuneWithinThreshold(details.latitude, details.longitude, location.latitude, location.longitude);
     return {
       name: details.name,
       mapboxId: details.mapboxId,
       placeType: details.placeType,
-      latitude: details.latitude,
-      longitude: details.longitude,
+      latitude: finetune ? (location.latitude as number) : details.latitude,
+      longitude: finetune ? (location.longitude as number) : details.longitude,
       address: details.address,
       meta: details.meta,
     };
@@ -419,13 +420,14 @@ export class ThreadService {
       throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
     }
     const details = await this.placesPort.retrieve(location.mapboxId, null);
+    const finetune = isFinetuneWithinThreshold(details.latitude, details.longitude, location.latitude, location.longitude);
     return {
       location: {
         name: details.name,
         mapboxId: details.mapboxId,
         placeType: details.placeType,
-        latitude: details.latitude,
-        longitude: details.longitude,
+        latitude: finetune ? (location.latitude as number) : details.latitude,
+        longitude: finetune ? (location.longitude as number) : details.longitude,
         address: details.address,
         meta: details.meta,
       },
@@ -443,6 +445,14 @@ function normalizeMediaIds(mediaIds: readonly string[] | undefined): readonly st
 }
 
 type LocationSnapshot = CreateThreadInput["location"];
+
+function isFinetuneWithinThreshold(canonicalLat: number, canonicalLng: number, clientLat: number | undefined, clientLng: number | undefined): boolean {
+  if (clientLat === undefined || clientLng === undefined) return false;
+  if (clientLat < -90 || clientLat > 90 || clientLng < -180 || clientLng > 180) return false;
+  const dLat = Math.abs(canonicalLat - clientLat);
+  const dLng = Math.abs(canonicalLng - clientLng);
+  return dLat <= 0.001 && dLng <= 0.001;
+}
 
 export function normalizeThreadPageLimit(limit: number | undefined): number {
   return normalizePageSize(limit);

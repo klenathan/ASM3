@@ -186,17 +186,10 @@ export function ThreadPage() {
                         className="mt-7"
                       />
                     )}
-                  {(thread as unknown as { location: import("../../features/societies/types").ThreadLocation | null }).location && (
+                  {thread.location && (
                     <div className="mt-4">
-                      <LocationPill
-                        location={(thread as unknown as { location: import("../../features/societies/types").ThreadLocation }).location!}
-                        onClick={() => setLocationOpen(true)}
-                      />
-                      <LocationModal
-                        location={(thread as unknown as { location: import("../../features/societies/types").ThreadLocation | null }).location}
-                        open={locationOpen}
-                        onOpenChange={setLocationOpen}
-                      />
+                      <LocationPill location={thread.location} onClick={() => setLocationOpen(true)} />
+                      <LocationModal location={thread.location} open={locationOpen} onOpenChange={setLocationOpen} />
                     </div>
                   )}
                   <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-foreground/15 pt-4">

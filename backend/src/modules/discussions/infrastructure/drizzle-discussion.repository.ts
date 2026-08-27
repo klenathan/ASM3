@@ -239,41 +239,49 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
   }
 
   async updateThread(threadId: string, input: UpdateThreadInput): Promise<ThreadRecord | null> {
-    const values: Record<string, unknown> = {
+    const base: Partial<typeof threads.$inferSelect> & { updatedAt: Date } = {
       updatedAt: input.updatedAt,
       ...(input.title === undefined ? {} : { title: input.title }),
       ...(input.body === undefined ? {} : { body: input.body }),
     };
+    let locationPatch: Partial<typeof threads.$inferSelect> = {};
     if (input.clearLocation) {
-      values["locationName"] = null;
-      values["locationMapboxId"] = null;
-      values["locationPlaceType"] = null;
-      values["latitude"] = null;
-      values["longitude"] = null;
-      values["locationAddress"] = null;
-      values["locationMeta"] = null;
+      locationPatch = {
+        locationName: null,
+        locationMapboxId: null,
+        locationPlaceType: null,
+        latitude: null,
+        longitude: null,
+        locationAddress: null,
+        locationMeta: null,
+      };
     } else if (input.location !== undefined) {
       if (input.location === null) {
-        values["locationName"] = null;
-        values["locationMapboxId"] = null;
-        values["locationPlaceType"] = null;
-        values["latitude"] = null;
-        values["longitude"] = null;
-        values["locationAddress"] = null;
-        values["locationMeta"] = null;
+        locationPatch = {
+          locationName: null,
+          locationMapboxId: null,
+          locationPlaceType: null,
+          latitude: null,
+          longitude: null,
+          locationAddress: null,
+          locationMeta: null,
+        };
       } else {
-        values["locationName"] = input.location.name;
-        values["locationMapboxId"] = input.location.mapboxId;
-        values["locationPlaceType"] = input.location.placeType;
-        values["latitude"] = input.location.latitude;
-        values["longitude"] = input.location.longitude;
-        values["locationAddress"] = input.location.address;
-        values["locationMeta"] = input.location.meta;
+        locationPatch = {
+          locationName: input.location.name,
+          locationMapboxId: input.location.mapboxId,
+          locationPlaceType: input.location.placeType,
+          latitude: input.location.latitude,
+          longitude: input.location.longitude,
+          locationAddress: input.location.address as never,
+          locationMeta: input.location.meta as never,
+        };
       }
     }
+    const values = { ...base, ...locationPatch } as Partial<typeof threads.$inferInsert>;
     const rows = await this.executor
       .update(threads)
-      .set(values as never)
+      .set(values)
       .where(eq(threads.id, threadId))
       .returning();
     const row = rows[0];

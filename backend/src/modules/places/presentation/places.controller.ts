@@ -2,7 +2,6 @@ import type { Context } from "hono";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { AppEnvironment } from "../../../app-types";
 import type { PlacesPort } from "../application/places.port";
-import type { MapboxPlacesAdapter } from "../infrastructure/mapbox-places.adapter";
 import { requireInjectedPrincipal } from "../../discussions/presentation/discussion.http.helpers";
 
 interface PlacesControllerDeps {
@@ -17,15 +16,11 @@ export function createPlacesController(deps: PlacesControllerDeps) {
       const prox = context.req.query("proximity") ?? null;
       const sessionToken = context.req.query("session_token") ?? null;
 
-      // Rate limit per user
-      const adapter = deps.placesPort as unknown as MapboxPlacesAdapter;
-      if (typeof adapter.checkRateLimit === "function") {
-        if (!adapter.checkRateLimit(principal.userId)) {
-          return context.json(
-            { error: { code: "RATE_LIMITED", message: "Too many requests", requestId: context.get("requestId"), details: {} } },
-            429,
-          );
-        }
+      if (deps.placesPort.checkRateLimit && !deps.placesPort.checkRateLimit(principal.userId)) {
+        return context.json(
+          { error: { code: "RATE_LIMITED", message: "Too many requests", requestId: context.get("requestId"), details: {} } },
+          429,
+        );
       }
 
       if (query.trim().length < 2) {
@@ -53,14 +48,11 @@ export function createPlacesController(deps: PlacesControllerDeps) {
         return context.json({ error: { code: "VALIDATION_ERROR", message: "mapboxId is required", requestId: context.get("requestId"), details: {} } }, 400);
       }
 
-      const adapter = deps.placesPort as unknown as MapboxPlacesAdapter;
-      if (typeof adapter.checkRateLimit === "function") {
-        if (!adapter.checkRateLimit(principal.userId)) {
-          return context.json(
-            { error: { code: "RATE_LIMITED", message: "Too many requests", requestId: context.get("requestId"), details: {} } },
-            429,
-          );
-        }
+      if (deps.placesPort.checkRateLimit && !deps.placesPort.checkRateLimit(principal.userId)) {
+        return context.json(
+          { error: { code: "RATE_LIMITED", message: "Too many requests", requestId: context.get("requestId"), details: {} } },
+          429,
+        );
       }
 
       try {
@@ -82,14 +74,11 @@ export function createPlacesController(deps: PlacesControllerDeps) {
         return context.json({ error: { code: "VALIDATION_ERROR", message: "Invalid coordinates", requestId: context.get("requestId"), details: {} } }, 400);
       }
 
-      const adapter = deps.placesPort as unknown as MapboxPlacesAdapter;
-      if (typeof adapter.checkRateLimit === "function") {
-        if (!adapter.checkRateLimit(principal.userId)) {
-          return context.json(
-            { error: { code: "RATE_LIMITED", message: "Too many requests", requestId: context.get("requestId"), details: {} } },
-            429,
-          );
-        }
+      if (deps.placesPort.checkRateLimit && !deps.placesPort.checkRateLimit(principal.userId)) {
+        return context.json(
+          { error: { code: "RATE_LIMITED", message: "Too many requests", requestId: context.get("requestId"), details: {} } },
+          429,
+        );
       }
 
       try {
