@@ -11,11 +11,12 @@
 # GATE (Academy Learner Lab):
 #   - Confirm EventBridge Scheduler + API destinations are available in the
 #     active lab (Associate Services) in us-east-1.
-#   - aws_scheduler_schedule assumes role_arn; LabRole must be permitted to
-#     call events:InvokeApiDestination on the destination ARN. The lab-managed
-#     LabRole policy usually grants events:* — verify in the console before
-#     applying. If not permitted, the documented fallback is an EventBridge-
-#     targeted one-off ECS worker task (see ticket #11 comment).
+#   - aws_scheduler_schedule assumes role_arn; LabRole must trust
+#     scheduler.amazonaws.com and be permitted to call
+#     events:InvokeApiDestination and sqs:SendMessage. The Glue job also
+#     requires glue.amazonaws.com trust plus Glue, Athena, S3, and Secrets
+#     Manager access. Set the explicit confirmation variable only after
+#     checking the active lab; the configuration fails closed otherwise.
 #   - No IAM roles/users are created here; everything reuses data.aws_iam_role.learner_lab.
 #
 # Teardown: `tofu destroy` removes schedule + destination + connection;
@@ -55,15 +56,18 @@ variable "analytics_refresh_stale_after_ms" {
 resource "terraform_data" "analytics_scheduler_permissions" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
-  input = var.analytics_scheduler_permissions_confirmed
+  input = var.analytics_learner_lab_permissions_confirmed
 
   lifecycle {
     precondition {
-      condition = var.analytics_scheduler_permissions_confirmed && strcontains(
+      condition = var.analytics_learner_lab_permissions_confirmed && strcontains(
         data.aws_iam_role.learner_lab.assume_role_policy,
         "scheduler.amazonaws.com",
+        ) && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "glue.amazonaws.com",
       )
-      error_message = "Analytics scheduling is disabled: verify the active LabRole trust includes scheduler.amazonaws.com and its permissions include events:InvokeApiDestination and sqs:SendMessage, then set analytics_scheduler_permissions_confirmed=true."
+      error_message = "Analytics is disabled: verify the active LabRole trust includes glue.amazonaws.com and scheduler.amazonaws.com and its effective Glue, Athena, S3, Secrets Manager, EventBridge, and SQS permissions, then set analytics_learner_lab_permissions_confirmed=true."
     }
   }
 }

@@ -55,11 +55,13 @@ class FakeAnalyticsRepository implements AnalyticsRepository {
 
 class FakeGlueGateway implements GlueGateway {
   startCalls = 0;
+  startedInputs: { runId: string; arguments?: Readonly<Record<string, string>> }[] = [];
   failStarts = false;
   statuses = new Map<string, GlueJobRunStatus>();
 
-  async startJobRun(input: { readonly runId: string }): Promise<string> {
+  async startJobRun(input: { readonly runId: string; readonly arguments?: Readonly<Record<string, string>> }): Promise<string> {
     this.startCalls++;
+    this.startedInputs.push(input);
     if (this.failStarts) throw new Error("glue unavailable");
     return `jobrun-${input.runId}`;
   }
@@ -171,6 +173,19 @@ describe("AnalyticsRefreshOrchestrator", () => {
       status: "requested",
       glueJobRunId: null,
     });
+  });
+
+  it("uses a deterministic snapshot timestamp and run prefix when reconciliation starts Glue", async () => {
+    const orchestrator = createOrchestrator();
+    const { runId } = await orchestrator.requestRefresh("admin");
+
+    await orchestrator.reconcile();
+
+    expect(glue.startedInputs[0]?.runId).toBe(runId);
+    expect(glue.startedInputs[0]?.arguments).toMatchObject({
+      "--output-prefix": `analytics/source/run=${runId}`,
+    });
+    expect(glue.startedInputs[0]?.arguments?.["--snapshot-at"]).toMatch(/^\d{8}T\d{6}Z$/);
   });
 
   it("coalesces a second request onto an active run instead of starting another export", async () => {

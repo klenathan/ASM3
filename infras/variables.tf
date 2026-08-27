@@ -43,8 +43,8 @@ variable "learner_lab_instance_profile_name" {
   default     = "LabInstanceProfile"
 }
 
-variable "analytics_scheduler_permissions_confirmed" {
-  description = "Set true only after verifying LabRole can invoke the API destination and send failed scheduler events to its DLQ. No custom IAM role is created."
+variable "analytics_learner_lab_permissions_confirmed" {
+  description = "Set true only after verifying LabRole trust for glue.amazonaws.com and scheduler.amazonaws.com and the Glue, Athena, S3, Secrets Manager, EventBridge, and SQS permissions required by analytics. No custom IAM role is created."
   type        = bool
   default     = false
 }

@@ -172,9 +172,12 @@ transient phase failures, and persists results through the existing analytics
 repository. No analytics Lambda artifacts or resources are part of this path.
 Scheduler delivery retries for one hour and sends exhausted events to the
 analytics scheduler SQS DLQ. Before enabling the pipeline, verify the active
-Learner Lab `LabRole` allows `events:InvokeApiDestination` and
-`sqs:SendMessage`, then set `analytics_scheduler_permissions_confirmed = true`;
-OpenTofu otherwise fails closed. No custom IAM role is created.
+Learner Lab `LabRole` trust for `glue.amazonaws.com` and
+`scheduler.amazonaws.com`, plus effective `glue:StartJobRun`, Glue discovery,
+Athena query, S3 object, Secrets Manager, `events:InvokeApiDestination`, and
+`sqs:SendMessage` permissions. Set
+`analytics_learner_lab_permissions_confirmed = true`; OpenTofu otherwise fails
+closed. No custom IAM role is created.
 
 OpenTofu manages the Glue connection/job, Glue Catalog database and tables,
 Athena workgroup, S3 lifecycle rules, scheduler, and the shared private S3

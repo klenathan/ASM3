@@ -17,7 +17,7 @@ Admin refresh or EventBridge Scheduler
   -> AWS Glue export job
   -> private analytics S3 bucket
      analytics/source/table=<name>/snapshot_at=<utc>/snapshot_id=<run-id>/
-     analytics/manifest/
+      analytics/manifest/snapshot_id=<run-id>/
   -> Glue Catalog external Parquet tables
   -> four Athena metric queries
   -> AnalyticsRepository.upsertMetric
@@ -32,6 +32,9 @@ reconciler starts Glue, waits for completion, starts one Athena query for each
 metric group, consumes all result pages, and persists valid rows atomically
 through the existing repository boundary. The run store and active-run unique
 index allow unfinished work to resume after an ECS restart.
+Each reconciler claims a run with a short PostgreSQL lease and uses
+compare-and-set saves, preventing separate ECS tasks from starting the same
+phase or overwriting a terminal state.
 
 No analytics-specific Lambda, S3 event chain, or separate analytics artifact
 build is used. The content-analysis Lambda is a separate moderation workflow
@@ -45,6 +48,9 @@ Parquet partitions identified by `snapshot_at` and `snapshot_id`, then appends
 the manifest only after all source tables succeed. Athena receives the
 immutable refresh run ID and selects only that manifest identity, so an
 overlapping or stale run cannot query another run's snapshot.
+The Glue retry uses the run's immutable creation timestamp and exact run
+partition, removes prior source/manifest objects for that run, and rewrites
+the manifest before Athena is allowed to read it.
 
 The Glue Catalog database is `analytics`. It contains one external table per
 source table plus the unpartitioned `snapshot_manifest` table. The Athena SQL
@@ -92,6 +98,16 @@ date that:
 6. Pagination produces the same result and an invalid row persists nothing.
 7. The admin API response shape and dashboard groups are unchanged.
 
+Database migrations are forward-only and applied in order through
+`pnpm db:migrate`. The current analytics boundary is migrations 0013
+(`analytics_metrics` nullable platform-key normalization), 0014 (durable
+refresh runs), and 0015 (refresh-run leases). The migration preflight retains
+the newest row per legacy `(metric_type, period_start)` platform key before
+0013 creates its unique index; it does not edit generated migration files.
+For rollback, deploy code compatible with the already-applied schema and
+restore data from the database backup if required. Do not delete or rewrite an
+applied Drizzle migration; roll forward with a new generated migration.
+
 After these checks pass, applying this cutover removes the previous analytics
 deployment resources and artifacts. Rollback is deliberately outside normal
 runtime behavior: restore the pre-cutover Git revision, rebuild from that
@@ -102,7 +118,7 @@ the durable handoff boundary; no automatic fallback deployment is maintained.
 
 1. Verify the active LabRole trust and permissions, then set
    `enable_analytics_pipeline = true`,
-   `analytics_scheduler_permissions_confirmed = true`, and, for deployed
+   `analytics_learner_lab_permissions_confirmed = true`, and, for deployed
    scheduling, set `analytics_glue_job_name` in `infras/terraform.tfvars`.
 2. Run `tofu plan` and `tofu apply` from `infras/`.
 3. Trigger the Admin Center refresh or call the admin refresh endpoint.

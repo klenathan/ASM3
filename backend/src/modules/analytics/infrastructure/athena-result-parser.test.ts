@@ -58,4 +58,27 @@ describe("parseAthenaResultRows", () => {
       ]]),
     ).toThrow("active_users");
   });
+
+  it("allows null society IDs and rejects non-UUID society IDs", () => {
+    const validRow = [
+      "user_growth",
+      "123e4567-e89b-12d3-a456-426614174000",
+      "2026-08-27",
+      "2026-08-27",
+      '{"registrations":1,"active_users":1,"total_users":1,"suspensions":0}',
+    ];
+    expect(parseAthenaResultRows(columns, [validRow])[0]?.societyId).toBe(
+      "123e4567-e89b-12d3-a456-426614174000",
+    );
+    expect(() => parseAthenaResultRows(columns, [[
+      ...validRow.slice(0, 1),
+      "society-1",
+      ...validRow.slice(2),
+    ]])).toThrow("invalid society_id");
+    expect(parseAthenaResultRows(columns, [[
+      ...validRow.slice(0, 1),
+      null,
+      ...validRow.slice(2),
+    ]])[0]?.societyId).toBeNull();
+  });
 });

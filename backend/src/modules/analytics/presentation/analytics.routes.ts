@@ -4,7 +4,6 @@ import type { AppEnvironment } from "../../../app-types";
 import type { AnalyticsService } from "../application/analytics.service";
 import {
   createAnalyticsController,
-  SCHEDULER_SECRET_HEADER,
 } from "./analytics.controller";
 import {
   analyticsPageSchema,
@@ -66,10 +65,6 @@ const scheduledRefreshRoute = createRoute({
 
 export interface AnalyticsRouteDependencies {
   readonly analyticsService: AnalyticsService;
-  readonly schedulerSecret?: string | undefined;
-  readonly handleScheduledRefresh?:
-    | (() => Promise<{ accepted: boolean; message: string }>)
-    | undefined;
 }
 
 export function registerAnalyticsRoutes(
@@ -78,12 +73,6 @@ export function registerAnalyticsRoutes(
 ): void {
   const controller = createAnalyticsController({
     analyticsService: dependencies.analyticsService,
-    ...(dependencies.schedulerSecret !== undefined
-      ? { schedulerSecret: dependencies.schedulerSecret }
-      : {}),
-    ...(dependencies.handleScheduledRefresh !== undefined
-      ? { handleScheduledRefresh: dependencies.handleScheduledRefresh }
-      : {}),
   });
   app.openapi(queryMetricsRoute, (context) => controller.queryMetrics(context) as never);
   app.openapi(refreshRoute, (context) => controller.refresh(context) as never);
@@ -92,4 +81,4 @@ export function registerAnalyticsRoutes(
   );
 }
 
-export { SCHEDULER_SECRET_HEADER };
+export { SCHEDULER_SECRET_HEADER } from "./analytics.controller";

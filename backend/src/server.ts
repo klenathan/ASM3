@@ -293,6 +293,24 @@ async function main(): Promise<void> {
         await analyticsRefreshOrchestrator.requestRefresh("admin");
       }
     },
+    ...(config.analyticsSchedulerSecret === null
+      ? {}
+      : { schedulerSecret: config.analyticsSchedulerSecret }),
+    onScheduledRefresh: async () => {
+      if (analyticsRefreshOrchestrator === undefined) {
+        return {
+          accepted: true,
+          message: "Analytics refresh orchestration is not configured; nothing was started.",
+        };
+      }
+      const result = await analyticsRefreshOrchestrator.requestRefresh("nightly");
+      return {
+        accepted: true,
+        message: result.coalesced
+          ? "An analytics refresh run is already in progress."
+          : "Scheduled analytics refresh started.",
+      };
+    },
   });
 
   // Analytics orchestration is driven by the durable PostgreSQL run store.
@@ -351,23 +369,6 @@ async function main(): Promise<void> {
   const app = createApp({
     analytics: {
       analyticsService: analytics.analyticsService,
-      ...(config.analyticsSchedulerSecret !== null
-        ? { schedulerSecret: config.analyticsSchedulerSecret }
-        : {}),
-      ...(analyticsRefreshOrchestrator !== undefined
-        ? {
-            handleScheduledRefresh: async () => {
-              const result =
-                await analyticsRefreshOrchestrator!.requestRefresh("nightly");
-              return {
-                accepted: true,
-                message: result.coalesced
-                  ? "An analytics refresh run is already in progress."
-                  : "Scheduled analytics refresh started.",
-              };
-            },
-          }
-        : {}),
     },
     config,
     logger,

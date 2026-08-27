@@ -20,6 +20,7 @@ export const createAthenaMetricSqlCatalog: MetricSqlCatalogFactory = (snapshotId
   const latestSnapshot = `latest AS (
    SELECT snapshot_at, snapshot_id FROM analytics.snapshot_manifest
    WHERE snapshot_id = ${snapshot}
+   ORDER BY completed_at DESC
    LIMIT 1
  )`;
 

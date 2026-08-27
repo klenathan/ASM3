@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import { METRIC_TYPES, type MetricType } from "../domain/analytics";
@@ -76,6 +76,53 @@ export class DrizzleRefreshRunStore implements RefreshRunStore {
     const active = await this.findActiveRun();
     if (active !== null) return active;
     throw new Error(`refresh run ${run.runId} could not be saved`);
+  }
+
+  async claim(
+    runId: string,
+    ownerId: string,
+    now: Date,
+    leaseDurationMs: number,
+  ): Promise<RefreshRunRecord | null> {
+    const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
+    const rows = await this.database
+      .update(analyticsRefreshRuns)
+      .set({ leaseOwner: ownerId, leaseExpiresAt })
+      .where(
+        and(
+          eq(analyticsRefreshRuns.runId, runId),
+          inArray(analyticsRefreshRuns.status, UNFINISHED_STATUSES),
+          or(
+            isNull(analyticsRefreshRuns.leaseOwner),
+            lte(analyticsRefreshRuns.leaseExpiresAt, now),
+            eq(analyticsRefreshRuns.leaseOwner, ownerId),
+          ),
+        ),
+      )
+      .returning();
+    return rows[0] === undefined ? null : toRecord(rows[0]);
+  }
+
+  async saveClaimed(
+    run: RefreshRunRecord,
+    ownerId: string,
+    now: Date,
+    leaseDurationMs: number,
+  ): Promise<RefreshRunRecord | null> {
+    const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
+    const rows = await this.database
+      .update(analyticsRefreshRuns)
+      .set({ ...toRow(run), leaseOwner: ownerId, leaseExpiresAt })
+      .where(
+        and(
+          eq(analyticsRefreshRuns.runId, run.runId),
+          eq(analyticsRefreshRuns.leaseOwner, ownerId),
+          gt(analyticsRefreshRuns.leaseExpiresAt, now),
+          inArray(analyticsRefreshRuns.status, UNFINISHED_STATUSES),
+        ),
+      )
+      .returning();
+    return rows[0] === undefined ? null : toRecord(rows[0]);
   }
 }
 

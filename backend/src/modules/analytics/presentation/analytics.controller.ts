@@ -1,8 +1,6 @@
 import type { Context } from "hono";
 
 import type { AppEnvironment } from "../../../app-types";
-import type { AppError } from "../../../shared/domain/errors";
-import { ApplicationError } from "../../../shared/domain/errors";
 import type { AnalyticsService } from "../application/analytics.service";
 import { analyticsErrorResponse, requireInjectedPrincipal, validated } from "./http.helpers";
 import type { z } from "@hono/zod-openapi";
@@ -13,8 +11,6 @@ export const SCHEDULER_SECRET_HEADER = "x-analytics-scheduler-secret";
 
 export interface AnalyticsControllerDependencies {
   readonly analyticsService: AnalyticsService;
-  readonly schedulerSecret?: string | undefined;
-  readonly handleScheduledRefresh?: (() => Promise<{ accepted: boolean; message: string }>) | undefined;
 }
 
 type QueryAnalyticsQuery = z.infer<typeof queryAnalyticsQuerySchema>;
@@ -80,38 +76,12 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
 
     async scheduledRefresh(context: Context<AppEnvironment>): Promise<Response> {
       try {
-        const headerError: AppError = new ApplicationError(
-          "AUTH_REQUIRED",
-          "A valid scheduler secret header is required",
-        );
         const presented = context.req.header(SCHEDULER_SECRET_HEADER);
-        const expected = dependencies.schedulerSecret;
-        if (
-          expected === undefined ||
-          expected.length === 0 ||
-          typeof presented !== "string" ||
-          presented.length !== expected.length ||
-          !timingSafeEqualStrings(presented, expected)
-        ) {
-          throw headerError;
-        }
-
-        if (dependencies.handleScheduledRefresh === undefined) {
-          return context.json(
-            {
-              accepted: true,
-              message:
-                "Analytics refresh orchestration is not configured; nothing was started.",
-            },
-            202,
-          );
-        }
-
+        const result = await dependencies.analyticsService.scheduledRefresh(presented);
         context.get("logger").info(
           { requestId: context.get("requestId") },
           "analytics scheduled refresh accepted",
         );
-        const result = await dependencies.handleScheduledRefresh();
         return context.json(result, 202);
       } catch (error) {
         context.get("logger").warn({
@@ -122,13 +92,4 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
       }
     },
   };
-}
-
-function timingSafeEqualStrings(presented: string, expected: string): boolean {
-  if (presented.length !== expected.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < expected.length; i++) {
-    mismatch |= presented.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return mismatch === 0;
 }

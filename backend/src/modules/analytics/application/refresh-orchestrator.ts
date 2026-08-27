@@ -44,6 +44,12 @@ const FAILED_ATHENA_STATUSES = new Set<AthenaQueryStatus>([
   "CANCELLED",
 ]);
 
+class RefreshRunLeaseLostError extends Error {
+  constructor(runId: string) {
+    super(`refresh run lease was lost for ${runId}`);
+  }
+}
+
 export interface RequestRefreshResult {
   readonly runId: string;
   readonly coalesced: boolean;
@@ -65,7 +71,10 @@ export class AnalyticsRefreshOrchestrator {
   private readonly logger: Logger | undefined;
   private readonly maxPhaseRetries: number;
   private readonly staleAfterMs: number;
+  private readonly leaseDurationMs: number;
+  private readonly leaseOwner = randomUUID();
   private readonly inFlight = new Set<string>();
+  private readonly claimedRuns = new Set<string>();
   private refreshRequestLock = Promise.resolve();
 
   constructor(options: RefreshOrchestratorOptions) {
@@ -78,6 +87,7 @@ export class AnalyticsRefreshOrchestrator {
     this.logger = options.logger;
     this.maxPhaseRetries = options.maxPhaseRetries ?? 3;
     this.staleAfterMs = options.staleAfterMs ?? 45 * 60 * 1000;
+    this.leaseDurationMs = options.leaseDurationMs ?? 5 * 60 * 1000;
   }
 
   get isConfigured(): boolean {
@@ -105,7 +115,19 @@ export class AnalyticsRefreshOrchestrator {
       if (!this.isStale(existing)) {
         return { runId: existing.runId, coalesced: true };
       }
-      await this.markFailed(existing, "run exceeded stale threshold");
+      const claimed = await this.runStore.claim(
+        existing.runId,
+        this.leaseOwner,
+        this.clock.now(),
+        this.leaseDurationMs,
+      );
+      if (claimed === null) return { runId: existing.runId, coalesced: true };
+      this.claimedRuns.add(existing.runId);
+      try {
+        await this.markFailed(claimed, "run exceeded stale threshold");
+      } finally {
+        this.claimedRuns.delete(existing.runId);
+      }
     }
 
     const now = this.clock.now();
@@ -132,35 +154,54 @@ export class AnalyticsRefreshOrchestrator {
     for (const run of runs) {
       if (this.inFlight.has(run.runId)) continue;
       this.inFlight.add(run.runId);
+      let claimed: RefreshRunRecord | null;
       try {
-        if (this.isStale(run)) {
-          await this.markFailed(run, "run exceeded stale threshold");
+        claimed = await this.runStore.claim(
+          run.runId,
+          this.leaseOwner,
+          this.clock.now(),
+          this.leaseDurationMs,
+        );
+      } catch (error) {
+        this.inFlight.delete(run.runId);
+        throw error;
+      }
+      if (claimed === null) {
+        this.inFlight.delete(run.runId);
+        continue;
+      }
+      this.claimedRuns.add(run.runId);
+      try {
+        if (this.isStale(claimed)) {
+          await this.markFailed(claimed, "run exceeded stale threshold");
           continue;
         }
-        switch (run.status) {
+        switch (claimed.status) {
           case "requested":
-            await this.retryGlueStart(run);
+            await this.retryGlueStart(claimed);
             break;
           case "exporting":
-            await this.pollGlue(run);
+            await this.pollGlue(claimed);
             break;
           case "querying":
-            await this.pollAthena(run);
+            await this.pollAthena(claimed);
             break;
           default:
             break;
         }
       } catch (error) {
-        await this.recordTransientError(
-          (await this.runStore.get(run.runId)) ?? run,
-          error,
-        );
+        if (error instanceof RefreshRunLeaseLostError) {
+          this.logger?.warn({ runId: run.runId }, "analytics refresh lease lost during reconcile");
+        } else {
+          await this.recordTransientError((await this.runStore.get(run.runId)) ?? claimed, error);
+        }
         this.logger?.warn(
           { err: error, runId: run.runId },
           "analytics refresh reconcile tick failed",
         );
       } finally {
         this.inFlight.delete(run.runId);
+        this.claimedRuns.delete(run.runId);
       }
     }
   }
@@ -187,7 +228,8 @@ export class AnalyticsRefreshOrchestrator {
       runId: run.runId,
       arguments: {
         "--refresh-run-id": run.runId,
-        "--output-prefix": `analytics/staging/${run.runId}`,
+        "--snapshot-at": snapshotPartition(run.createdAt),
+        "--output-prefix": `analytics/source/run=${run.runId}`,
       },
     });
     await this.updateRun(run, {
@@ -362,6 +404,16 @@ export class AnalyticsRefreshOrchestrator {
       ...patch,
       updatedAt: this.clock.now(),
     };
+    if (this.claimedRuns.has(run.runId)) {
+      const saved = await this.runStore.saveClaimed(
+        updated,
+        this.leaseOwner,
+        updated.updatedAt,
+        this.leaseDurationMs,
+      );
+      if (saved === null) throw new RefreshRunLeaseLostError(run.runId);
+      return saved;
+    }
     return this.runStore.save(updated);
   }
 
@@ -370,4 +422,8 @@ export class AnalyticsRefreshOrchestrator {
     if (run === null) throw new Error(`analytics refresh run ${runId} disappeared`);
     return run;
   }
+}
+
+function snapshotPartition(createdAt: Date): string {
+  return createdAt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }

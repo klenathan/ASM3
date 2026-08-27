@@ -211,6 +211,42 @@ describe("AnalyticsService", () => {
     expect(response.accepted).toBe(true);
   });
 
+  it("validates scheduled refresh secrets in the application layer", async () => {
+    const service = createService(undefined, false, undefined, "scheduler-secret");
+
+    await expect(service.scheduledRefresh(undefined)).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
+    await expect(service.scheduledRefresh("wrong-secret")).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
+  });
+
+  it("accepts a valid scheduled refresh secret and reports an unconfigured pipeline", async () => {
+    const service = createService(undefined, false, undefined, "scheduler-secret");
+
+    await expect(service.scheduledRefresh("scheduler-secret")).resolves.toEqual({
+      accepted: true,
+      message: "Analytics refresh orchestration is not configured; nothing was started.",
+    });
+  });
+
+  it("publishes a valid scheduled refresh to the orchestrator", async () => {
+    let scheduled = false;
+    const service = createService(
+      undefined,
+      false,
+      undefined,
+      "scheduler-secret",
+      async () => {
+        scheduled = true;
+        return { accepted: true, message: "queued" };
+      },
+    );
+
+    await expect(service.scheduledRefresh("scheduler-secret")).resolves.toEqual({
+      accepted: true,
+      message: "queued",
+    });
+    expect(scheduled).toBe(true);
+  });
+
   it("supports pagination", async () => {
     const repository = new FakeAnalyticsRepository();
     for (let i = 0; i < 25; i++) {
@@ -238,6 +274,8 @@ function createService(
   repository?: AnalyticsRepository | undefined,
   isModeratorOfSociety = false,
   onRefreshRequested?: (() => Promise<void>) | undefined,
+  schedulerSecret?: string | undefined,
+  onScheduledRefresh?: (() => Promise<{ accepted: boolean; message: string }>) | undefined,
 ): AnalyticsService {
   return new AnalyticsService({
     repository: repository ?? new FakeAnalyticsRepository(),
@@ -261,6 +299,8 @@ function createService(
     },
     clock,
     onRefreshRequested,
+    schedulerSecret,
+    onScheduledRefresh,
   });
 }
 

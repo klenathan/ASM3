@@ -10,6 +10,8 @@ export interface AnalyticsModuleDependencies {
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly onRefreshRequested?: (() => Promise<void>) | undefined;
+  readonly schedulerSecret?: string | undefined;
+  readonly onScheduledRefresh?: (() => Promise<{ accepted: boolean; message: string }>) | undefined;
 }
 
 export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies) {
@@ -21,6 +23,8 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
     accountReader: dependencies.accountReader,
     membershipRepository: dependencies.membershipRepository,
     onRefreshRequested: dependencies.onRefreshRequested,
+    schedulerSecret: dependencies.schedulerSecret,
+    onScheduledRefresh: dependencies.onScheduledRefresh,
   });
 
   return {
@@ -41,10 +45,6 @@ export {
   createAthenaMetricSqlCatalog,
   METRIC_SQL_TYPES,
 } from "./infrastructure/athena-sql-catalog";
-export {
-  PlaceholderGlueGateway,
-  PlaceholderAthenaGateway,
-} from "./infrastructure/placeholder-analytics-gateways";
 export type {
   AthenaGateway,
   AthenaMetricRow,

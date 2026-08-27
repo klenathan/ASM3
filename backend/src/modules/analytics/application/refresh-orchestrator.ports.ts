@@ -37,6 +37,20 @@ export interface RefreshRunStore {
   get(runId: string): Promise<RefreshRunRecord | null>;
   listUnfinishedRuns(): Promise<readonly RefreshRunRecord[]>;
   save(run: RefreshRunRecord): Promise<RefreshRunRecord>;
+  /** Atomically acquires the processing lease for one unfinished run. */
+  claim(
+    runId: string,
+    ownerId: string,
+    now: Date,
+    leaseDurationMs: number,
+  ): Promise<RefreshRunRecord | null>;
+  /** Saves only while this owner still holds the active-run lease. */
+  saveClaimed(
+    run: RefreshRunRecord,
+    ownerId: string,
+    now: Date,
+    leaseDurationMs: number,
+  ): Promise<RefreshRunRecord | null>;
 }
 
 export interface GlueJobStartInput {
@@ -108,4 +122,5 @@ export interface RefreshOrchestratorOptions {
   readonly logger?: Logger | undefined;
   readonly maxPhaseRetries?: number | undefined;
   readonly staleAfterMs?: number | undefined;
+  readonly leaseDurationMs?: number | undefined;
 }

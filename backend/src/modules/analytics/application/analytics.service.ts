@@ -2,6 +2,7 @@ import type { Clock } from "../../../shared/application/clock";
 import { normalizePageSize } from "../../../shared/application/pagination";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
 import { assertSystemAdmin, assertTargetExists } from "../../identity/domain/access.policy";
+import { ApplicationError } from "../../../shared/domain/errors";
 import type { IdentityRepository } from "../../identity/application/identity.repository";
 import type { MembershipRepository } from "../../societies/application/membership.repository";
 import { isActiveModerator } from "../../societies/domain/membership";
@@ -27,6 +28,8 @@ export interface AnalyticsServiceDependencies {
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly clock?: Clock | undefined;
   readonly onRefreshRequested?: (() => Promise<void>) | undefined;
+  readonly schedulerSecret?: string | undefined;
+  readonly onScheduledRefresh?: (() => Promise<{ accepted: boolean; message: string }>) | undefined;
 }
 
 export class AnalyticsService {
@@ -34,12 +37,16 @@ export class AnalyticsService {
   private readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   private readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   private readonly onRefreshRequested: (() => Promise<void>) | undefined;
+  private readonly schedulerSecret: string | undefined;
+  private readonly onScheduledRefresh: (() => Promise<{ accepted: boolean; message: string }>) | undefined;
 
   constructor(dependencies: AnalyticsServiceDependencies) {
     this.repository = dependencies.repository;
     this.accountReader = dependencies.accountReader;
     this.membershipRepository = dependencies.membershipRepository;
     this.onRefreshRequested = dependencies.onRefreshRequested;
+    this.schedulerSecret = dependencies.schedulerSecret;
+    this.onScheduledRefresh = dependencies.onScheduledRefresh;
   }
 
   async queryMetrics(
@@ -118,6 +125,33 @@ export class AnalyticsService {
       message: "Analytics refresh has been queued. Results will be available in a few minutes.",
     };
   }
+
+  async scheduledRefresh(presentedSecret: string | undefined): Promise<{ accepted: boolean; message: string }> {
+    if (
+      this.schedulerSecret === undefined ||
+      presentedSecret === undefined ||
+      !timingSafeEqualStrings(presentedSecret, this.schedulerSecret)
+    ) {
+      throw new ApplicationError("AUTH_REQUIRED", "A valid scheduler secret header is required");
+    }
+
+    if (this.onScheduledRefresh === undefined) {
+      return {
+        accepted: true,
+        message: "Analytics refresh orchestration is not configured; nothing was started.",
+      };
+    }
+    return this.onScheduledRefresh();
+  }
+}
+
+function timingSafeEqualStrings(presented: string, expected: string): boolean {
+  if (presented.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index++) {
+    mismatch |= presented.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+  return mismatch === 0;
 }
 
 function toDto(record: AnalyticsMetricRecord): AnalyticsMetricDto {

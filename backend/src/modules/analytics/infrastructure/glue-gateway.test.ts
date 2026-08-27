@@ -19,6 +19,7 @@ describe("GlueGatewayAdapter", () => {
         runId: "run-1",
         arguments: {
           "--output-prefix": "analytics/source/run-1",
+          "--snapshot-at": "20260901T000000Z",
           "--refresh-run-id": "caller-cannot-override",
         },
       }),
@@ -29,6 +30,7 @@ describe("GlueGatewayAdapter", () => {
       Arguments: {
         "--refresh-run-id": "run-1",
         "--output-prefix": "analytics/source/run-1",
+        "--snapshot-at": "20260901T000000Z",
       },
     });
   });

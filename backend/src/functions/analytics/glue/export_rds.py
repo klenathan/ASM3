@@ -8,6 +8,8 @@ snapshots while its contract queries consistently select the newest one.
 import sys
 from datetime import datetime, timezone
 
+import boto3
+
 from awsglue.context import GlueContext
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.job import Job
@@ -36,7 +38,10 @@ def main() -> None:
     database = argument("catalog-database")
     connection_name = argument("connection-name")
     run_id = argument("refresh-run-id")
-    snapshot_at = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    snapshot_at = argument("snapshot-at")
+    if len(snapshot_at) != 16 or not snapshot_at.endswith("Z") or snapshot_at[8] != "T":
+        raise ValueError("snapshot-at must be a UTC partition timestamp")
+    cleanup_run_output(bucket, run_id, snapshot_at)
     jdbc = context.extract_jdbc_conf(connection_name)
     jdbc_url = jdbc.get("fullUrl") or jdbc.get("url")
     if not jdbc_url:
@@ -112,9 +117,33 @@ def main() -> None:
         [(snapshot_at, run_id, datetime.now(timezone.utc))],
         ["snapshot_at", "snapshot_id", "completed_at"],
     )
-    manifest.write.mode("append").parquet(f"s3://{bucket}/analytics/manifest/")
+    manifest.write.mode("overwrite").parquet(
+        f"s3://{bucket}/analytics/manifest/snapshot_id={run_id}/",
+    )
 
     job.commit()
+
+
+def cleanup_run_output(bucket: str, run_id: str, snapshot_at: str) -> None:
+    """Make a retry overwrite the run's exact source and manifest prefixes."""
+    client = boto3.client("s3")
+    prefixes = [
+        f"analytics/source/table={table}/snapshot_at={snapshot_at}/snapshot_id={run_id}/"
+        for table in ("users", "societies", "threads", "comments", "memberships", "votes", "reports")
+    ]
+    prefixes.append(f"analytics/manifest/snapshot_id={run_id}/")
+    for prefix in prefixes:
+        response = client.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        while True:
+            objects = [{"Key": item["Key"]} for item in response.get("Contents", [])]
+            if objects:
+                deleted = client.delete_objects(Bucket=bucket, Delete={"Objects": objects})
+                if deleted.get("Errors"):
+                    raise RuntimeError(f"could not clean previous analytics output: {deleted['Errors']}")
+            token = response.get("NextContinuationToken")
+            if token is None:
+                break
+            response = client.list_objects_v2(Bucket=bucket, Prefix=prefix, ContinuationToken=token)
 
 
 def schema_for(table: str):

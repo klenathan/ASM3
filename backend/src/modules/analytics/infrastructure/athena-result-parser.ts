@@ -8,6 +8,8 @@ import type {
 } from "../domain/analytics";
 import { assertMetricType } from "../domain/analytics";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export type AthenaResultRow = readonly (string | null | undefined)[];
 
 /** Convert Athena's stringly typed result rows into the application contract. */
@@ -43,7 +45,7 @@ export function parseAthenaResultRows(
 
     return {
       metricType,
-      societyId: optionalValue(row, indexes.get("society_id")!) || null,
+      societyId: parseSocietyId(optionalValue(row, indexes.get("society_id")!), index),
       periodStart,
       periodEnd,
       data: payload,
@@ -71,6 +73,14 @@ function requiredValue(
 function optionalValue(row: AthenaResultRow, index: number): string | null {
   const value = row[index];
   return value === undefined || value === null ? null : value;
+}
+
+function parseSocietyId(value: string | null, rowIndex: number): string | null {
+  if (value === null || value === "") return null;
+  if (!UUID_PATTERN.test(value)) {
+    throw new Error(`Athena result row ${rowIndex + 1} has invalid society_id`);
+  }
+  return value;
 }
 
 function parseDate(value: string, column: string): Date {

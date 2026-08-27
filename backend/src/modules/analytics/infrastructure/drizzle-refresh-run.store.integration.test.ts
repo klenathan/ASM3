@@ -48,6 +48,22 @@ describeWithDb("DrizzleRefreshRunStore", () => {
     expect(new Set(saved.map((run) => run.runId)).size).toBe(1);
     await expect(store.listUnfinishedRuns()).resolves.toHaveLength(1);
   });
+
+  it("allows only one owner to claim an unfinished run", async () => {
+    await pool.query("DELETE FROM analytics_refresh_runs");
+    const run = makeRun("123e4567-e89b-12d3-a456-426614174003");
+    await store.save(run);
+    const now = new Date("2026-09-01T00:00:00.000Z");
+
+    await expect(store.claim(run.runId, "owner-a", now, 60_000)).resolves.not.toBeNull();
+    await expect(store.claim(run.runId, "owner-b", now, 60_000)).resolves.toBeNull();
+    await expect(
+      store.saveClaimed({ ...run, status: "completed" }, "owner-b", now, 60_000),
+    ).resolves.toBeNull();
+    await expect(
+      store.saveClaimed({ ...run, status: "completed" }, "owner-a", now, 60_000),
+    ).resolves.toMatchObject({ status: "completed" });
+  });
 });
 
 function makeRun(runId: string): RefreshRunRecord {

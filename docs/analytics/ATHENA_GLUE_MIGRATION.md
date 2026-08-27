@@ -14,9 +14,11 @@ The ECS backend owns the complete analytics refresh lifecycle:
    `POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
    authenticated by `x-analytics-scheduler-secret`.
 3. `AnalyticsRefreshOrchestrator` coalesces concurrent requests into a durable
-   PostgreSQL run and returns before AWS work starts. Its reconciler starts and
-   reconciles one Glue export, starts four Athena queries, and persists their
-   rows through `AnalyticsRepository`.
+PostgreSQL run and returns before AWS work starts. Its reconciler starts and
+reconciles one Glue export under a PostgreSQL lease, starts four Athena
+queries, and persists their rows through `AnalyticsRepository`. Lease-protected
+compare-and-set saves prevent another ECS task from concurrently advancing the
+same run or overwriting a terminal state.
 
 The run lifecycle is `requested -> exporting -> querying -> completed`, with
 `failed` as the terminal error state. Glue and Athena retries are bounded;
@@ -33,7 +35,7 @@ transaction and writes:
 s3://<analytics-bucket>/analytics/source/table=users/
   snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
 s3://<analytics-bucket>/analytics/source/table=<name>/...
-s3://<analytics-bucket>/analytics/manifest/part-*.parquet
+s3://<analytics-bucket>/analytics/manifest/snapshot_id=<run-id>/part-*.parquet
 s3://<analytics-bucket>/analytics/query-results/<athena-files>
 s3://<analytics-bucket>/analytics/glue-temp/<temporary-files>
 ```
@@ -43,6 +45,9 @@ The source dataset contains `users`, `societies`, `threads`, `comments`,
 `society_id` for both thread and comment votes. The manifest is written only
 after all seven tables succeed. Athena is passed the current run ID and uses
 only its matching `snapshot_at`/`snapshot_id` partitions for every join.
+Retries reuse the run creation timestamp as `snapshot_at`, clean that run's
+source and manifest prefixes, and rewrite the run-scoped manifest. The
+`completed_at` ordering is deterministic if old manifest objects remain.
 
 The Glue Catalog database is `analytics`. It contains one external Parquet
 table per source table and an unpartitioned `snapshot_manifest` table. Source
@@ -113,3 +118,14 @@ RDS path. There is no automatic analytics fallback. If rollback is required,
 restore the pre-cutover Git revision, rebuild that revision's artifacts, and
 reapply its OpenTofu configuration. The shared analytics S3 bucket is retained
 as the data handoff boundary, while normal teardown remains `tofu destroy`.
+
+### Database Migration Boundary
+
+Run `pnpm db:migrate`, not raw `drizzle-kit migrate`, so the preflight runs
+before migration 0013. It deterministically deletes older duplicate
+platform-wide rows for `(metric_type, period_start)`, retaining the newest by
+`updated_at`, `created_at`, and `id`, then applies generated migrations 0013,
+0014, and 0015 in order. Migrations are forward-only: do not edit or remove an
+applied SQL file or snapshot metadata. Roll back application code only to a
+revision compatible with the applied schema, and use database backup restore
+for data rollback.
