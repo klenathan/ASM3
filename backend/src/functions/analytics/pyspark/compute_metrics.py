@@ -6,7 +6,7 @@ Reads JSONL dumps from S3 (analytics/staging/<timestamp>/), computes four
 metric types in one pass, and writes results as JSONL to S3
 (analytics/output/<timestamp>/).
 
-Usage (submitted by start-emr Lambda via spark-submit):
+Usage (submitted by start-serverless Lambda via spark-submit):
   spark-submit compute_metrics.py \
     --staging-bucket <bucket> \
     --staging-path <prefix/timestamp> \
@@ -33,8 +33,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     spark = SparkSession.builder.appName("RMITSocietyAnalytics").getOrCreate()
-    staging_base = f"s3a://{args.staging_bucket}/{args.staging_path}"
-    output_base = f"s3a://{args.output_bucket}/{args.output_path}"
+    staging_base = f"s3://{args.staging_bucket}/{args.staging_path}"
+    output_base = f"s3://{args.output_bucket}/{args.output_path}"
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

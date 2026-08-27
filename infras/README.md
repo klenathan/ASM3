@@ -141,6 +141,54 @@ Keep the Lambda outside the VPC so it has outbound HTTPS access without a NAT
 Gateway. The active Learner Lab `LabRole` must allow the function to read the
 secret, read approved S3 media, and write CloudWatch logs.
 
+### Analytics — EMR Serverless (cost-optimized)
+
+The analytics pipeline is the **Analytics-category AWS service** required by
+Assessment 3. It is fully gated by `enable_analytics_pipeline` (default
+`false`, costs nothing when disabled).
+
+**Why EMR Serverless vs classic EMR:** Classic EMR provisions 2× m5.large
+(4 vCPU) for ~5 minutes nightly plus cluster spin-up time and EMR markup,
+even though the PySpark job (`compute_metrics.py` reading 6 JSONL dumps from
+S3) runs for only a few minutes. Learner Lab caps at 32 vCPU / 9 instances,
+so the 4 vCPU reservation is expensive. EMR Serverless bills only for
+vCPU/memory seconds while the Spark job runs, reuses the same
+`POST /api/v1/admin/analytics/refresh` (system_admin, 202 Accepted) trigger,
+and auto-stops after 15 minutes idle — no EC2 subnet, key, or
+TerminateJobFlows complexity.
+
+**Chain (automatic, no manual polling):**
+`POST /api/v1/admin/analytics/refresh` → async invoke `analytics-dump-rds`
+Lambda (VPC, RDS → S3 `analytics/staging/<ts>/_SUCCESS`) → S3 event
+triggers `analytics-start-serverless` Lambda
+(`StartJobRunCommand` with `s3://analytics/pyspark/compute_metrics.py`,
+args `--staging-bucket/--staging-path/--output-bucket/--output-path`,
+`sparkSubmitParameters` driver 1 vCPU/3GB + executor 2 vCPU/4GB ×1,
+`logUri` `s3://analytics/emr-serverless-logs`,
+poll `GetJobRun` every 30s, 900s timeout, `CancelJobRun` on timeout)
+→ Spark reads `s3://` (not `s3a://`) and writes
+`coalesce(1).json` to `s3://analytics/output/<ts>/metrics.jsonl` →
+S3 `_SUCCESS` triggers `analytics-load-results` Lambda (VPC) →
+upserts on `(metric_type, society_id, period_start)` into
+`analytics_metrics`. EventBridge `cron(0 2 * * ? *)` also triggers the dump
+nightly. Infras manages `aws_emrserverless_application` (`emr-7.2.0`, SPARK,
+max 3 vCPU/7GB, auto-stop 15m) plus 3 Lambdas via OpenTofu; all reuse
+`LabRole`/`LabInstanceProfile`, CloudWatch logs retained 7 days. `FAILED`
+jobRuns surface as errors and do not trigger load-results. Destroy after demo
+(`tofu destroy`); `End Lab` does not stop Serverless apps.
+
+Build the artifacts before enabling:
+
+```sh
+cd backend
+pnpm build:analytics
+cd ../infras
+tofu plan
+tofu apply
+```
+
+Use `GET /api/v1/admin/analytics` to verify fresh metrics after a refresh.
+
 ### Troubleshoot `voc-cancel-cred` upload failures
 
 An S3 error naming `assumed-role/voclabs/user...` and the
