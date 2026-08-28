@@ -110,18 +110,6 @@ resource "aws_security_group_rule" "analytics_glue_self" {
   description              = "Glue worker communication within the security group"
 }
 
-resource "aws_security_group_rule" "analytics_glue_to_database" {
-  count = var.enable_analytics_pipeline ? 1 : 0
-
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.database.id
-  source_security_group_id = aws_security_group.analytics_glue[0].id
-  description              = "Glue analytics export PostgreSQL access"
-}
-
 resource "aws_route_table" "analytics_private" {
   count  = var.enable_analytics_pipeline ? 1 : 0
   vpc_id = aws_vpc.this.id
