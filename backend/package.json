@@ -13,6 +13,7 @@
     "build": "tsc -p tsconfig.build.json",
     "build:content-analysis": "node scripts/build-content-analysis.mjs",
     "build:analytics-workflow": "node scripts/build-analytics-workflow.mjs",
+    "analytics:demo": "node scripts/seed-analytics-demo.mjs",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",

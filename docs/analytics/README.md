@@ -63,6 +63,42 @@ UTC inclusive `period_end`, and JSON-object `data`. The adapter ignores Athena
 header rows, consumes paginated results, converts empty society IDs to `null`,
 and rejects malformed rows before persistence.
 
+## Demo data seeding
+
+Use the checked-in seeder to populate PostgreSQL source tables with deterministic
+RMIT activity. It creates demo users, memberships, threads, comments, votes, and
+pending/resolved reports; it does **not** write `analytics_metrics` directly.
+The normal Glue snapshot and Athena queries therefore remain the source of the
+dashboard data.
+
+From `backend/`:
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+pnpm analytics:demo
+```
+
+The script is repeatable. It uses a fixed ID namespace and upserts only its
+`analytics.demo.*@rmit.edu.au` users and related records. Use `--users 60` to
+increase the synthetic population (12–200 users are accepted). To seed and
+immediately request the authenticated scheduled-refresh route, configure
+`ANALYTICS_API_URL` (defaults to `http://localhost:3000`) and
+`ANALYTICS_SCHEDULER_SECRET`, then run:
+
+```bash
+pnpm analytics:demo -- --refresh
+```
+
+Without `--refresh`, click **Refresh analytics** in Admin Center after the
+seeder completes. Wait for the refresh status to become `completed`, then
+reload the analytics dashboard. The refresh can take several minutes because
+it runs Glue, four parallel Athena queries, and the workflow persistence step.
+
+The script requires at least five active societies, so run `pnpm db:seed` first
+against a new database. It is intended for a live coursework demo; remove the
+demo rows or destroy the demo stack afterward.
+
 ## AWS Resources And Cost
 
 The `enable_analytics_pipeline` flag defaults to `false` and gates the shared
