@@ -5,6 +5,7 @@ The job writes each source table beneath a stable catalog location and adds
 the run identity as partition values. Athena can therefore retain historical
 snapshots while its contract queries consistently select the newest one.
 """
+import logging
 import sys
 from datetime import datetime, timezone
 
@@ -15,6 +16,12 @@ from awsglue.dynamicframe import DynamicFrame
 from awsglue.job import Job
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+LOGGER = logging.getLogger(__name__)
 
 
 def argument(name: str, default: str | None = None) -> str:
@@ -39,6 +46,7 @@ def main() -> None:
     snapshot_at = argument("snapshot-at")
     if len(snapshot_at) != 16 or not snapshot_at.endswith("Z") or snapshot_at[8] != "T":
         raise ValueError("snapshot-at must be a UTC partition timestamp")
+    LOGGER.info("Starting analytics snapshot run_id=%s snapshot_at=%s", run_id, snapshot_at)
     cleanup_run_output(bucket, run_id, snapshot_at)
     jdbc = context.extract_jdbc_conf(connection_name)
     jdbc_url = jdbc.get("fullUrl") or jdbc.get("url")
@@ -79,7 +87,17 @@ def main() -> None:
         "driver": "org.postgresql.Driver",
     }
     for table, query in queries.items():
-        frame = context.spark_session.read.format("jdbc").options(**jdbc_options).option("query", query).load()
+        LOGGER.info("Reading table=%s from PostgreSQL through JDBC", table)
+        try:
+            frame = (
+                context.spark_session.read.format("jdbc")
+                .options(**jdbc_options)
+                .option("query", query)
+                .load()
+            )
+        except Exception:
+            LOGGER.exception("JDBC read failed for table=%s", table)
+            raise
         frame = frame.withColumn("snapshot_at", F.lit(snapshot_at))
         frame = frame.withColumn("snapshot_id", F.lit(run_id))
         dynamic = DynamicFrame.fromDF(frame, context, table)
@@ -92,8 +110,10 @@ def main() -> None:
         )
         sink.setCatalogInfo(catalogDatabase=database, catalogTableName=table)
         sink.setFormat("glueparquet")
+        LOGGER.info("Writing table=%s to Parquet", table)
         sink.writeFrame(dynamic)
 
+    LOGGER.info("Writing snapshot manifest")
     manifest = context.spark_session.createDataFrame(
         [(snapshot_at, run_id, datetime.now(timezone.utc))],
         ["snapshot_at", "snapshot_id", "completed_at"],
@@ -103,6 +123,7 @@ def main() -> None:
     )
 
     job.commit()
+    LOGGER.info("Analytics snapshot completed run_id=%s", run_id)
 
 
 def cleanup_run_output(bucket: str, run_id: str, snapshot_at: str) -> None:
@@ -118,6 +139,7 @@ def cleanup_run_output(bucket: str, run_id: str, snapshot_at: str) -> None:
         while True:
             objects = [{"Key": item["Key"]} for item in response.get("Contents", [])]
             if objects:
+                LOGGER.info("Deleting stale output objects=%s prefix=%s", len(objects), prefix)
                 deleted = client.delete_objects(Bucket=bucket, Delete={"Objects": objects})
                 if deleted.get("Errors"):
                     raise RuntimeError(f"could not clean previous analytics output: {deleted['Errors']}")

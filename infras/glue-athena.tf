@@ -322,11 +322,12 @@ resource "aws_glue_job" "analytics_export" {
   connections = [aws_glue_connection.analytics[0].name]
 
   default_arguments = {
-    "--job-language"     = "python"
-    "--analytics-bucket" = aws_s3_bucket.analytics[0].id
-    "--catalog-database" = local.analytics_catalog_database
-    "--connection-name"  = aws_glue_connection.analytics[0].name
-    "--TempDir"          = "s3://${aws_s3_bucket.analytics[0].id}/analytics/glue-temp/"
+    "--job-language"                     = "python"
+    "--analytics-bucket"                 = aws_s3_bucket.analytics[0].id
+    "--catalog-database"                 = local.analytics_catalog_database
+    "--connection-name"                  = aws_glue_connection.analytics[0].name
+    "--enable-continuous-cloudwatch-log" = "true"
+    "--TempDir"                          = "s3://${aws_s3_bucket.analytics[0].id}/analytics/glue-temp/"
   }
 
   tags = local.common_tags
