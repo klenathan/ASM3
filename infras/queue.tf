@@ -105,8 +105,14 @@ data "aws_iam_policy_document" "analytics_scheduler_dlq" {
     resources = [aws_sqs_queue.analytics_scheduler_dlq[0].arn]
 
     principals {
-      type        = "AWS"
-      identifiers = [data.aws_iam_role.learner_lab.arn]
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_cloudwatch_event_rule.analytics_nightly_refresh[0].arn]
     }
   }
 }

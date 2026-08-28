@@ -98,6 +98,18 @@ resource "aws_security_group" "analytics_glue" {
   tags = merge(local.common_tags, { Name = "${local.name}-analytics-glue" })
 }
 
+resource "aws_security_group_rule" "analytics_glue_self" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.analytics_glue[0].id
+  source_security_group_id = aws_security_group.analytics_glue[0].id
+  description              = "Glue worker communication within the security group"
+}
+
 resource "aws_security_group_rule" "analytics_glue_to_database" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
@@ -305,7 +317,7 @@ resource "aws_glue_job" "analytics_export" {
   role_arn          = data.aws_iam_role.learner_lab.arn
   glue_version      = "4.0"
   worker_type       = "G.1X"
-  number_of_workers = 1
+  number_of_workers = 2
   max_retries       = 0
   timeout           = 30
 

@@ -2,18 +2,18 @@
 # Analytics refresh scheduling (Lambda-free orchestration, ticket #11)
 #
 # Nightly and on-demand analytics refreshes are orchestrated by the ECS
-# backend (decision #10): EventBridge Scheduler fires an API destination
-# (API-key connection) that POSTs to the backend's internal scheduled-refresh
+# backend (decision #10): a scheduled EventBridge rule invokes an API
+# destination (API-key connection) that POSTs to the backend's internal scheduled-refresh
 # route. The backend starts the Glue export, polls it with an in-process
 # reconciler, runs the Athena metric queries, and upserts results into RDS.
 # No analytics Lambda is involved anywhere in this flow.
 #
 # GATE (Academy Learner Lab):
-#   - Confirm EventBridge Scheduler + API destinations are available in the
+#   - Confirm EventBridge scheduled rules + API destinations are available in the
 #     active lab (Associate Services) in us-east-1.
-#   - aws_scheduler_schedule assumes role_arn; LabRole must trust
-#     scheduler.amazonaws.com and be permitted to call
-#     events:InvokeApiDestination and sqs:SendMessage. The Glue job also
+#   - EventBridge assumes role_arn; LabRole must trust events.amazonaws.com
+#     and be permitted to call events:InvokeApiDestination. The DLQ queue
+#     policy separately permits EventBridge to send failed events. The Glue job also
 #     requires glue.amazonaws.com trust plus Glue, Athena, S3, and Secrets
 #     Manager access. Set the explicit confirmation variable only after
 #     checking the active lab; the configuration fails closed otherwise.
@@ -30,7 +30,7 @@ variable "analytics_glue_job_name" {
 }
 
 variable "analytics_refresh_schedule_expression" {
-  description = "EventBridge Scheduler expression for the nightly analytics refresh."
+  description = "EventBridge schedule expression for the nightly analytics refresh."
   type        = string
   default     = "cron(0 2 * * ? *)"
 }
@@ -62,12 +62,12 @@ resource "terraform_data" "analytics_scheduler_permissions" {
     precondition {
       condition = var.analytics_learner_lab_permissions_confirmed && strcontains(
         data.aws_iam_role.learner_lab.assume_role_policy,
-        "scheduler.amazonaws.com",
+        "events.amazonaws.com",
         ) && strcontains(
         data.aws_iam_role.learner_lab.assume_role_policy,
         "glue.amazonaws.com",
       )
-      error_message = "Analytics is disabled: verify the active LabRole trust includes glue.amazonaws.com and scheduler.amazonaws.com and its effective Glue, Athena, S3, Secrets Manager, EventBridge, and SQS permissions, then set analytics_learner_lab_permissions_confirmed=true."
+      error_message = "Analytics is disabled: verify the active LabRole trust includes glue.amazonaws.com and events.amazonaws.com and its effective Glue, Athena, S3, Secrets Manager, EventBridge, and SQS permissions, then set analytics_learner_lab_permissions_confirmed=true."
     }
   }
 }
@@ -118,33 +118,34 @@ resource "aws_cloudwatch_event_api_destination" "analytics_scheduled_refresh" {
 
 }
 
-resource "aws_scheduler_schedule" "analytics_nightly_refresh" {
+resource "aws_cloudwatch_event_rule" "analytics_nightly_refresh" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
-  name       = "${local.name}-analytics-nightly-refresh"
-  group_name = "default"
+  name                = "${local.name}-analytics-nightly-refresh"
+  description         = "Triggers the nightly analytics refresh"
+  schedule_expression = var.analytics_refresh_schedule_expression
+  state               = "ENABLED"
 
-  flexible_time_window {
-    mode = "OFF"
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "analytics_nightly_refresh" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.analytics_nightly_refresh[0].name
+  target_id = "analytics-scheduled-refresh"
+  arn       = aws_cloudwatch_event_api_destination.analytics_scheduled_refresh[0].arn
+  role_arn  = data.aws_iam_role.learner_lab.arn
+  input     = jsonencode({})
+
+  dead_letter_config {
+    arn = aws_sqs_queue.analytics_scheduler_dlq[0].arn
   }
 
-  schedule_expression          = var.analytics_refresh_schedule_expression
-  schedule_expression_timezone = "UTC"
-
-  target {
-    arn      = aws_cloudwatch_event_api_destination.analytics_scheduled_refresh[0].arn
-    role_arn = data.aws_iam_role.learner_lab.arn
-
-    input = jsonencode({})
-
-    dead_letter_config {
-      arn = aws_sqs_queue.analytics_scheduler_dlq[0].arn
-    }
-
-    retry_policy {
-      maximum_retry_attempts       = 3
-      maximum_event_age_in_seconds = 3600
-    }
+  retry_policy {
+    maximum_retry_attempts       = 3
+    maximum_event_age_in_seconds = 3600
   }
 
+  depends_on = [aws_sqs_queue_policy.analytics_scheduler_dlq]
 }

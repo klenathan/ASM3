@@ -186,6 +186,11 @@ resource "aws_ecs_service" "backend" {
   desired_count   = var.app_desired_count
   launch_type     = "EC2"
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
 }
