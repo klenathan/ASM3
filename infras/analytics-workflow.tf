@@ -54,6 +54,18 @@ resource "aws_security_group_rule" "analytics_workflow_endpoint_ingress" {
   source_security_group_id = aws_security_group.analytics_workflow[0].id
 }
 
+resource "aws_security_group_rule" "ecs_analytics_endpoint_ingress" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  type                     = "ingress"
+  description              = "ECS secret injection and log delivery to analytics interface endpoints"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.analytics_workflow_endpoints[0].id
+  source_security_group_id = aws_security_group.ecs.id
+}
+
 resource "aws_security_group" "analytics_workflow_endpoints" {
   count = var.enable_analytics_pipeline ? 1 : 0
 

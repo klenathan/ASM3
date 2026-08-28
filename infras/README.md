@@ -171,7 +171,9 @@ EventBridge invokes the same backend request path through the authenticated
 `cron(0 2 * * ? *)` UTC. The ECS backend does not poll Glue or Athena.
 Step Functions owns waiting, retries, timeout handling, and fan-in. The
 workflow Lambda runs in the database subnets and uses VPC interface endpoints
-for Athena, Secrets Manager, and CloudWatch Logs.
+for Athena, Secrets Manager, and CloudWatch Logs. ECS is also allowed HTTPS
+ingress to those endpoints because ECS task secret injection and `awslogs`
+delivery resolve the same private endpoint DNS names.
 
 Scheduler delivery retries for one hour and sends exhausted events to the
 analytics scheduler SQS DLQ. Before enabling the pipeline, verify the active

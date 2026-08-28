@@ -70,10 +70,12 @@ analytics S3 bucket, Glue, Catalog, Athena, VPC endpoints, Step Functions,
 workflow Lambda, lifecycle, and scheduled EventBridge resources. EventBridge
 delivery retries use an SQS DLQ. The generated scheduler secret is stored in
 Secrets Manager and injected into ECS without exposing it in the task
-environment. The bucket is private and uses SSE-S3. Retention is 30 days for
-source snapshots and manifests, 7 days for Athena result files, and 1 day for
-Glue temporary files. RDS `analytics_metrics` is the durable dashboard history
-and is not subject to those S3 lifecycle rules.
+environment. ECS is permitted HTTPS access to the private interface endpoints;
+without that rule, ECS secret injection and `awslogs` delivery time out. The
+bucket is private and uses SSE-S3. Retention is 30 days for source snapshots
+and manifests, 7 days for Athena result files, and 1 day for Glue temporary
+files. RDS `analytics_metrics` is the durable dashboard history and is not
+subject to those S3 lifecycle rules.
 
 Glue uses two `G.1X` workers with concurrency one and Athena uses one
 configured workgroup. The deployment reuses `LabRole`, avoids additional IAM
