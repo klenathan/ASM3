@@ -15,8 +15,6 @@ from awsglue.dynamicframe import DynamicFrame
 from awsglue.job import Job
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
-from psycopg2 import connect
-from psycopg2.extras import RealDictCursor
 
 
 def argument(name: str, default: str | None = None) -> str:
@@ -49,56 +47,39 @@ def main() -> None:
 
     queries = {
         "users": """
-          SELECT u.id, u.created_at, p.status
+          SELECT u.id::text AS id, u.created_at, p.status
           FROM auth_users u INNER JOIN user_profiles p ON p.user_id = u.id
         """,
-        "societies": "SELECT id, name, slug, status, created_at FROM societies",
-        "threads": "SELECT id, society_id, author_id, status, created_at FROM threads",
+        "societies": "SELECT id::text AS id, name, slug, status, created_at FROM societies",
+        "threads": "SELECT id::text AS id, society_id::text AS society_id, author_id::text AS author_id, status, created_at FROM threads",
         "comments": """
-          SELECT c.id, c.thread_id, c.author_id, c.status, c.created_at, t.society_id
+          SELECT c.id::text AS id, c.thread_id::text AS thread_id, c.author_id::text AS author_id,
+                 c.status, c.created_at, t.society_id::text AS society_id
           FROM comments c INNER JOIN threads t ON t.id = c.thread_id
         """,
-        "memberships": "SELECT society_id, user_id, role, status, joined_at FROM society_memberships",
+        "memberships": "SELECT society_id::text AS society_id, user_id::text AS user_id, role, status, joined_at FROM society_memberships",
         "votes": """
-           SELECT v.thread_id AS target_id, v.user_id, v.value, v.created_at, t.society_id
+           SELECT v.thread_id::text AS target_id, v.user_id::text AS user_id, v.value, v.created_at, t.society_id::text AS society_id
            FROM thread_votes v INNER JOIN threads t ON t.id = v.thread_id
            UNION ALL
-           SELECT v.comment_id AS target_id, v.user_id, v.value, v.created_at, t.society_id
+           SELECT v.comment_id::text AS target_id, v.user_id::text AS user_id, v.value, v.created_at, t.society_id::text AS society_id
            FROM comment_votes v
            INNER JOIN comments c ON c.id = v.comment_id
            INNER JOIN threads t ON t.id = c.thread_id
         """,
         "reports": """
-          SELECT id, society_id, status, created_at, resolved_at FROM reports
+          SELECT id::text AS id, society_id::text AS society_id, status, created_at, resolved_at FROM reports
         """,
     }
 
-    # Read every table from one repeatable-read transaction. This prevents a
-    # refresh from joining rows from different database commit points.
-    database_connection = connect(
-        jdbc_url.removeprefix("jdbc:"),
-        user=jdbc["user"],
-        password=jdbc["password"],
-    )
-    database_connection.set_session(isolation_level="REPEATABLE READ", readonly=True)
-    table_rows = {}
-    try:
-        with database_connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            for table, query in queries.items():
-                cursor.execute(query)
-                table_rows[table] = [
-                    {
-                        key: str(value) if value.__class__.__name__ == "UUID" else value
-                        for key, value in row.items()
-                    }
-                    for row in cursor.fetchall()
-                ]
-        database_connection.commit()
-    finally:
-        database_connection.close()
-
-    for table in queries:
-        frame = context.spark_session.createDataFrame(table_rows[table], schema_for(table))
+    jdbc_options = {
+        "url": jdbc_url,
+        "user": jdbc["user"],
+        "password": jdbc["password"],
+        "driver": "org.postgresql.Driver",
+    }
+    for table, query in queries.items():
+        frame = context.spark_session.read.format("jdbc").options(**jdbc_options).option("query", query).load()
         frame = frame.withColumn("snapshot_at", F.lit(snapshot_at))
         frame = frame.withColumn("snapshot_id", F.lit(run_id))
         dynamic = DynamicFrame.fromDF(frame, context, table)
@@ -144,23 +125,6 @@ def cleanup_run_output(bucket: str, run_id: str, snapshot_at: str) -> None:
             if token is None:
                 break
             response = client.list_objects_v2(Bucket=bucket, Prefix=prefix, ContinuationToken=token)
-
-
-def schema_for(table: str):
-    from pyspark.sql import types as T
-
-    string = T.StringType()
-    timestamp = T.TimestampType()
-    schemas = {
-        "users": [("id", string), ("created_at", timestamp), ("status", string)],
-        "societies": [("id", string), ("name", string), ("slug", string), ("status", string), ("created_at", timestamp)],
-        "threads": [("id", string), ("society_id", string), ("author_id", string), ("status", string), ("created_at", timestamp)],
-        "comments": [("id", string), ("thread_id", string), ("author_id", string), ("status", string), ("created_at", timestamp), ("society_id", string)],
-        "memberships": [("society_id", string), ("user_id", string), ("role", string), ("status", string), ("joined_at", timestamp)],
-         "votes": [("target_id", string), ("user_id", string), ("value", T.LongType()), ("created_at", timestamp), ("society_id", string)],
-        "reports": [("id", string), ("society_id", string), ("status", string), ("created_at", timestamp), ("resolved_at", timestamp)],
-    }
-    return T.StructType([T.StructField(name, data_type, True) for name, data_type in schemas[table]])
 
 
 if __name__ == "__main__":
