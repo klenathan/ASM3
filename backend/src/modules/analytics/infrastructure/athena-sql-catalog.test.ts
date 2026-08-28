@@ -12,6 +12,10 @@ describe("ATHENA_METRIC_SQL", () => {
       expect(sql).toContain("society_id");
       expect(sql).toContain("period_start");
       expect(sql).toContain("period_end");
+      expect(sql).toContain(
+        "date_add('millisecond', -1, date_add('day', 1, CAST(current_date AS timestamp))) AS period_end",
+      );
+      expect(sql).not.toContain("+ INTERVAL '1' DAY - INTERVAL '1' MILLISECOND AS period_end");
       expect(sql).toContain(" AS data");
       expect(sql).toContain(`WHERE snapshot_id = CAST('${snapshotId}' AS varchar)`);
     }

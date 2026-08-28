@@ -9,7 +9,8 @@ import type {
 } from "../../modules/analytics/application/refresh-run.ports";
 import { createAthenaMetricSqlCatalog } from "../../modules/analytics/infrastructure/athena-sql-catalog";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { createWorkflowPool } from "./workflow-database";
+import type { Pool } from "pg";
 interface WorkflowEvent {
   readonly action: "mark" | "prepare" | "persist";
   readonly runId: string;
@@ -106,12 +107,7 @@ async function getDependencies(): Promise<{
     databaseUrl = response.SecretString;
     if (databaseUrl === undefined) throw new Error("database URL secret has no string value");
   }
-  pool = new Pool({
-    connectionString: databaseUrl,
-    max: 1,
-    connectionTimeoutMillis: 5_000,
-    idleTimeoutMillis: 30_000,
-  });
+  pool = createWorkflowPool(databaseUrl);
   const database = drizzle({ client: pool });
   runStore = new DrizzleRefreshRunStore(database);
   repository = new DrizzleAnalyticsRepository(database);

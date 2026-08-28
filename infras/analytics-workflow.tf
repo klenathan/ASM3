@@ -30,17 +30,6 @@ resource "aws_security_group" "analytics_workflow" {
   tags = merge(local.common_tags, { Name = "${local.name}-analytics-workflow" })
 }
 
-resource "aws_security_group_rule" "database_analytics_workflow" {
-  count = var.enable_analytics_pipeline ? 1 : 0
-
-  type                     = "ingress"
-  description              = "Analytics workflow Lambda PostgreSQL access"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.database.id
-  source_security_group_id = aws_security_group.analytics_workflow[0].id
-}
 
 resource "aws_security_group_rule" "analytics_workflow_endpoint_ingress" {
   count = var.enable_analytics_pipeline ? 1 : 0
@@ -155,6 +144,7 @@ resource "aws_lambda_function" "analytics_workflow" {
   environment {
     variables = {
       DATABASE_URL_SECRET_ARN = aws_secretsmanager_secret.database_url.arn
+      RDS_CA_BUNDLE_PATH      = "/var/task/rds-global-bundle.pem"
     }
   }
 
@@ -180,6 +170,7 @@ locals {
           "runId.$" = "$.runId"
           status    = "exporting"
         }
+        ResultPath = "$.marked"
         Retry = [{
           ErrorEquals     = ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
           IntervalSeconds = 2
@@ -209,7 +200,7 @@ locals {
         Parameters = {
           action           = "prepare"
           "runId.$"        = "$.runId"
-          "glueJobRunId.$" = "$.glue.JobRunId"
+          "glueJobRunId.$" = "$.glue.Id"
         }
         ResultPath = "$.prepared"
         Retry = [{
@@ -249,8 +240,16 @@ locals {
                 "ClientRequestToken.$" = "States.Format('{}:{}', $$.Execution.Input.runId, $.metricType)"
               }
               ResultSelector = {
-                "metricType.$"       = "$$.Map.Item.Value.metricType"
-                "queryExecutionId.$" = "$.QueryExecutionId"
+                "queryExecutionId.$" = "$.QueryExecution.QueryExecutionId"
+              }
+              ResultPath = "$.athena"
+              Next      = "ShapeQueryResult"
+            }
+            ShapeQueryResult = {
+              Type = "Pass"
+              Parameters = {
+                "metricType.$"       = "$.metricType"
+                "queryExecutionId.$" = "$.athena.queryExecutionId"
               }
               End = true
             }

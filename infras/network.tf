@@ -98,6 +98,17 @@ resource "aws_security_group" "database" {
     }
   }
 
+  dynamic "ingress" {
+    for_each = var.enable_analytics_pipeline ? [true] : []
+    content {
+      description     = "Analytics workflow Lambda PostgreSQL access"
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [aws_security_group.analytics_workflow[0].id]
+    }
+  }
+
   egress {
     description = "Default outbound access"
     from_port   = 0

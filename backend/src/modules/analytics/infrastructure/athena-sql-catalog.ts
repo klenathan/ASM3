@@ -119,14 +119,23 @@ export const createAthenaMetricSqlCatalog: MetricSqlCatalogFactory = (snapshotId
    'top_societies' AS metric_type,
    CAST(NULL AS varchar) AS society_id,
    ${PERIOD_COLUMNS},
-   json_format(CAST(ROW(
-       json_parse(concat('[', coalesce((SELECT array_join(array_agg(
-       json_format(CAST(CAST(ROW(society_id, name, member_count, thread_count) AS ROW(society_id VARCHAR, name VARCHAR, member_count BIGINT, thread_count BIGINT)) AS JSON))
-       ORDER BY member_count DESC, society_id), ',') FROM top_members)), ''), ']')),
-       json_parse(concat('[', coalesce((SELECT array_join(array_agg(
-       json_format(CAST(CAST(ROW(society_id, name, member_count, thread_count) AS ROW(society_id VARCHAR, name VARCHAR, member_count BIGINT, thread_count BIGINT)) AS JSON))
-       ORDER BY thread_count DESC, society_id), ',') FROM top_threads)), ''), ']'))
-   ) AS ROW(top_by_members JSON, top_by_threads JSON)) AS JSON)) AS data`,
+   json_format(json_parse(concat(
+     '{"top_by_members":',
+     coalesce(
+       (SELECT concat('[', array_join(array_agg(
+         json_format(CAST(CAST(ROW(society_id, name, member_count, thread_count) AS ROW(society_id VARCHAR, name VARCHAR, member_count BIGINT, thread_count BIGINT)) AS JSON))
+         ORDER BY member_count DESC, society_id), ','), ']') FROM top_members),
+       '[]'
+     ),
+     ',"top_by_threads":',
+     coalesce(
+       (SELECT concat('[', array_join(array_agg(
+         json_format(CAST(CAST(ROW(society_id, name, member_count, thread_count) AS ROW(society_id VARCHAR, name VARCHAR, member_count BIGINT, thread_count BIGINT)) AS JSON))
+         ORDER BY thread_count DESC, society_id), ','), ']') FROM top_threads),
+       '[]'
+     ),
+     '}'
+   ))) AS data`,
 
     moderation: `
  WITH ${latestSnapshot}, latest_reports AS (

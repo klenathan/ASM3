@@ -85,6 +85,11 @@
 - Learner Lab sessions and credits are temporary. `End Lab` stops EC2 but does not reliably stop RDS, Fargate, NAT gateways, load balancers, or storage. Destroy the demo stack after use, and do not treat delayed usage or budget data as proof that spending is safe. Resetting the lab is irreversible and deletes its resources.
 - Route 53 domain registration and Marketplace purchasing are unavailable or restricted. Avoid custom domains and Marketplace AMIs unless access has been verified; use the generated Amplify hostname and supported AMIs by default.
 - Research references: [AWS Academy Learner Lab Educator Guide](https://d1.awsstatic.com/AWS%20Academy%20Learner%20Lab%20Educator%20Guide.pdf), [EC2 quotas](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html), [RDS quotas](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html), and [RDS stopping behavior](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html).
+## Read-only AWS CLI diagnostics
+
+- Before AWS CLI or OpenTofu inspection, load the repository `.env` into the shell environment with `set -a; source .env; set +a`. Run commands from the repository root so the intended `AWS_PROFILE`, `AWS_REGION`, and related settings are used.
+- Keep diagnostics read-only: prefer `aws sts get-caller-identity`, `aws glue get-jobs`, `aws glue get-job-runs`, `aws athena list-work-groups`, `aws ecs describe-task-definition`, and `tofu output`/`tofu show`; do not apply, deploy, destroy, or mutate AWS resources during investigation.
+- Never print, paste, or commit `.env`, credentials, secret values, private keys, or full environment dumps. Redact account identifiers, ARNs containing sensitive context, request headers, and secret-bearing CLI output in reports.
 
 ## Cost and infrastructure rules
 
