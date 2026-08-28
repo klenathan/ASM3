@@ -81,23 +81,8 @@ const environmentSchema = z
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
-    ANALYTICS_GLUE_JOB_NAME: z.string().trim().min(1).optional(),
-    ANALYTICS_ATHENA_DATABASE: z.string().trim().min(1).default("analytics"),
-    ANALYTICS_ATHENA_CATALOG: z.string().trim().min(1).default("AwsDataCatalog"),
-    ANALYTICS_ATHENA_WORKGROUP: z.string().trim().min(1).default("analytics"),
-    ANALYTICS_ATHENA_OUTPUT_LOCATION: z.string().trim().min(1).optional(),
+    ANALYTICS_REFRESH_STATE_MACHINE_ARN: z.string().trim().min(1).optional(),
     ANALYTICS_SCHEDULER_SECRET: z.string().trim().min(1).optional(),
-    ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS: z.coerce
-      .number()
-      .int()
-      .min(1000)
-      .default(60_000),
-    ANALYTICS_REFRESH_MAX_PHASE_RETRIES: z.coerce.number().int().min(1).default(3),
-    ANALYTICS_REFRESH_STALE_AFTER_MS: z.coerce
-      .number()
-      .int()
-      .min(60_000)
-      .default(45 * 60 * 1000),
     MAPBOX_SECRET_TOKEN: z.string().trim().min(1).optional(),
     MAPBOX_PUBLIC_TOKEN: z.string().trim().min(1).optional(),
   })
@@ -135,24 +120,24 @@ const environmentSchema = z
       });
     }
     if (
-      value.ANALYTICS_GLUE_JOB_NAME !== undefined &&
+      value.ANALYTICS_REFRESH_STATE_MACHINE_ARN !== undefined &&
       value.AWS_REGION === undefined
     ) {
       context.addIssue({
         code: "custom",
-        path: ["ANALYTICS_GLUE_JOB_NAME"],
+        path: ["ANALYTICS_REFRESH_STATE_MACHINE_ARN"],
         message: "AWS_REGION is required when analytics orchestration is enabled",
       });
     }
     if (
       value.ANALYTICS_SCHEDULER_SECRET !== undefined &&
-      value.ANALYTICS_GLUE_JOB_NAME === undefined
+      value.ANALYTICS_REFRESH_STATE_MACHINE_ARN === undefined
     ) {
       context.addIssue({
         code: "custom",
         path: ["ANALYTICS_SCHEDULER_SECRET"],
         message:
-          "ANALYTICS_GLUE_JOB_NAME is required when a scheduler secret is configured",
+          "ANALYTICS_REFRESH_STATE_MACHINE_ARN is required when a scheduler secret is configured",
       });
     }
     if (value.NODE_ENV === "production" && value.MEDIA_BUCKET === undefined) {
@@ -234,15 +219,8 @@ export interface AppConfig {
   readonly analysisMaxImages: number;
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
-  readonly analyticsGlueJobName: string | null;
-  readonly analyticsAthenaDatabase: string;
-  readonly analyticsAthenaCatalog: string;
-  readonly analyticsAthenaWorkGroup: string;
-  readonly analyticsAthenaOutputLocation: string | null;
+  readonly analyticsRefreshStateMachineArn: string | null;
   readonly analyticsSchedulerSecret: string | null;
-  readonly analyticsRefreshReconcileIntervalMs: number;
-  readonly analyticsRefreshMaxPhaseRetries: number;
-  readonly analyticsRefreshStaleAfterMs: number;
   readonly mapboxSecretToken: string | null;
   readonly mapboxPublicToken: string | null;
 }
@@ -291,17 +269,9 @@ export function loadConfig(
     analysisMaxImages: result.data.ANALYSIS_MAX_IMAGES,
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,
-    analyticsGlueJobName: result.data.ANALYTICS_GLUE_JOB_NAME ?? null,
-    analyticsAthenaDatabase: result.data.ANALYTICS_ATHENA_DATABASE,
-    analyticsAthenaCatalog: result.data.ANALYTICS_ATHENA_CATALOG,
-    analyticsAthenaWorkGroup: result.data.ANALYTICS_ATHENA_WORKGROUP,
-    analyticsAthenaOutputLocation: result.data.ANALYTICS_ATHENA_OUTPUT_LOCATION ?? null,
+    analyticsRefreshStateMachineArn:
+      result.data.ANALYTICS_REFRESH_STATE_MACHINE_ARN ?? null,
     analyticsSchedulerSecret: result.data.ANALYTICS_SCHEDULER_SECRET ?? null,
-    analyticsRefreshReconcileIntervalMs:
-      result.data.ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS,
-    analyticsRefreshMaxPhaseRetries:
-      result.data.ANALYTICS_REFRESH_MAX_PHASE_RETRIES,
-    analyticsRefreshStaleAfterMs: result.data.ANALYTICS_REFRESH_STALE_AFTER_MS,
     mapboxSecretToken: result.data.MAPBOX_SECRET_TOKEN ?? null,
     mapboxPublicToken: result.data.MAPBOX_PUBLIC_TOKEN ?? null,
   };

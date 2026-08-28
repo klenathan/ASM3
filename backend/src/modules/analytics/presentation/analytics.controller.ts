@@ -73,6 +73,19 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         return analyticsErrorResponse(context, error);
       }
     },
+    async refreshStatus(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const result = await dependencies.analyticsService.refreshStatus(principal);
+        return context.json(result, 200);
+      } catch (error) {
+        context.get("logger").warn({
+          requestId: context.get("requestId"),
+          error: error instanceof Error ? error.message : String(error),
+        }, "analytics refresh status failed");
+        return analyticsErrorResponse(context, error);
+      }
+    },
 
     async scheduledRefresh(context: Context<AppEnvironment>): Promise<Response> {
       try {

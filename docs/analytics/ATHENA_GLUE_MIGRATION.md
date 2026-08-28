@@ -6,30 +6,32 @@ the final data, orchestration, verification, and rollback contract.
 
 ## Runtime Ownership
 
-The ECS backend owns the complete analytics refresh lifecycle:
+The ECS backend owns the API boundary and durable refresh request; a managed
+Step Functions workflow owns the long-running AWS lifecycle:
 
-1. `POST /api/v1/admin/analytics/refresh` authorizes a `system_admin` and
-   requests a refresh while preserving the existing `202 Accepted` response.
-2. EventBridge Scheduler calls
+1. `POST /api/v1/admin/analytics/refresh` authorizes a `system_admin`, creates
+   a durable run, starts Step Functions, and returns `202 Accepted`.
+2. The scheduled EventBridge rule calls
    `POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
    authenticated by `x-analytics-scheduler-secret`.
-3. `AnalyticsRefreshOrchestrator` coalesces concurrent requests into a durable
-PostgreSQL run and returns before AWS work starts. Its reconciler starts and
-reconciles one Glue export under a PostgreSQL lease, starts four Athena
-queries, and persists their rows through `AnalyticsRepository`. Lease-protected
-compare-and-set saves prevent another ECS task from concurrently advancing the
-same run or overwriting a terminal state.
+3. `AnalyticsRefreshWorkflow` coalesces concurrent requests into one durable
+   PostgreSQL run. Step Functions invokes the workflow Lambda to mark phases,
+   waits for one Glue export, runs four Athena queries in parallel, and invokes
+   the Lambda to retrieve and persist their rows.
 
 The run lifecycle is `requested -> exporting -> querying -> completed`, with
-`failed` as the terminal error state. Glue and Athena retries are bounded;
-unfinished runs become stale after the configured threshold. Athena receives
-`<run-id>:<metric-type>` client request tokens so query retries are idempotent.
+`failed` as the terminal error state. Step Functions owns retry and timeout
+handling. Athena receives `<run-id>:<metric-type>` client request tokens, and
+the workflow Lambda's metric upserts are safe to replay.
+
+The ECS process does not poll Glue or Athena. The Admin Center reads the
+durable latest-run status endpoint while an execution is active.
 
 ## S3 And Glue Contract
 
 The gated private bucket is named `${project}-analytics-${accountId}` and uses
-SSE-S3. A Glue run reads all source data from PostgreSQL in one repeatable-read
-transaction and writes:
+SSE-S3. Glue reads `users`, `societies`, `threads`, `comments`, `memberships`,
+`votes`, and `reports` from PostgreSQL through separate JDBC reads. It writes:
 
 ```text
 s3://<analytics-bucket>/analytics/source/table=users/
@@ -86,15 +88,18 @@ remain unchanged.
 `infras/analytics-storage.tf` owns the gated shared S3 bucket and its policy.
 `infras/glue-athena.tf` owns the Glue connection, export script object, Glue
 Catalog, Glue job, Athena workgroup, VPC access, and retention rules.
-`infras/scheduling.tf` owns the gated EventBridge Scheduler, API destination,
-generated shared secret, retry policy, and SQS DLQ. The pre-created `LabRole` is
-reused; no IAM roles or users are created. OpenTofu fails closed unless the
-active LabRole trust and required permissions have been verified explicitly.
+`infras/scheduling.tf` owns the gated EventBridge scheduled rule, API
+destination, generated shared secret, retry policy, and SQS DLQ.
+`infras/analytics-workflow.tf` owns the workflow Lambda, Step Functions state
+machine, Lambda security groups, and private interface endpoints. The
+pre-created `LabRole` is reused; no IAM roles or users are created. OpenTofu
+fails closed unless the active LabRole trust and required permissions have
+been verified explicitly.
 
 The complete analytics deployment is disabled by default. Setting
-`enable_analytics_pipeline = true` enables all of these resources and wires
-the Glue/Athena settings into the ECS task. No analytics-specific build step
-is required; OpenTofu uploads the Glue script from
+`enable_analytics_pipeline = true` enables these resources. Build
+`backend/dist-function/analytics-workflow.zip` before `tofu plan`; OpenTofu
+uploads the workflow bundle and the Glue script from
 `backend/src/functions/analytics/glue/export_rds.py`.
 
 ## Acceptance Evidence

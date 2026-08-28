@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
 import { METRIC_TYPES, type MetricType } from "../domain/analytics";
@@ -7,7 +7,7 @@ import type {
   RefreshRunStore,
   RefreshRunStatus,
   RefreshRunTrigger,
-} from "../application/refresh-orchestrator.ports";
+} from "../application/refresh-run.ports";
 import { analyticsRefreshRuns } from "./refresh-run.tables";
 
 const UNFINISHED_STATUSES: readonly RefreshRunStatus[] = [
@@ -32,6 +32,14 @@ export class DrizzleRefreshRunStore implements RefreshRunStore {
       .limit(1);
     return rows[0] === undefined ? null : toRecord(rows[0]);
   }
+  async findLatestRun(): Promise<RefreshRunRecord | null> {
+    const rows = await this.database
+      .select()
+      .from(analyticsRefreshRuns)
+      .orderBy(desc(analyticsRefreshRuns.createdAt))
+      .limit(1);
+    return rows[0] === undefined ? null : toRecord(rows[0]);
+  }
 
   async get(runId: string): Promise<RefreshRunRecord | null> {
     const rows = await this.database
@@ -40,15 +48,6 @@ export class DrizzleRefreshRunStore implements RefreshRunStore {
       .where(eq(analyticsRefreshRuns.runId, runId))
       .limit(1);
     return rows[0] === undefined ? null : toRecord(rows[0]);
-  }
-
-  async listUnfinishedRuns(): Promise<readonly RefreshRunRecord[]> {
-    const rows = await this.database
-      .select()
-      .from(analyticsRefreshRuns)
-      .where(inArray(analyticsRefreshRuns.status, UNFINISHED_STATUSES))
-      .orderBy(asc(analyticsRefreshRuns.createdAt));
-    return rows.map(toRecord);
   }
 
   async save(run: RefreshRunRecord): Promise<RefreshRunRecord> {
@@ -71,58 +70,9 @@ export class DrizzleRefreshRunStore implements RefreshRunStore {
       .returning();
     if (inserted[0] !== undefined) return toRecord(inserted[0]);
 
-    // The partial unique index makes concurrent first requests converge on
-    // the run that won the active slot instead of creating duplicate work.
     const active = await this.findActiveRun();
     if (active !== null) return active;
     throw new Error(`refresh run ${run.runId} could not be saved`);
-  }
-
-  async claim(
-    runId: string,
-    ownerId: string,
-    now: Date,
-    leaseDurationMs: number,
-  ): Promise<RefreshRunRecord | null> {
-    const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
-    const rows = await this.database
-      .update(analyticsRefreshRuns)
-      .set({ leaseOwner: ownerId, leaseExpiresAt })
-      .where(
-        and(
-          eq(analyticsRefreshRuns.runId, runId),
-          inArray(analyticsRefreshRuns.status, UNFINISHED_STATUSES),
-          or(
-            isNull(analyticsRefreshRuns.leaseOwner),
-            lte(analyticsRefreshRuns.leaseExpiresAt, now),
-            eq(analyticsRefreshRuns.leaseOwner, ownerId),
-          ),
-        ),
-      )
-      .returning();
-    return rows[0] === undefined ? null : toRecord(rows[0]);
-  }
-
-  async saveClaimed(
-    run: RefreshRunRecord,
-    ownerId: string,
-    now: Date,
-    leaseDurationMs: number,
-  ): Promise<RefreshRunRecord | null> {
-    const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
-    const rows = await this.database
-      .update(analyticsRefreshRuns)
-      .set({ ...toRow(run), leaseOwner: ownerId, leaseExpiresAt })
-      .where(
-        and(
-          eq(analyticsRefreshRuns.runId, run.runId),
-          eq(analyticsRefreshRuns.leaseOwner, ownerId),
-          gt(analyticsRefreshRuns.leaseExpiresAt, now),
-          inArray(analyticsRefreshRuns.status, UNFINISHED_STATUSES),
-        ),
-      )
-      .returning();
-    return rows[0] === undefined ? null : toRecord(rows[0]);
   }
 }
 

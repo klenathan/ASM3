@@ -4,14 +4,15 @@ import type { MembershipRepository } from "../societies/application/membership.r
 import { AnalyticsService } from "./application/analytics.service";
 import { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
 import { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
+import type { RequestRefreshResult } from "./application/refresh-workflow";
 
 export interface AnalyticsModuleDependencies {
   readonly database: Database;
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
-  readonly onRefreshRequested?: (() => Promise<void>) | undefined;
+  readonly onRefreshRequested?: (() => Promise<RequestRefreshResult | void>) | undefined;
   readonly schedulerSecret?: string | undefined;
-  readonly onScheduledRefresh?: (() => Promise<{ accepted: boolean; message: string }>) | undefined;
+  readonly onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined;
 }
 
 export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies) {
@@ -22,6 +23,7 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
     repository,
     accountReader: dependencies.accountReader,
     membershipRepository: dependencies.membershipRepository,
+    runStore: refreshRunStore,
     onRefreshRequested: dependencies.onRefreshRequested,
     schedulerSecret: dependencies.schedulerSecret,
     onScheduledRefresh: dependencies.onScheduledRefresh,
@@ -33,33 +35,30 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
     analyticsService,
   };
 }
-
 export { AnalyticsService } from "./application/analytics.service";
 export type { AnalyticsServiceDependencies } from "./application/analytics.service";
-export { AnalyticsRefreshOrchestrator } from "./application/refresh-orchestrator";
+export {
+  AnalyticsRefreshWorkflow,
+  type RefreshWorkflowStarter,
+  type RequestRefreshResult,
+} from "./application/refresh-workflow";
 export { InMemoryRefreshRunStore } from "./application/refresh-run.store";
 export { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
-export { AthenaGatewayAdapter } from "./infrastructure/athena-gateway";
-export { GlueGatewayAdapter } from "./infrastructure/glue-gateway";
+export { StepFunctionsWorkflowStarter } from "./infrastructure/step-functions-workflow-starter";
+export type { StepFunctionsWorkflowStarterConfig } from "./infrastructure/step-functions-workflow-starter";
 export {
   createAthenaMetricSqlCatalog,
   METRIC_SQL_TYPES,
 } from "./infrastructure/athena-sql-catalog";
 export type {
-  AthenaGateway,
   AthenaMetricRow,
-  AthenaQueryInput,
-  AthenaQueryStatus,
-  GlueGateway,
-  GlueJobRunStatus,
   MetricSqlCatalog,
   MetricSqlCatalogFactory,
-  RefreshOrchestratorOptions,
   RefreshRunRecord,
   RefreshRunStatus,
   RefreshRunStore,
   RefreshRunTrigger,
-} from "./application/refresh-orchestrator.ports";
+} from "./application/refresh-run.ports";
 export { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
 export type { AnalyticsRepository } from "./application/analytics.repository";
 export {

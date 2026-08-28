@@ -10,7 +10,23 @@ import {
   errorSchema,
   queryAnalyticsQuerySchema,
   refreshResponseSchema,
+  refreshStatusSchema,
 } from "./analytics.schemas";
+
+const refreshStatusRoute = createRoute({
+  method: "get",
+  path: "/api/v1/admin/analytics/refresh/status",
+  tags: ["Analytics"],
+  summary: "Get the latest analytics refresh status",
+  responses: {
+    200: {
+      description: "Latest analytics refresh status",
+      content: { "application/json": { schema: refreshStatusSchema.nullable() } },
+    },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
 
 const queryMetricsRoute = createRoute({
   method: "get",
@@ -50,7 +66,7 @@ const scheduledRefreshRoute = createRoute({
   path: "/api/v1/admin/analytics/scheduled-refresh",
   tags: ["Analytics"],
   summary:
-    "Internal nightly refresh entry point invoked by EventBridge Scheduler via an API destination; authenticated with a shared secret header",
+    "Internal nightly refresh entry point invoked by an EventBridge scheduled rule via an API destination; authenticated with a shared secret header",
   responses: {
     202: {
       description: "Scheduled refresh accepted",
@@ -75,6 +91,7 @@ export function registerAnalyticsRoutes(
     analyticsService: dependencies.analyticsService,
   });
   app.openapi(queryMetricsRoute, (context) => controller.queryMetrics(context) as never);
+  app.openapi(refreshStatusRoute, (context) => controller.refreshStatus(context) as never);
   app.openapi(refreshRoute, (context) => controller.refresh(context) as never);
   app.openapi(scheduledRefreshRoute, (context) =>
     controller.scheduledRefresh(context) as never,

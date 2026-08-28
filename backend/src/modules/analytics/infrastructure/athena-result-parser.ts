@@ -1,4 +1,4 @@
-import type { AthenaMetricRow } from "../application/refresh-orchestrator.ports";
+import type { AthenaMetricRow } from "../application/refresh-run.ports";
 import type {
   ContentVolumeData,
   MetricPayload,

@@ -15,11 +15,9 @@ import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
 import { createAuditModule } from "./modules/audit/index";
 import {
-  AnalyticsRefreshOrchestrator,
+  AnalyticsRefreshWorkflow,
   createAnalyticsModule,
-  AthenaGatewayAdapter,
-  GlueGatewayAdapter,
-  createAthenaMetricSqlCatalog,
+  StepFunctionsWorkflowStarter,
 } from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
@@ -281,90 +279,37 @@ async function main(): Promise<void> {
   });
   audit.start();
 
-  let analyticsRefreshOrchestrator:
-    | AnalyticsRefreshOrchestrator
-    | undefined;
+  let analyticsRefreshWorkflow: AnalyticsRefreshWorkflow | undefined;
   const analytics = createAnalyticsModule({
     database: database.db,
     accountReader: identity.repository,
     membershipRepository: societies.membershipRepository,
-    onRefreshRequested: async () => {
-      if (analyticsRefreshOrchestrator !== undefined) {
-        await analyticsRefreshOrchestrator.requestRefresh("admin");
-      }
-    },
+    onRefreshRequested: async () =>
+      analyticsRefreshWorkflow?.requestRefresh("admin"),
     ...(config.analyticsSchedulerSecret === null
       ? {}
-      : { schedulerSecret: config.analyticsSchedulerSecret }),
-    onScheduledRefresh: async () => {
-      if (analyticsRefreshOrchestrator === undefined) {
-        return {
-          accepted: true,
-          message: "Analytics refresh orchestration is not configured; nothing was started.",
-        };
-      }
-      const result = await analyticsRefreshOrchestrator.requestRefresh("nightly");
-      return {
-        accepted: true,
-        message: result.coalesced
-          ? "An analytics refresh run is already in progress."
-          : "Scheduled analytics refresh started.",
-      };
-    },
+      : {
+          schedulerSecret: config.analyticsSchedulerSecret,
+          onScheduledRefresh: async () => {
+            if (analyticsRefreshWorkflow === undefined) {
+              throw new Error("analytics refresh workflow is not configured");
+            }
+            return analyticsRefreshWorkflow.requestRefresh("nightly");
+          },
+        }),
   });
 
-  // Analytics orchestration is driven by the durable PostgreSQL run store.
-  // Requests only record/coalesce work; the reconciler performs AWS calls.
-  if (config.analyticsGlueJobName !== null && config.awsRegion !== null) {
-    analyticsRefreshOrchestrator = new AnalyticsRefreshOrchestrator({
-      repository: analytics.repository,
+  if (
+    config.analyticsRefreshStateMachineArn !== null &&
+    config.awsRegion !== null
+  ) {
+    analyticsRefreshWorkflow = new AnalyticsRefreshWorkflow({
       runStore: analytics.refreshRunStore,
-      glueGateway: new GlueGatewayAdapter({
+      starter: new StepFunctionsWorkflowStarter({
         region: config.awsRegion,
-        jobName: config.analyticsGlueJobName,
+        stateMachineArn: config.analyticsRefreshStateMachineArn,
       }),
-      athenaGateway: new AthenaGatewayAdapter({
-        region: config.awsRegion,
-        database: config.analyticsAthenaDatabase,
-        catalog: config.analyticsAthenaCatalog,
-        workGroup: config.analyticsAthenaWorkGroup,
-        ...(config.analyticsAthenaOutputLocation === null
-          ? {}
-          : { outputLocation: config.analyticsAthenaOutputLocation }),
-      }),
-      sqlByMetricType: createAthenaMetricSqlCatalog,
-      logger,
-      maxPhaseRetries: config.analyticsRefreshMaxPhaseRetries,
-      staleAfterMs: config.analyticsRefreshStaleAfterMs,
     });
-  }
-  let analyticsReconcileTimer: NodeJS.Timeout | undefined;
-  if (analyticsRefreshOrchestrator !== undefined) {
-    const tick = async () => {
-      try {
-        await analyticsRefreshOrchestrator!.reconcile();
-      } catch (error) {
-        logger.error(
-          { err: error },
-          "analytics refresh reconcile tick failed",
-        );
-      }
-    };
-    const firstTick = setTimeout(tick, 1_000);
-    firstTick.unref();
-    analyticsReconcileTimer = setInterval(
-      tick,
-      config.analyticsRefreshReconcileIntervalMs,
-    );
-    analyticsReconcileTimer.unref();
-    logger.info(
-      {
-        intervalMs: config.analyticsRefreshReconcileIntervalMs,
-        maxPhaseRetries: config.analyticsRefreshMaxPhaseRetries,
-        staleAfterMs: config.analyticsRefreshStaleAfterMs,
-      },
-      "analytics refresh reconciler started",
-    );
   }
   const app = createApp({
     analytics: {
@@ -430,9 +375,6 @@ async function main(): Promise<void> {
       await database.close();
       if (analysisRetryTimer !== undefined) {
         clearInterval(analysisRetryTimer);
-      }
-      if (analyticsReconcileTimer !== undefined) {
-        clearInterval(analyticsReconcileTimer);
       }
       clearTimeout(forceShutdown);
       logger.info("shutdown complete");

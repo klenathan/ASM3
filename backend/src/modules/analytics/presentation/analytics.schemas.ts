@@ -94,5 +94,19 @@ export const refreshResponseSchema = z
   .object({
     accepted: z.boolean(),
     message: z.string(),
+    runId: z.string().uuid().optional(),
+    status: z.enum(["requested", "exporting", "querying", "completed", "failed"]).optional(),
   })
   .openapi("AnalyticsRefreshResponse");
+
+export const refreshStatusSchema = z
+  .object({
+    runId: z.string().uuid(),
+    trigger: z.enum(["admin", "nightly"]),
+    status: z.enum(["requested", "exporting", "querying", "completed", "failed"]),
+    attempts: z.number().int().nonnegative(),
+    lastError: z.string().nullable(),
+    createdAt: isoDate,
+    updatedAt: isoDate,
+  })
+  .openapi("AnalyticsRefreshStatus");

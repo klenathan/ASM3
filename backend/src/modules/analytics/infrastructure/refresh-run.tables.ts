@@ -1,4 +1,4 @@
-import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const analyticsRefreshRuns = pgTable(
@@ -15,8 +15,6 @@ export const analyticsRefreshRuns = pgTable(
     lastError: text("last_error"),
     glueJobRunId: text("glue_job_run_id"),
     athenaQueryExecutionIds: jsonb("athena_query_execution_ids").notNull().default({}),
-    leaseOwner: text("lease_owner"),
-    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true, mode: "date" }),
   },
   (table) => [
     check(
@@ -30,6 +28,5 @@ export const analyticsRefreshRuns = pgTable(
     uniqueIndex("idx_analytics_refresh_runs_one_active")
       .on(sql`(1)`)
       .where(sql`${table.status} IN ('requested', 'exporting', 'querying')`),
-    index("idx_analytics_refresh_runs_lease").on(table.status, table.leaseExpiresAt),
   ],
 );

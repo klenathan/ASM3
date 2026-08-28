@@ -11,8 +11,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
 import { Button } from "../../components/ui/button";
+
+import { Badge } from "../../components/ui/badge";
 import {
   Card,
   CardContent,
@@ -22,8 +23,17 @@ import {
 } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 
-import { queryMetrics, refreshAnalytics } from "./analytics-api";
-import type { UserGrowthData, ContentVolumeData, TopSocietiesData, ModerationData, MetricPayload } from "./analytics-api";
+import { getAnalyticsRefreshStatus, queryMetrics, refreshAnalytics } from "./analytics-api";
+import type {
+  AnalyticsPage,
+  ContentVolumeData,
+  MetricPayload,
+  ModerationData,
+  RefreshRun,
+  RefreshStatus,
+  TopSocietiesData,
+  UserGrowthData,
+} from "./analytics-api";
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
 
@@ -42,6 +52,25 @@ function isTopSocieties(data: MetricPayload): data is TopSocietiesData {
 function isModeration(data: MetricPayload): data is ModerationData {
   return "pendingReports" in data;
 }
+
+function platformMetricData(page: AnalyticsPage | undefined): MetricPayload | undefined {
+  return page?.metrics.find((metric) => metric.societyId === null)?.data;
+}
+
+const REFRESH_STATUS_LABEL: Record<RefreshStatus, string> = {
+  requested: "Queued",
+  exporting: "Exporting snapshot",
+  querying: "Running metrics",
+  completed: "Completed",
+  failed: "Failed",
+};
+
+function refreshStatusVariant(status: RefreshStatus): "default" | "secondary" | "destructive" {
+  if (status === "failed") return "destructive";
+  if (status === "completed") return "default";
+  return "secondary";
+}
+
 
 function UserGrowthChart({ data }: { data: UserGrowthData }) {
   const chartData = [
@@ -218,45 +247,81 @@ export function AnalyticsSection() {
     refetchInterval: 30_000,
   });
 
-  const refreshMutation = useMutation({
-    mutationFn: refreshAnalytics,
-    onSuccess: () => {
-      // Refetch all metrics after a delay to allow pipeline to complete
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["analytics"] });
-      }, 60_000);
+  const refreshStatusQuery = useQuery<RefreshRun | null>({
+    queryKey: ["analytics", "refresh-status"],
+    queryFn: getAnalyticsRefreshStatus,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "requested" || status === "exporting" || status === "querying"
+        ? 5_000
+        : false;
     },
   });
 
-  const userGrowthData = userGrowthQuery.data?.metrics[0]?.data;
-  const contentVolumeData = contentVolumeQuery.data?.metrics[0]?.data;
-  const topSocietiesData = topSocietiesQuery.data?.metrics[0]?.data;
-  const moderationData = moderationQuery.data?.metrics[0]?.data;
+  const refreshMutation = useMutation({
+    mutationFn: refreshAnalytics,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      void queryClient.invalidateQueries({ queryKey: ["analytics", "refresh-status"] });
+    },
+  });
+
+  const userGrowthData = platformMetricData(userGrowthQuery.data);
+  const contentVolumeData = platformMetricData(contentVolumeQuery.data);
+  const topSocietiesData = platformMetricData(topSocietiesQuery.data);
+  const moderationData = platformMetricData(moderationQuery.data);
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Platform-wide usage metrics computed nightly via the EMR pipeline.
-          </p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Platform-wide usage metrics computed nightly through Glue and Athena.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshMutation.mutate()}
+            disabled={refreshMutation.isPending}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? "animate-spin" : ""}`}
+            />
+            {refreshMutation.isPending ? "Refreshing…" : "Refresh Analytics"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refreshMutation.mutate()}
-          disabled={refreshMutation.isPending}
-        >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? "animate-spin" : ""}`}
-          />
-          {refreshMutation.isPending ? "Refreshing…" : "Refresh Analytics"}
-        </Button>
+        {refreshMutation.isError ? (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {refreshMutation.error instanceof Error && refreshMutation.error.message
+              ? refreshMutation.error.message
+              : "Unable to refresh analytics. Try again."}
+          </p>
+        ) : null}
+        {refreshStatusQuery.data ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" role="status" aria-live="polite">
+            <span className="text-muted-foreground">Latest refresh:</span>
+            <Badge variant={refreshStatusVariant(refreshStatusQuery.data.status)}>
+              {REFRESH_STATUS_LABEL[refreshStatusQuery.data.status]}
+            </Badge>
+            {refreshStatusQuery.data.status === "failed" && refreshStatusQuery.data.lastError ? (
+              <span className="text-destructive">{refreshStatusQuery.data.lastError}</span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {userGrowthQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : userGrowthQuery.isError ? (
+          <MetricCardError
+            title="User Growth"
+            error={userGrowthQuery.error}
+            onRetry={() => void userGrowthQuery.refetch()}
+            isRetrying={userGrowthQuery.isFetching}
+          />
         ) : userGrowthData && isUserGrowth(userGrowthData) ? (
           <UserGrowthChart data={userGrowthData} />
         ) : (
@@ -265,6 +330,13 @@ export function AnalyticsSection() {
 
         {contentVolumeQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : contentVolumeQuery.isError ? (
+          <MetricCardError
+            title="Content Volume"
+            error={contentVolumeQuery.error}
+            onRetry={() => void contentVolumeQuery.refetch()}
+            isRetrying={contentVolumeQuery.isFetching}
+          />
         ) : contentVolumeData && isContentVolume(contentVolumeData) ? (
           <ContentVolumeChart data={contentVolumeData} />
         ) : (
@@ -273,6 +345,13 @@ export function AnalyticsSection() {
 
         {topSocietiesQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : topSocietiesQuery.isError ? (
+          <MetricCardError
+            title="Top Societies"
+            error={topSocietiesQuery.error}
+            onRetry={() => void topSocietiesQuery.refetch()}
+            isRetrying={topSocietiesQuery.isFetching}
+          />
         ) : topSocietiesData && isTopSocieties(topSocietiesData) ? (
           <TopSocietiesChart data={topSocietiesData} />
         ) : (
@@ -281,6 +360,13 @@ export function AnalyticsSection() {
 
         {moderationQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : moderationQuery.isError ? (
+          <MetricCardError
+            title="Moderation"
+            error={moderationQuery.error}
+            onRetry={() => void moderationQuery.refetch()}
+            isRetrying={moderationQuery.isFetching}
+          />
         ) : moderationData && isModeration(moderationData) ? (
           <ModerationChart data={moderationData} />
         ) : (
@@ -288,6 +374,40 @@ export function AnalyticsSection() {
         )}
       </div>
     </div>
+  );
+}
+
+
+function MetricCardError({
+  title,
+  error,
+  onRetry,
+  isRetrying,
+}: {
+  title: string;
+  error: unknown;
+  onRetry: () => void;
+  isRetrying: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex h-[200px] flex-col items-center justify-center gap-3">
+          <p role="alert" className="text-center text-sm text-destructive">
+            {error instanceof Error && error.message
+              ? error.message
+              : "Unable to load analytics. Try again."}
+          </p>
+          <Button type="button" variant="outline" onClick={onRetry} disabled={isRetrying}>
+            <RefreshCw aria-hidden="true" className={isRetrying ? "animate-spin" : undefined} />
+            Retry
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

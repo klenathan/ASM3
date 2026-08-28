@@ -4,53 +4,48 @@
 
 Assessment 3 requires an Analytics-category AWS service invoked automatically
 by application or UI code. A system administrator can trigger
-`POST /api/v1/admin/analytics/refresh` and receive `202 Accepted`; EventBridge
-Scheduler invokes the nightly route at `cron(0 2 * * ? *)` UTC. Both triggers
-are handled by the ECS backend orchestrator and preserve the existing admin
-API, dashboard, four metric groups, and persisted `analytics_metrics` rows.
+`POST /api/v1/admin/analytics/refresh` and receive `202 Accepted`; a scheduled
+EventBridge rule invokes the nightly route at `cron(0 2 * * ? *)` UTC. Both
+triggers create a durable refresh run and start a Standard Step Functions
+workflow. The existing admin API, dashboard, four metric groups, and persisted
+`analytics_metrics` rows remain unchanged.
 
 ## Final Architecture
 
-```text
-Admin refresh or EventBridge Scheduler
-  -> ECS backend orchestrator
+Admin refresh or scheduled EventBridge rule
+  -> ECS backend creates a durable run
+  -> Standard Step Functions workflow
   -> AWS Glue export job
   -> private analytics S3 bucket
      analytics/source/table=<name>/snapshot_at=<utc>/snapshot_id=<run-id>/
       analytics/manifest/snapshot_id=<run-id>/
   -> Glue Catalog external Parquet tables
-  -> four Athena metric queries
-  -> AnalyticsRepository.upsertMetric
+  -> four Athena metric queries in parallel
+  -> analytics workflow Lambda retrieves results and persists metrics
   -> RDS analytics_metrics
-```
 
-The ECS process is the only pipeline command owner. The scheduler calls
+The scheduler calls
 `POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
-using the generated `x-analytics-scheduler-secret` header. The orchestrator
-records one durable PostgreSQL refresh run and returns immediately; its
-reconciler starts Glue, waits for completion, starts one Athena query for each
-metric group, consumes all result pages, and persists valid rows atomically
-through the existing repository boundary. The run store and active-run unique
-index allow unfinished work to resume after an ECS restart.
-Each reconciler claims a run with a short PostgreSQL lease and uses
-compare-and-set saves, preventing separate ECS tasks from starting the same
-phase or overwriting a terminal state.
+using the generated `x-analytics-scheduler-secret` header. The backend records
+one durable PostgreSQL refresh run and starts the workflow, then returns
+immediately. Step Functions owns Glue completion waiting, runs the four Athena
+queries in parallel, and invokes the analytics workflow Lambda to retrieve
+validated result pages and persist them through the existing repository.
+The backend does not poll Glue or Athena. The API exposes the latest durable
+workflow state for the Admin Center.
 
-No analytics-specific Lambda, S3 event chain, or separate analytics artifact
-build is used. The content-analysis Lambda is a separate moderation workflow
-and is not part of this pipeline.
+The workflow Lambda runs in the private database subnets, uses the existing
+LabRole, and reaches RDS plus Athena through VPC interface endpoints. The
+content-analysis Lambda remains a separate moderation workflow.
 
 ## Data Contract
 
 Glue reads `users`, `societies`, `threads`, `comments`, `memberships`, `votes`,
-and `reports` from one PostgreSQL repeatable-read transaction. It writes
-Parquet partitions identified by `snapshot_at` and `snapshot_id`, then appends
-the manifest only after all source tables succeed. Athena receives the
-immutable refresh run ID and selects only that manifest identity, so an
-overlapping or stale run cannot query another run's snapshot.
-The Glue retry uses the run's immutable creation timestamp and exact run
-partition, removes prior source/manifest objects for that run, and rewrites
-the manifest before Athena is allowed to read it.
+and `reports` from PostgreSQL through separate JDBC reads. It writes Parquet
+partitions identified by `snapshot_at` and `snapshot_id`, then writes the
+manifest only after all source tables succeed. Athena receives the immutable
+refresh run ID and selects only that manifest identity, so a partial failed run
+is never queryable.
 
 The Glue Catalog database is `analytics`. It contains one external table per
 source table plus the unpartitioned `snapshot_manifest` table. The Athena SQL
@@ -71,19 +66,21 @@ and rejects malformed rows before persistence.
 ## AWS Resources And Cost
 
 The `enable_analytics_pipeline` flag defaults to `false` and gates the shared
-analytics S3 bucket as well as Glue, Catalog, Athena, VPC, lifecycle, and
-Scheduler resources. Scheduler retries use an SQS DLQ. The generated scheduler
-secret is stored in Secrets Manager and injected into ECS without exposing it
-in the task environment. The bucket is private and uses SSE-S3. Retention is 30
-days for source snapshots and manifests, 7 days for Athena result files, and
-1 day for Glue temporary files. RDS `analytics_metrics` is the durable
-dashboard history and is not subject to those S3 lifecycle rules.
+analytics S3 bucket, Glue, Catalog, Athena, VPC endpoints, Step Functions,
+workflow Lambda, lifecycle, and scheduled EventBridge resources. EventBridge
+delivery retries use an SQS DLQ. The generated scheduler secret is stored in
+Secrets Manager and injected into ECS without exposing it in the task
+environment. The bucket is private and uses SSE-S3. Retention is 30 days for
+source snapshots and manifests, 7 days for Athena result files, and 1 day for
+Glue temporary files. RDS `analytics_metrics` is the durable dashboard history
+and is not subject to those S3 lifecycle rules.
 
-Glue uses one `G.1X` worker with concurrency one and Athena uses one configured
-workgroup. The deployment reuses `LabRole`, avoids additional IAM resources,
-and does not provision duplicate compute. Destroy the demo stack with
-`tofu destroy`; stopping the Learner Lab does not reliably stop RDS or clean
-up S3 data.
+Glue uses two `G.1X` workers with concurrency one and Athena uses one
+configured workgroup. The deployment reuses `LabRole`, avoids additional IAM
+resources, and does not provision duplicate compute. The workflow Lambda is
+reserved to one concurrent invocation. Destroy the demo stack with
+`tofu destroy`; stopping the Learner Lab does not reliably stop RDS or clean up
+S3 data.
 
 ## Verification And Rollback Boundary
 
@@ -116,14 +113,19 @@ the durable handoff boundary; no automatic fallback deployment is maintained.
 
 ## Operations
 
-1. Verify the active LabRole trust and permissions, then set
+1. Verify the active Learner Lab service list and LabRole trust/permissions.
+   Step Functions is not confirmed by the checked-in service list; do not
+   apply until the active lab explicitly provides it. Then set
    `enable_analytics_pipeline = true`,
    `analytics_learner_lab_permissions_confirmed = true`, and, for deployed
    scheduling, set `analytics_glue_job_name` in `infras/terraform.tfvars`.
-2. Run `tofu plan` and `tofu apply` from `infras/`.
-3. Trigger the Admin Center refresh or call the admin refresh endpoint.
-4. Verify `GET /api/v1/admin/analytics`, Glue job history, Athena query history,
-   and the scheduler/API destination configuration.
-5. Run `tofu destroy` after the demonstration, using
+2. From `backend/`, run `pnpm install --frozen-lockfile` and
+   `pnpm build:analytics-workflow`.
+3. Run `tofu plan` and `tofu apply` from `infras/`.
+4. Trigger the Admin Center refresh or call the admin refresh endpoint.
+5. Verify `GET /api/v1/admin/analytics`, the refresh status endpoint, Glue job
+   history, Athena query history, and the scheduler/API destination
+   configuration.
+6. Run `tofu destroy` after the demonstration, using
    `force_destroy_buckets = true` only when deleting non-empty demo buckets is
    intended.

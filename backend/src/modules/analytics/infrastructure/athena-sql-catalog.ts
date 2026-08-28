@@ -1,9 +1,9 @@
 import { METRIC_TYPES } from "../domain/analytics";
-import type { MetricSqlCatalog, MetricSqlCatalogFactory } from "../application/refresh-orchestrator.ports";
+import type { MetricSqlCatalog, MetricSqlCatalogFactory } from "../application/refresh-run.ports";
 
 const PERIOD_COLUMNS = `
   CAST(current_date AS timestamp) AS period_start,
-  CAST(current_date AS timestamp) + INTERVAL '1' DAY - INTERVAL '1' MILLISECOND AS period_end`;
+  date_add('millisecond', -1, date_add('day', 1, CAST(current_date AS timestamp))) AS period_end`;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

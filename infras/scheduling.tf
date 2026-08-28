@@ -1,12 +1,9 @@
 # ---------------------------------------------------------------------------
-# Analytics refresh scheduling (Lambda-free orchestration, ticket #11)
+# Analytics refresh scheduling and workflow.
 #
-# Nightly and on-demand analytics refreshes are orchestrated by the ECS
-# backend (decision #10): a scheduled EventBridge rule invokes an API
-# destination (API-key connection) that POSTs to the backend's internal scheduled-refresh
-# route. The backend starts the Glue export, polls it with an in-process
-# reconciler, runs the Athena metric queries, and upserts results into RDS.
-# No analytics Lambda is involved anywhere in this flow.
+# EventBridge invokes the backend only to create a durable run. The backend
+# starts a Standard Step Functions execution; Step Functions waits for Glue and
+# Athena and invokes the workflow Lambda to update the run and persist metrics.
 #
 # GATE (Academy Learner Lab):
 #   - Confirm EventBridge scheduled rules + API destinations are available in the
@@ -24,7 +21,7 @@
 # ---------------------------------------------------------------------------
 
 variable "analytics_glue_job_name" {
-  description = "Name of the Glue job that exports RDS data to S3 for Athena (defined alongside the analytics pipeline resources). Empty string disables analytics orchestration env wiring."
+  description = "Optional name override for the Glue job that exports RDS data to S3 for Athena."
   type        = string
   default     = ""
 }
@@ -33,24 +30,6 @@ variable "analytics_refresh_schedule_expression" {
   description = "EventBridge schedule expression for the nightly analytics refresh."
   type        = string
   default     = "cron(0 2 * * ? *)"
-}
-
-variable "analytics_refresh_reconcile_interval_ms" {
-  description = "Backend reconciler sweep interval for in-flight analytics refresh runs."
-  type        = number
-  default     = 60000
-}
-
-variable "analytics_refresh_max_phase_retries" {
-  description = "Per-phase retry cap inside the backend orchestrator before a run fails."
-  type        = number
-  default     = 3
-}
-
-variable "analytics_refresh_stale_after_ms" {
-  description = "How long a refresh run may stay untouched before the reconciler fails it as stale."
-  type        = number
-  default     = 2700000
 }
 
 resource "terraform_data" "analytics_scheduler_permissions" {
@@ -66,8 +45,14 @@ resource "terraform_data" "analytics_scheduler_permissions" {
         ) && strcontains(
         data.aws_iam_role.learner_lab.assume_role_policy,
         "glue.amazonaws.com",
+        ) && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "states.amazonaws.com",
+        ) && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "lambda.amazonaws.com",
       )
-      error_message = "Analytics is disabled: verify the active LabRole trust includes glue.amazonaws.com and events.amazonaws.com and its effective Glue, Athena, S3, Secrets Manager, EventBridge, and SQS permissions, then set analytics_learner_lab_permissions_confirmed=true."
+      error_message = "Analytics is disabled: verify LabRole trust for EventBridge, Glue, Step Functions, and Lambda plus the required Glue, Athena, S3, Secrets Manager, EventBridge, SQS, and RDS permissions, then set analytics_learner_lab_permissions_confirmed=true."
     }
   }
 }

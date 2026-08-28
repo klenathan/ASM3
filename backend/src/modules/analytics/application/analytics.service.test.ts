@@ -15,6 +15,8 @@ import type {
   AnalyticsRepository,
   UpsertAnalyticsMetricInput,
 } from "./analytics.repository";
+import type { RefreshRunRecord } from "./refresh-run.ports";
+import type { RequestRefreshResult } from "./refresh-workflow";
 
 const now = new Date("2026-09-15T00:00:00.000Z");
 const clock: Clock = { now: () => now };
@@ -205,11 +207,49 @@ describe("AnalyticsService", () => {
     expect(refreshCalled).toBe(true);
   });
 
-  it("accepts admin refresh without a publisher", async () => {
-    const service = createService();
-    const response = await service.refresh(admin);
-    expect(response.accepted).toBe(true);
+  it("returns the latest durable refresh status to system admins", async () => {
+    const latestRun: RefreshRunRecord = {
+      runId: "123e4567-e89b-12d3-a456-426614174000",
+      trigger: "admin",
+      status: "querying",
+      attempts: 1,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+      glueJobRunId: "jr_1",
+      athenaQueryExecutionIds: {},
+    };
+    const service = createService(undefined, false, undefined, undefined, undefined, {
+      findLatestRun: async () => latestRun,
+    });
+
+    await expect(service.refreshStatus(admin)).resolves.toEqual({
+      runId: latestRun.runId,
+      trigger: "admin",
+      status: "querying",
+      attempts: 1,
+      lastError: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
   });
+
+  it("returns no status when the refresh store has no runs", async () => {
+    const service = createService(undefined, false, undefined, undefined, undefined, {
+      findLatestRun: async () => null,
+    });
+
+    await expect(service.refreshStatus(admin)).resolves.toBeNull();
+  });
+
+  it("rejects refresh status for non-admins", async () => {
+    const service = createService(undefined, false, undefined, undefined, undefined, {
+      findLatestRun: async () => null,
+    });
+
+    await expect(service.refreshStatus(moderator)).rejects.toMatchObject({ code: "ADMIN_REQUIRED" });
+  });
+
 
   it("validates scheduled refresh secrets in the application layer", async () => {
     const service = createService(undefined, false, undefined, "scheduler-secret");
@@ -226,8 +266,7 @@ describe("AnalyticsService", () => {
       message: "Analytics refresh orchestration is not configured; nothing was started.",
     });
   });
-
-  it("publishes a valid scheduled refresh to the orchestrator", async () => {
+  it("publishes a valid scheduled refresh to the workflow", async () => {
     let scheduled = false;
     const service = createService(
       undefined,
@@ -236,13 +275,19 @@ describe("AnalyticsService", () => {
       "scheduler-secret",
       async () => {
         scheduled = true;
-        return { accepted: true, message: "queued" };
+        return {
+          runId: "123e4567-e89b-12d3-a456-426614174000",
+          status: "requested",
+          coalesced: false,
+        };
       },
     );
 
-    await expect(service.scheduledRefresh("scheduler-secret")).resolves.toEqual({
+    await expect(service.scheduledRefresh("scheduler-secret")).resolves.toMatchObject({
       accepted: true,
-      message: "queued",
+      message: "Scheduled analytics refresh started.",
+      runId: "123e4567-e89b-12d3-a456-426614174000",
+      status: "requested",
     });
     expect(scheduled).toBe(true);
   });
@@ -275,7 +320,8 @@ function createService(
   isModeratorOfSociety = false,
   onRefreshRequested?: (() => Promise<void>) | undefined,
   schedulerSecret?: string | undefined,
-  onScheduledRefresh?: (() => Promise<{ accepted: boolean; message: string }>) | undefined,
+  onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined,
+  runStore?: { findLatestRun: () => Promise<RefreshRunRecord | null> } | undefined,
 ): AnalyticsService {
   return new AnalyticsService({
     repository: repository ?? new FakeAnalyticsRepository(),
@@ -298,6 +344,7 @@ function createService(
       },
     },
     clock,
+    runStore,
     onRefreshRequested,
     schedulerSecret,
     onScheduledRefresh,

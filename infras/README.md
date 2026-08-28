@@ -157,39 +157,54 @@ The final path preserves the administrator API and dashboard metrics:
 
 ```text
 POST /api/v1/admin/analytics/refresh (system_admin, 202 Accepted)
-  -> ECS backend orchestrator
-  -> AWS Glue export job (one repeatable-read RDS snapshot)
+  -> ECS creates durable refresh run
+  -> Standard Step Functions workflow
+  -> AWS Glue export job
   -> private analytics S3 bucket (partitioned Parquet + manifest)
-  -> Athena queries (four metric groups)
-  -> analytics_metrics in RDS
+  -> Athena queries (four metric groups in parallel)
+  -> analytics workflow Lambda retrieves results and updates RDS
   -> GET /api/v1/admin/analytics
 ```
 
-EventBridge Scheduler invokes the same backend orchestration through the
-authenticated `/api/v1/admin/analytics/scheduled-refresh` API destination at
-`cron(0 2 * * ? *)` UTC. The ECS reconciler polls Glue and Athena, retries
-transient phase failures, and persists results through the existing analytics
-repository. No analytics Lambda artifacts or resources are part of this path.
+EventBridge invokes the same backend request path through the authenticated
+`/api/v1/admin/analytics/scheduled-refresh` API destination at
+`cron(0 2 * * ? *)` UTC. The ECS backend does not poll Glue or Athena.
+Step Functions owns waiting, retries, timeout handling, and fan-in. The
+workflow Lambda runs in the database subnets and uses VPC interface endpoints
+for Athena, Secrets Manager, and CloudWatch Logs.
+
 Scheduler delivery retries for one hour and sends exhausted events to the
 analytics scheduler SQS DLQ. Before enabling the pipeline, verify the active
-Learner Lab `LabRole` trust for `glue.amazonaws.com` and
-`scheduler.amazonaws.com`, plus effective `glue:StartJobRun`, Glue discovery,
-Athena query, S3 object, Secrets Manager, `events:InvokeApiDestination`, and
-`sqs:SendMessage` permissions. Set
-`analytics_learner_lab_permissions_confirmed = true`; OpenTofu otherwise fails
-closed. No custom IAM role is created.
+Learner Lab `LabRole` trust for `events.amazonaws.com`, `glue.amazonaws.com`,
+`states.amazonaws.com`, and `lambda.amazonaws.com`, plus effective Glue,
+Athena, S3, Secrets Manager, Step Functions, Lambda, EventBridge, SQS, and RDS
+permissions. Set `analytics_learner_lab_permissions_confirmed = true`;
+OpenTofu otherwise fails closed. No custom IAM role is created.
+
+The checked-in Learner Lab service list currently does not confirm Step
+Functions availability. Do not treat `tofu validate` as proof that the active
+lab can create this state machine: verify the lab Resources/Service Access
+list and `LabRole` trust before `tofu apply`. If either is unavailable, keep
+the analytics gate disabled rather than silently substituting another
+orchestrator.
 
 OpenTofu manages the Glue connection/job, Glue Catalog database and tables,
-Athena workgroup, S3 lifecycle rules, scheduler, and the shared private S3
-bucket. All analytics resources are gated by `enable_analytics_pipeline` and
-reuse the pre-created `LabRole`; no IAM roles are created. Source snapshots
-and manifests expire after 30 days, Athena results after 7 days, and Glue
-temporary files after 1 day. Destroy after a demo (`tofu destroy`); `End Lab`
-does not stop RDS or remove retained S3 objects unless force destroy is set.
+Athena workgroup, Step Functions state machine, workflow Lambda, Lambda
+interface endpoints, S3 lifecycle rules, scheduled EventBridge rule, API
+destination, and the shared private S3 bucket. All analytics resources are
+gated by `enable_analytics_pipeline` and reuse the pre-created `LabRole`; no
+IAM roles are created. Source snapshots and manifests expire after 30 days,
+Athena results after 7 days, and Glue temporary files after 1 day. Destroy
+after a demo (`tofu destroy`); `End Lab` does not stop RDS or remove retained
+S3 objects unless force destroy is set.
 
-No analytics build step is required. Deploy with:
+Build the workflow Lambda before planning:
 
 ```sh
+cd ../backend
+pnpm install --frozen-lockfile
+pnpm build:analytics-workflow
+cd ../infras
 tofu plan
 tofu apply
 ```

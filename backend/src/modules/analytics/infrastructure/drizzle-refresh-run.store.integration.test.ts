@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
-import type { RefreshRunRecord } from "../application/refresh-orchestrator.ports";
+import type { RefreshRunRecord } from "../application/refresh-run.ports";
 import { DrizzleRefreshRunStore } from "./drizzle-refresh-run.store";
 
 const connectionString = process.env.DATABASE_URL;
@@ -46,23 +46,27 @@ describeWithDb("DrizzleRefreshRunStore", () => {
 
     const saved = await Promise.all([store.save(first), store.save(second)]);
     expect(new Set(saved.map((run) => run.runId)).size).toBe(1);
-    await expect(store.listUnfinishedRuns()).resolves.toHaveLength(1);
+    await expect(store.findActiveRun()).resolves.toMatchObject({
+      runId: saved[0]!.runId,
+      status: "querying",
+    });
   });
 
-  it("allows only one owner to claim an unfinished run", async () => {
+  it("returns the newest run for status reporting", async () => {
     await pool.query("DELETE FROM analytics_refresh_runs");
-    const run = makeRun("123e4567-e89b-12d3-a456-426614174003");
-    await store.save(run);
-    const now = new Date("2026-09-01T00:00:00.000Z");
+    const older = makeRun("123e4567-e89b-12d3-a456-426614174003");
+    const newer = {
+      ...makeRun("123e4567-e89b-12d3-a456-426614174004"),
+      createdAt: new Date("2026-09-02T00:00:00.000Z"),
+    };
+    await store.save(older);
+    await store.save({ ...older, status: "completed" });
+    await store.save(newer);
 
-    await expect(store.claim(run.runId, "owner-a", now, 60_000)).resolves.not.toBeNull();
-    await expect(store.claim(run.runId, "owner-b", now, 60_000)).resolves.toBeNull();
-    await expect(
-      store.saveClaimed({ ...run, status: "completed" }, "owner-b", now, 60_000),
-    ).resolves.toBeNull();
-    await expect(
-      store.saveClaimed({ ...run, status: "completed" }, "owner-a", now, 60_000),
-    ).resolves.toMatchObject({ status: "completed" });
+    await expect(store.findLatestRun()).resolves.toMatchObject({
+      runId: newer.runId,
+      status: "querying",
+    });
   });
 });
 

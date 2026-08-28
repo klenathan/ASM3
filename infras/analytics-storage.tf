@@ -1,9 +1,9 @@
 # ---------------------------------------------------------------------------
 # Shared analytics storage.
 #
-# The ECS analytics orchestrator uses this bucket for Glue source snapshots,
-# the snapshot manifest, Glue temporary files, and Athena query results.
-# ---------------------------------------------------------------------------
+# The managed Step Functions workflow and workflow Lambda use this bucket for
+# Glue source snapshots, the snapshot manifest, temporary files, and Athena
+# query results.
 
 variable "enable_analytics_pipeline" {
   description = "Deploy the gated Glue + Athena analytics pipeline and its shared S3 bucket."

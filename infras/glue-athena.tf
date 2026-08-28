@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
 # Glue + Athena analytics data plane.
 #
-# Glue materializes a consistent PostgreSQL snapshot and Athena queries the
-# cataloged Parquet data. Both are started and reconciled by the ECS backend.
+# Glue materializes run-scoped PostgreSQL data and Athena queries the cataloged
+# Parquet data. Step Functions starts and waits for both services.
 # ---------------------------------------------------------------------------
 
 variable "analytics_glue_script_path" {

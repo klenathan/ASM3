@@ -26,12 +26,12 @@ force_destroy_buckets = false
 # content_analysis_auto_remove_confidence = 0.90
 
 # ---- Analytics Glue + Athena pipeline (gated) -------------------------------
-# Enable the gated Glue + Athena analytics pipeline (Analytics AWS category).
-# No analytics Lambda build is needed.
+# Build the workflow Lambda from backend before applying infrastructure.
+# Enable only after verifying the active Learner Lab supports Step Functions
+# and the pre-created LabRole trusts states.amazonaws.com and
+# lambda.amazonaws.com.
 #   enable_analytics_pipeline = true
 #   analytics_learner_lab_permissions_confirmed = true
-# Nightly refresh orchestration (Lambda-free): set the Glue job name that the
-# backend orchestrator should start; EventBridge Scheduler + API destination
-# then hit POST /api/v1/admin/analytics/scheduled-refresh with a generated
-# shared secret. See infras/scheduling.tf.
+# The nightly trigger uses EventBridge + API destination and the same backend
+# scheduler secret. See infras/scheduling.tf.
 #   analytics_glue_job_name = "asm3-prod-analytics-metrics-export"

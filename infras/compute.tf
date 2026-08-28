@@ -82,14 +82,7 @@ locals {
     { name = "ANALYSIS_MAX_COMMENTS", value = "40" },
     { name = "ANALYSIS_TIMEOUT_MS", value = "50000" },
     ], var.enable_analytics_pipeline ? [
-    { name = "ANALYTICS_GLUE_JOB_NAME", value = local.analytics_glue_job_name },
-    { name = "ANALYTICS_ATHENA_DATABASE", value = local.analytics_catalog_database },
-    { name = "ANALYTICS_ATHENA_CATALOG", value = "AwsDataCatalog" },
-    { name = "ANALYTICS_ATHENA_WORKGROUP", value = aws_athena_workgroup.analytics[0].name },
-    { name = "ANALYTICS_ATHENA_OUTPUT_LOCATION", value = "s3://${aws_s3_bucket.analytics[0].id}/analytics/query-results/" },
-    { name = "ANALYTICS_REFRESH_RECONCILE_INTERVAL_MS", value = tostring(var.analytics_refresh_reconcile_interval_ms) },
-    { name = "ANALYTICS_REFRESH_MAX_PHASE_RETRIES", value = tostring(var.analytics_refresh_max_phase_retries) },
-    { name = "ANALYTICS_REFRESH_STALE_AFTER_MS", value = tostring(var.analytics_refresh_stale_after_ms) },
+    { name = "ANALYTICS_REFRESH_STATE_MACHINE_ARN", value = local.analytics_refresh_state_machine_arn },
   ] : [])
 }
 
