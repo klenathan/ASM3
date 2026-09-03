@@ -57,7 +57,7 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly profile: DiscussionProfilePort;
   readonly media: ThreadMediaPort;
   readonly events: ThreadEventPublisher;
-  readonly placesPort?: PlacesPort;
+  readonly placesPort?: PlacesPort | undefined;
   /**
    * Optional read-only source of the latest automated content-analysis outcome
    * for a thread, used to surface a verification badge.
@@ -453,14 +453,26 @@ export class ThreadService {
     return states.get(threadId) ?? null;
   }
 
-  private async resolveLocation(location: CreateThreadCommand["location"]): Promise<LocationSnapshot> {
-    if (location === undefined) return undefined;
-    if (location === null) return null;
-    if (!location.mapboxId) throw new ApplicationError("VALIDATION_ERROR", "Location mapboxId is required");
+  private async verifyLocation(location: {
+    mapboxId?: string;
+    latitude?: number;
+    longitude?: number;
+  }): Promise<NonNullable<LocationSnapshot>> {
+    const mapboxId = location.mapboxId?.trim();
+    if (!mapboxId) throw new ApplicationError("VALIDATION_ERROR", "Location mapboxId is required");
     if (this.placesPort === undefined) {
       throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
     }
-    const details = await this.placesPort.retrieve(location.mapboxId, null);
+    let details;
+    try {
+      details = await this.placesPort.retrieve(mapboxId, null);
+    } catch (error) {
+      if (error instanceof ApplicationError) throw error;
+      throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
+    }
+    if (!details) {
+      throw new ApplicationError("VALIDATION_ERROR", "Selected place could not be verified");
+    }
     const finetune = isFinetuneWithinThreshold(details.latitude, details.longitude, location.latitude, location.longitude);
     return {
       name: details.name,
@@ -473,26 +485,17 @@ export class ThreadService {
     };
   }
 
+  private async resolveLocation(location: CreateThreadCommand["location"]): Promise<LocationSnapshot> {
+    if (location === undefined) return undefined;
+    if (location === null) return null;
+    return this.verifyLocation(location);
+  }
+
   private async resolveLocationUpdate(location: UpdateThreadCommand["location"]): Promise<Partial<UpdateThreadInput>> {
     if (location === undefined) return {};
     if (location === null) return { clearLocation: true };
-    if (!location.mapboxId) throw new ApplicationError("VALIDATION_ERROR", "Location mapboxId is required");
-    if (this.placesPort === undefined) {
-      throw new ApplicationError("PLACES_UNAVAILABLE", "Location service unavailable");
-    }
-    const details = await this.placesPort.retrieve(location.mapboxId, null);
-    const finetune = isFinetuneWithinThreshold(details.latitude, details.longitude, location.latitude, location.longitude);
-    return {
-      location: {
-        name: details.name,
-        mapboxId: details.mapboxId,
-        placeType: details.placeType,
-        latitude: finetune ? (location.latitude as number) : details.latitude,
-        longitude: finetune ? (location.longitude as number) : details.longitude,
-        address: details.address,
-        meta: details.meta,
-      },
-    };
+    const verified = await this.verifyLocation(location);
+    return { location: verified };
   }
 }
 
@@ -507,8 +510,14 @@ function normalizeMediaIds(mediaIds: readonly string[] | undefined): readonly st
 
 type LocationSnapshot = CreateThreadInput["location"];
 
-function isFinetuneWithinThreshold(canonicalLat: number, canonicalLng: number, clientLat: number | undefined, clientLng: number | undefined): boolean {
-  if (clientLat === undefined || clientLng === undefined) return false;
+function isFinetuneWithinThreshold(
+  canonicalLat: number,
+  canonicalLng: number,
+  clientLat: number | undefined,
+  clientLng: number | undefined,
+): boolean {
+  if (typeof clientLat !== "number" || typeof clientLng !== "number") return false;
+  if (!Number.isFinite(clientLat) || !Number.isFinite(clientLng)) return false;
   if (clientLat < -90 || clientLat > 90 || clientLng < -180 || clientLng > 180) return false;
   const dLat = Math.abs(canonicalLat - clientLat);
   const dLng = Math.abs(canonicalLng - clientLng);

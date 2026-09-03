@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { MapPin, Search, X } from "lucide-react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
+import { LocateFixed, MapPin, Search, X } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { retrievePlace, searchPlaces } from "./api";
-import type { PickedLocation, } from "./types";
+import type { PickedLocation } from "./types";
 import type { PlaceSuggestion } from "./api";
 
 interface Props {
@@ -22,27 +22,40 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
   const [debounced, setDebounced] = useState("");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [proximity, setProximity] = useState<string | null>("144.9631,-37.8136");
-  const [errorBanner, setErrorBanner] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [geoNotice, setGeoNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 250);
     return () => clearTimeout(t);
   }, [query]);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setProximity(`${pos.coords.longitude},${pos.coords.latitude}`),
-        () => {},
-        { timeout: 3000 },
-      );
+  function handleRequestLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoNotice("Geolocation is not supported by your browser");
+      return;
     }
-  }, []);
-
+    setIsLocating(true);
+    setGeoNotice(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setProximity(`${pos.coords.longitude},${pos.coords.latitude}`);
+        setIsLocating(false);
+        setGeoNotice("Nearby location bias active");
+      },
+      () => {
+        setIsLocating(false);
+        setGeoNotice("Location permission denied or unavailable");
+      },
+      { timeout: 5000 },
+    );
+  }
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isFetching, setIsFetching] = useState(false);
-
+  const [retryCount, setRetryCount] = useState(0);
   useEffect(() => {
     if (debounced.trim().length < 2) {
       setSuggestions([]);
@@ -55,7 +68,7 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
         if (!cancelled) setSuggestions(res.suggestions);
       })
       .catch(() => {
-        if (!cancelled) setErrorBanner(true);
+        if (!cancelled) setErrorBanner("Search unavailable — post without location or retry.");
       })
       .finally(() => {
         if (!cancelled) setIsFetching(false);
@@ -63,7 +76,7 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
     return () => {
       cancelled = true;
     };
-  }, [debounced, proximity, sessionToken]);
+  }, [debounced, proximity, sessionToken, retryCount]);
 
   const hasQuery = debounced.trim().length >= 2;
 
@@ -80,9 +93,22 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
       });
       setQuery("");
       setDebounced("");
+      setSessionToken(null);
+      setErrorBanner(null);
     } catch {
-      setErrorBanner(true);
+      setErrorBanner("Could not retrieve place details — please retry or select another place.");
     }
+  }
+
+  function handleClear() {
+    setSessionToken(null);
+    setErrorBanner(null);
+    onClear?.();
+  }
+
+  function handleSearchBlur(event: FocusEvent<HTMLDivElement>) {
+    if (searchRef.current?.contains(event.relatedTarget as Node | null)) return;
+    setSessionToken(null);
   }
 
   if (picked) {
@@ -90,7 +116,7 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
       <div className="flex items-center gap-2 rounded-none border border-foreground/15 bg-muted px-3 py-2 text-sm">
         <MapPin className="size-4 shrink-0 text-primary" />
         <span className="min-w-0 flex-1 truncate">{picked.name}</span>
-        <button type="button" aria-label="Remove location" className="rounded p-1 hover:bg-background" onClick={onClear} disabled={disabled}>
+        <button type="button" aria-label="Remove location" className="rounded p-1 hover:bg-background" onClick={handleClear} disabled={disabled}>
           <X className="size-4" />
         </button>
       </div>
@@ -98,16 +124,30 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
   }
 
   return (
-    <div className="space-y-2">
+    <div ref={searchRef} className="space-y-2" onBlur={handleSearchBlur}>
       {errorBanner && (
-        <p role="alert" className="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-          Search unavailable — post without location or retry.{" "}
-          <button type="button" className="underline" onClick={() => setErrorBanner(false)}>
-            Dismiss
-          </button>
-        </p>
+        <div role="alert" className="flex items-center justify-between gap-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <span>{errorBanner}</span>
+          <span className="flex shrink-0 gap-2">
+            {debounced.trim().length >= 2 && (
+              <button
+                type="button"
+                className="font-medium underline hover:no-underline"
+                onClick={() => {
+                  setErrorBanner(null);
+                  setRetryCount((c) => c + 1);
+                }}
+              >
+                Retry
+              </button>
+            )}
+            <button type="button" className="underline hover:no-underline" onClick={() => setErrorBanner(null)}>
+              Dismiss
+            </button>
+          </span>
+        </div>
       )}
-      <div className="relative">
+      <div className="relative flex items-center">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
@@ -118,10 +158,21 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
           }}
           placeholder="Add location — search RMIT campuses, buildings or venues"
           disabled={disabled}
-          className="h-11 w-full rounded-none border-foreground/15 bg-background pl-10"
+          className="h-11 w-full rounded-none border-foreground/15 bg-background pl-10 pr-10"
           aria-label="Search location"
         />
+        <button
+          type="button"
+          onClick={handleRequestLocation}
+          disabled={disabled || isLocating}
+          aria-label="Use current location"
+          title="Use current location for nearby suggestions"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+        >
+          <LocateFixed className={`size-4 ${isLocating ? "animate-spin text-primary" : ""}`} />
+        </button>
       </div>
+      {geoNotice && <p className="text-xs text-muted-foreground">{geoNotice}</p>}
       {hasQuery && (
         <div className="max-h-56 overflow-auto border border-foreground/15 bg-background">
           {isFetching && <p className="px-3 py-3 text-xs text-muted-foreground">Searching…</p>}

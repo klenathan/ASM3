@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { reverseGeocode } from "./api";
+import { createLocationMap } from "./mapbox-map";
+import type { MapboxMarker } from "./mapbox-map";
 import type { PickedLocation } from "./types";
 
 interface Props {
@@ -9,68 +11,80 @@ interface Props {
 
 export function LocationPreview({ location, onUpdate }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<unknown>(null);
-  const markerRef = useRef<unknown>(null);
   const [addressText, setAddressText] = useState<string | null>(null);
+  const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
-    if (!token || !containerRef.current) return;
-    let map: unknown;
+    setMapFailed(false);
+    if (!containerRef.current) return;
+    let removeMap: (() => void) | undefined;
     (async () => {
       try {
-        const mod = await import("mapbox-gl");
-        const mapboxgl = (mod as unknown as { default: typeof import("mapbox-gl").default }).default ?? (mod as unknown as typeof import("mapbox-gl").default);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mapboxgl as any).accessToken = token;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const m = new (mapboxgl as any).Map({
+        const handle = await createLocationMap({
           container: containerRef.current!,
-          style: document.documentElement.classList.contains("dark") ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v12",
-          center: [location.longitude, location.latitude],
+          coordinates: [location.longitude, location.latitude],
           zoom: 15,
-          attributionControl: false,
+          draggable: true,
+          onError: () => {
+            if (!cancelled) setMapFailed(true);
+          },
         });
-        map = m;
-        mapRef.current = m;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const marker = new (mapboxgl as any).Marker({ draggable: true, color: "oklch(0.53 0.18 32)" })
-          .setLngLat([location.longitude, location.latitude])
-          .addTo(m);
-        markerRef.current = marker;
+        if (!handle) {
+          if (!cancelled) setMapFailed(true);
+          return;
+        }
+        if (cancelled) {
+          handle.map.remove();
+          return;
+        }
+        removeMap = () => handle.map.remove();
+        const marker: MapboxMarker = handle.marker;
         marker.on("dragend", async () => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const lngLat = (marker as any).getLngLat();
-          const lat = lngLat.lat as number;
-          const lng = lngLat.lng as number;
+          const lngLat = marker.getLngLat();
+          const lat = lngLat.lat;
+          const lng = lngLat.lng;
           try {
             const rev = await reverseGeocode(lat, lng);
             if (cancelled) return;
             setAddressText((rev.address as unknown as { full_address?: string } | null)?.full_address ?? rev.name ?? null);
             onUpdate({ ...location, latitude: lat, longitude: lng, address: rev.address });
           } catch {
-            if (!cancelled) onUpdate({ ...location, latitude: lat, longitude: lng });
+            if (!cancelled) {
+              setAddressText(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+              onUpdate({ ...location, latitude: lat, longitude: lng, address: null });
+            }
           }
         });
       } catch {
-        // map load failed — leave container empty, fallback to text
+        if (!cancelled) setMapFailed(true);
       }
     })();
     return () => {
       cancelled = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const m = map as any;
-      if (m?.remove) m.remove();
+      removeMap?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.mapboxId]);
 
+  const displayAddress =
+    addressText ??
+    (location.address as { full_address?: string } | null)?.full_address ??
+    `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`;
+
   return (
     <div className="space-y-2">
-      <div ref={containerRef} className="h-[200px] w-full border border-foreground/15 bg-muted" aria-label="Location preview map" />
-      {addressText && <p className="text-xs text-muted-foreground">{addressText}</p>}
-      <p className="text-xs text-muted-foreground">Drag the pin to fine-tune.</p>
+      {mapFailed ? (
+        <div className="flex h-[140px] w-full flex-col justify-center rounded-none border border-foreground/15 bg-muted p-4 text-xs text-muted-foreground" role="region" aria-label="Location details fallback">
+          <p className="font-semibold text-foreground">{location.name}</p>
+          <p className="mt-1">{displayAddress}</p>
+          <p className="mt-2 text-muted-foreground/80">Map preview unavailable (drag fine-tune disabled)</p>
+        </div>
+      ) : (
+        <div ref={containerRef} className="h-[200px] w-full border border-foreground/15 bg-muted" aria-label="Location preview map" />
+      )}
+      {!mapFailed && addressText && <p className="text-xs text-muted-foreground">{addressText}</p>}
+      {!mapFailed && <p className="text-xs text-muted-foreground">Drag the pin to fine-tune.</p>}
     </div>
   );
 }

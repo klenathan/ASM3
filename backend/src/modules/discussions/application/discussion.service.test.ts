@@ -30,6 +30,7 @@ import { VoteService } from "./vote.service";
 import type { DiscussionProfilePort } from "./discussion.profile";
 import type { ThreadMediaPort } from "./thread-media.port";
 import type { ThreadEventPublisher } from "./thread-events.port";
+import type { PlacesPort } from "../../places/application/places.port";
 
 const society: SocietyRecord = {
   id: "society-id",
@@ -215,6 +216,222 @@ describe("discussion services", () => {
       code: "SOCIETY_FORBIDDEN",
     });
   });
+
+  it("attaches verified location snapshot with canonical details", async () => {
+    const repository = new FakeDiscussionRepository();
+    const fakePlaces: PlacesPort = {
+      search: async () => [],
+      retrieve: async (id) => ({
+        mapboxId: id,
+        name: "RMIT Building 80",
+        placeType: "poi",
+        latitude: -37.808,
+        longitude: 144.963,
+        address: { street: "445 Swanston St" },
+        meta: { category: "education" },
+      }),
+      reverse: async (lat, lng) => ({ latitude: lat, longitude: lng, address: null, name: null }),
+    };
+    const service = createThreadService(repository, undefined, undefined, fakePlaces);
+
+    const thread = await service.createThread(member, society.id, {
+      title: "Study session at Building 80",
+      body: "Level 4",
+      location: { mapboxId: "place.80" },
+    });
+
+    expect(thread.location).toEqual({
+      mapboxId: "place.80",
+      name: "RMIT Building 80",
+      placeType: "poi",
+      latitude: -37.808,
+      longitude: 144.963,
+      address: { street: "445 Swanston St" },
+      meta: { category: "education" },
+    });
+  });
+
+  it("accepts fine-tuned coordinates within 0.001 degree threshold", async () => {
+    const repository = new FakeDiscussionRepository();
+    const fakePlaces: PlacesPort = {
+      search: async () => [],
+      retrieve: async (id) => ({
+        mapboxId: id,
+        name: "RMIT Building 80",
+        placeType: "poi",
+        latitude: -37.808,
+        longitude: 144.963,
+        address: { street: "445 Swanston St" },
+        meta: null,
+      }),
+      reverse: async (lat, lng) => ({ latitude: lat, longitude: lng, address: null, name: null }),
+    };
+    const service = createThreadService(repository, undefined, undefined, fakePlaces);
+
+    const thread = await service.createThread(member, society.id, {
+      title: "Building 80 Entrance",
+      body: "Swanston St side",
+      location: {
+        mapboxId: "place.80",
+        latitude: -37.8085,
+        longitude: 144.9635,
+      },
+    });
+
+    expect(thread.location?.latitude).toBe(-37.8085);
+    expect(thread.location?.longitude).toBe(144.9635);
+    expect(thread.location?.name).toBe("RMIT Building 80");
+  });
+
+  it("falls back to canonical coordinates when fine-tuning exceeds threshold", async () => {
+    const repository = new FakeDiscussionRepository();
+    const fakePlaces: PlacesPort = {
+      search: async () => [],
+      retrieve: async (id) => ({
+        mapboxId: id,
+        name: "RMIT Building 80",
+        placeType: "poi",
+        latitude: -37.808,
+        longitude: 144.963,
+        address: null,
+        meta: null,
+      }),
+      reverse: async (lat, lng) => ({ latitude: lat, longitude: lng, address: null, name: null }),
+    };
+    const service = createThreadService(repository, undefined, undefined, fakePlaces);
+
+    const thread = await service.createThread(member, society.id, {
+      title: "Building 80 Remote Pin",
+      body: "Pin too far away",
+      location: {
+        mapboxId: "place.80",
+        latitude: -37.810,
+        longitude: 144.963,
+      },
+    });
+
+    expect(thread.location?.latitude).toBe(-37.808);
+    expect(thread.location?.longitude).toBe(144.963);
+  });
+
+  it("falls back to canonical coordinates when client coordinates are invalid or out of range", async () => {
+    const repository = new FakeDiscussionRepository();
+    const fakePlaces: PlacesPort = {
+      search: async () => [],
+      retrieve: async (id) => ({
+        mapboxId: id,
+        name: "RMIT Building 80",
+        placeType: "poi",
+        latitude: -37.808,
+        longitude: 144.963,
+        address: null,
+        meta: null,
+      }),
+      reverse: async (lat, lng) => ({ latitude: lat, longitude: lng, address: null, name: null }),
+    };
+    const service = createThreadService(repository, undefined, undefined, fakePlaces);
+
+    const thread = await service.createThread(member, society.id, {
+      title: "Invalid Coords",
+      body: "Testing",
+      location: {
+        mapboxId: "place.80",
+        latitude: 95,
+        longitude: 144.963,
+      },
+    });
+
+    expect(thread.location?.latitude).toBe(-37.808);
+    expect(thread.location?.longitude).toBe(144.963);
+  });
+
+  it("rejects location attachment when mapboxId is missing or blank", async () => {
+    const repository = new FakeDiscussionRepository();
+    const service = createThreadService(repository);
+
+    await expect(
+      service.createThread(member, society.id, {
+        title: "Missing mapboxId",
+        body: "Testing",
+        location: { mapboxId: "   " },
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Location mapboxId is required",
+    });
+  });
+
+  it("throws PLACES_UNAVAILABLE when placesPort fails or is unconfigured", async () => {
+    const repository = new FakeDiscussionRepository();
+    const serviceNoPort = createThreadService(repository);
+    await expect(
+      serviceNoPort.createThread(member, society.id, {
+        title: "No Places Port",
+        body: "Testing",
+        location: { mapboxId: "place.1" },
+      }),
+    ).rejects.toMatchObject({
+      code: "PLACES_UNAVAILABLE",
+    });
+
+    const failingPort: PlacesPort = {
+      search: async () => [],
+      retrieve: async () => {
+        throw new Error("Mapbox API network error");
+      },
+      reverse: async (lat, lng) => ({ latitude: lat, longitude: lng, address: null, name: null }),
+    };
+    const serviceFailing = createThreadService(repository, undefined, undefined, failingPort);
+    await expect(
+      serviceFailing.createThread(member, society.id, {
+        title: "Failing Places Port",
+        body: "Testing",
+        location: { mapboxId: "place.1" },
+      }),
+    ).rejects.toMatchObject({
+      code: "PLACES_UNAVAILABLE",
+    });
+  });
+
+  it("updates and clears thread location", async () => {
+    const repository = new FakeDiscussionRepository();
+    const fakePlaces: PlacesPort = {
+      search: async () => [],
+      retrieve: async (id) => ({
+        mapboxId: id,
+        name: "RMIT Building 10",
+        placeType: "poi",
+        latitude: -37.807,
+        longitude: 144.964,
+        address: null,
+        meta: null,
+       }),
+      reverse: async (lat, lng) => ({ latitude: lat, longitude: lng, address: null, name: null }),
+    };
+    const service = createThreadService(repository, undefined, undefined, fakePlaces);
+
+    const created = await service.createThread(member, society.id, {
+      title: "Initial thread",
+      body: "Body",
+      location: { mapboxId: "place.10" },
+    });
+    expect(created.location?.name).toBe("RMIT Building 10");
+
+    const updated = await service.updateThread(member, created.id, {
+      location: {
+        mapboxId: "place.10",
+        latitude: -37.8074,
+        longitude: 144.9642,
+      },
+    });
+    expect(updated.location?.latitude).toBe(-37.8074);
+    expect(updated.location?.longitude).toBe(144.9642);
+
+    const cleared = await service.updateThread(member, created.id, {
+      location: null,
+    });
+    expect(cleared.location).toBeNull();
+  });
 });
 
 function createThreadService(
@@ -224,6 +441,7 @@ function createThreadService(
     publishThreadCreated: async () => undefined,
     publishAutoRemoved: async () => undefined,
   },
+  placesPort?: PlacesPort,
 ): ThreadService {
   return new ThreadService({
     repository,
@@ -234,6 +452,7 @@ function createThreadService(
     events,
     membershipRepository: new FakeMembershipRepository(),
     societyRepository: new FakeSocietyRepository(),
+    ...(placesPort !== undefined ? { placesPort } : {}),
   });
 }
 
@@ -353,7 +572,7 @@ class FakeDiscussionRepository implements DiscussionRepository {
       score: 0,
       commentCount: 0,
       deletedAt: null,
-      location: null,
+      location: input.location ?? null,
     };
     this.threads.set(thread.id, thread);
     return thread;
@@ -362,7 +581,8 @@ class FakeDiscussionRepository implements DiscussionRepository {
   async updateThread(threadId: string, input: UpdateThreadInput): Promise<ThreadRecord | null> {
     const current = await this.findThread(threadId);
     if (current === null) return null;
-    const updated = { ...current, ...input };
+    const location = input.clearLocation ? null : (input.location !== undefined ? input.location : current.location);
+    const updated = { ...current, ...input, location };
     this.threads.set(threadId, updated);
     return updated;
   }
