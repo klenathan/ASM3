@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LocationModal } from "./location-modal";
 import type { ThreadLocation } from "./types";
@@ -12,9 +12,54 @@ const testLocation: ThreadLocation = {
   address: { full_address: "445 Swanston St, Melbourne VIC" },
 };
 
+function setMapboxToken(token?: string) {
+  if (token) {
+    (import.meta.env as Record<string, string>).VITE_MAPBOX_PUBLIC_TOKEN = token;
+    return;
+  }
+  delete (import.meta.env as Record<string, string | undefined>).VITE_MAPBOX_PUBLIC_TOKEN;
+}
+
+const mapboxMock = vi.hoisted(() => {
+  let errorHandler: (() => void) | undefined;
+  const map = {
+    remove: vi.fn(),
+    on: vi.fn((event: string, listener: () => void) => {
+      if (event === "error") errorHandler = listener;
+    }),
+  };
+  return {
+    map,
+    getErrorHandler: () => errorHandler,
+    reset: () => {
+      errorHandler = undefined;
+      map.remove.mockReset();
+      map.on.mockClear();
+    },
+  };
+});
+
+vi.mock("mapbox-gl", () => ({
+  default: {
+    accessToken: "",
+    Map: function MapboxMap() {
+      return mapboxMock.map;
+    },
+    Marker: function MapboxMarker() {
+      return {
+        setLngLat: vi.fn().mockReturnThis(),
+        addTo: vi.fn().mockReturnThis(),
+      };
+    },
+  },
+}));
+
 describe("LocationModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    setMapboxToken();
+    mapboxMock.reset();
   });
 
   it("renders nothing when location is null or open is false", () => {
@@ -27,11 +72,11 @@ describe("LocationModal", () => {
     expect(closedContainer).toBeEmptyDOMElement();
   });
 
-  it("renders location details and fallback when token is absent", () => {
+  it("renders location details and fallback when token is absent", async () => {
     render(<LocationModal location={testLocation} open={true} onOpenChange={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "RMIT Building 80" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: /location details fallback/i })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: /location details fallback/i })).toBeInTheDocument();
     expect(screen.getByText("Interactive map preview unavailable")).toBeInTheDocument();
     expect(screen.getAllByText("445 Swanston St, Melbourne VIC")).toHaveLength(2);
 
@@ -39,49 +84,30 @@ describe("LocationModal", () => {
     expect(mapboxLink).toHaveAttribute("href", expect.stringContaining("https://www.mapbox.com/search/"));
   });
 
-  it("formats coordinates if address is missing", () => {
+  it("formats coordinates if address is missing", async () => {
     const locWithoutAddress: ThreadLocation = {
       ...testLocation,
       address: null,
     };
     render(<LocationModal location={locWithoutAddress} open={true} onOpenChange={vi.fn()} />);
 
+    await screen.findByRole("region", { name: /location details fallback/i });
     expect(screen.getAllByText("-37.80800, 144.96300")).toHaveLength(2);
   });
 
   it("displays fallback when mapbox emits an async error and resets on reopen", async () => {
-    let errorHandler: (() => void) | undefined;
-    const mockMap = {
-      remove: vi.fn(),
-      on: vi.fn((event: string, listener: () => void) => {
-        if (event === "error") {
-          errorHandler = listener;
-        }
-      }),
-    };
-
     vi.stubEnv("VITE_MAPBOX_PUBLIC_TOKEN", "pk.test");
-    vi.doMock("mapbox-gl", () => ({
-      default: {
-        accessToken: "",
-        Map: vi.fn(() => mockMap),
-        Marker: vi.fn(() => ({
-          setLngLat: vi.fn().mockReturnThis(),
-          addTo: vi.fn().mockReturnThis(),
-        })),
-      },
-    }));
-
+    setMapboxToken("pk.test");
     const { rerender } = render(<LocationModal location={testLocation} open={true} onOpenChange={vi.fn()} />);
 
-    // When mapbox emits an async error, fallback should show
-    errorHandler?.();
+    await waitFor(() => expect(mapboxMock.getErrorHandler()).toBeTypeOf("function"));
+    act(() => mapboxMock.getErrorHandler()?.());
+    expect(await screen.findByRole("region", { name: /location details fallback/i })).toBeInTheDocument();
 
-    // Reopening modal resets mapFailed
     rerender(<LocationModal location={testLocation} open={false} onOpenChange={vi.fn()} />);
     rerender(<LocationModal location={testLocation} open={true} onOpenChange={vi.fn()} />);
 
-    vi.unstubAllEnvs();
-    vi.doUnmock("mapbox-gl");
+    await waitFor(() => expect(screen.getByLabelText("Location map")).toBeInTheDocument());
+    expect(screen.queryByRole("region", { name: /location details fallback/i })).not.toBeInTheDocument();
   });
 });

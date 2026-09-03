@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { reverseGeocode } from "./api";
+import { createLocationMap } from "./mapbox-map";
+import type { MapboxMarker } from "./mapbox-map";
 import type { PickedLocation } from "./types";
 
 interface Props {
@@ -9,43 +11,35 @@ interface Props {
 
 export function LocationPreview({ location, onUpdate }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<unknown>(null);
-  const markerRef = useRef<unknown>(null);
   const [addressText, setAddressText] = useState<string | null>(null);
   const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
-    if (!token) {
-      setMapFailed(true);
-      return;
-    }
     setMapFailed(false);
     if (!containerRef.current) return;
-    let map: { remove?: () => void } | undefined;
+    let removeMap: (() => void) | undefined;
     (async () => {
       try {
-        // Dynamic import mapbox-gl to avoid heavy WebGL bundle on initial load and handle missing WebGL
-        const mod = await import("mapbox-gl");
-        type MapboxType = { accessToken: string; Map: new (opts: unknown) => { remove: () => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => { on: (event: string, handler: () => void) => void; getLngLat: () => { lat: number; lng: number } } } } };
-        const mapboxgl = ((mod as unknown as { default: MapboxType }).default ?? mod) as MapboxType;
-        mapboxgl.accessToken = token;
-        const isDark = document.documentElement.classList.contains("dark");
-        const m = new mapboxgl.Map({
+        const handle = await createLocationMap({
           container: containerRef.current!,
-          style: isDark ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v12",
-          center: [location.longitude, location.latitude],
+          coordinates: [location.longitude, location.latitude],
           zoom: 15,
-          attributionControl: true,
+          draggable: true,
+          onError: () => {
+            if (!cancelled) setMapFailed(true);
+          },
         });
-        map = m;
-        mapRef.current = m;
-        const markerColor = isDark ? "oklch(0.72 0.17 32)" : "oklch(0.53 0.18 32)";
-        const marker = new mapboxgl.Marker({ draggable: true, color: markerColor })
-          .setLngLat([location.longitude, location.latitude])
-          .addTo(m);
-        markerRef.current = marker;
+        if (!handle) {
+          if (!cancelled) setMapFailed(true);
+          return;
+        }
+        if (cancelled) {
+          handle.map.remove();
+          return;
+        }
+        removeMap = () => handle.map.remove();
+        const marker: MapboxMarker = handle.marker;
         marker.on("dragend", async () => {
           const lngLat = marker.getLngLat();
           const lat = lngLat.lat;
@@ -68,8 +62,7 @@ export function LocationPreview({ location, onUpdate }: Props) {
     })();
     return () => {
       cancelled = true;
-      const m = map as { remove?: () => void } | undefined;
-      if (m?.remove) m.remove();
+      removeMap?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.mapboxId]);

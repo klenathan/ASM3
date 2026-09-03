@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ExternalLink, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { createLocationMap, isMapboxTokenConfigured } from "./mapbox-map";
 import type { ThreadLocation } from "./types";
 
 interface Props {
@@ -10,49 +11,50 @@ interface Props {
 }
 
 export function LocationModal({ location, open, onOpenChange }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [mapContainer, setMapContainer] = useState<HTMLDivElement | null>(null);
   const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
+    if (open && location) setMapFailed(false);
+  }, [open, location]);
+
+  useEffect(() => {
     let cancelled = false;
-    if (!open || !location) return;
-    setMapFailed(false);
-    const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
-    if (!token) {
+    if (!open || !location || mapFailed) return;
+    if (!isMapboxTokenConfigured()) {
       setMapFailed(true);
       return;
     }
-    if (!containerRef.current) return;
-    let map: { remove?: () => void } | undefined;
+    if (!mapContainer) return;
+    let removeMap: (() => void) | undefined;
     (async () => {
       try {
-        // Dynamic import mapbox-gl to avoid heavy WebGL bundle on initial load and handle missing WebGL
-        const mod = await import("mapbox-gl");
-        const mapboxgl = (mod as unknown as { default: { accessToken: string; Map: new (opts: unknown) => { remove: () => void; on: (event: string, listener: (e: unknown) => void) => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => void } } } }).default;
-        mapboxgl.accessToken = token;
-        const isDark = document.documentElement.classList.contains("dark");
-        const m = new mapboxgl.Map({
-          container: containerRef.current!,
-          style: isDark ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v12",
-          center: [location.longitude, location.latitude],
+        const handle = await createLocationMap({
+          container: mapContainer,
+          coordinates: [location.longitude, location.latitude],
           zoom: 14,
-          attributionControl: true,
+          onError: () => {
+            if (!cancelled) setMapFailed(true);
+          },
         });
-        m.on("error", () => {
+        if (!handle) {
           if (!cancelled) setMapFailed(true);
-        });
-        map = m;
-        const markerColor = isDark ? "oklch(0.72 0.17 32)" : "oklch(0.53 0.18 32)";
-        new mapboxgl.Marker({ color: markerColor }).setLngLat([location.longitude, location.latitude]).addTo(m);
+          return;
+        }
+        if (cancelled) {
+          handle.map.remove();
+          return;
+        }
+        removeMap = () => handle.map.remove();
       } catch {
         if (!cancelled) setMapFailed(true);
       }
     })();
     return () => {
       cancelled = true;
-      if (map?.remove) map.remove();
+      removeMap?.();
     };
-  }, [open, location]);
+  }, [open, location, mapContainer, mapFailed]);
 
   if (!location) return null;
 
@@ -77,7 +79,7 @@ export function LocationModal({ location, open, onOpenChange }: Props) {
             <p className="mt-3 text-xs text-muted-foreground/80">Interactive map preview unavailable</p>
           </div>
         ) : (
-          <div ref={containerRef} className="h-[400px] w-full bg-muted max-sm:h-[55dvh]" aria-label="Location map" />
+          <div ref={setMapContainer} className="h-[400px] w-full bg-muted max-sm:h-[55dvh]" aria-label="Location map" />
         )}
         <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{displayAddress}</p>

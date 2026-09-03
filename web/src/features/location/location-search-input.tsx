@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { LocateFixed, MapPin, Search, X } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { retrievePlace, searchPlaces } from "./api";
@@ -26,6 +26,7 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
   const [isLocating, setIsLocating] = useState(false);
   const [geoNotice, setGeoNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 250);
@@ -105,6 +106,11 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
     onClear?.();
   }
 
+  function handleSearchBlur(event: FocusEvent<HTMLDivElement>) {
+    if (searchRef.current?.contains(event.relatedTarget as Node | null)) return;
+    setSessionToken(null);
+  }
+
   if (picked) {
     return (
       <div className="flex items-center gap-2 rounded-none border border-foreground/15 bg-muted px-3 py-2 text-sm">
@@ -118,9 +124,9 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
   }
 
   return (
-    <div className="space-y-2">
+    <div ref={searchRef} className="space-y-2" onBlur={handleSearchBlur}>
       {errorBanner && (
-        <div role="alert" className="flex items-center justify-between gap-2 border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+        <div role="alert" className="flex items-center justify-between gap-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <span>{errorBanner}</span>
           <span className="flex shrink-0 gap-2">
             {debounced.trim().length >= 2 && (

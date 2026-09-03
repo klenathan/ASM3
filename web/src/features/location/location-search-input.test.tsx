@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LocationSearchInput } from "./location-search-input";
@@ -78,6 +78,24 @@ describe("LocationSearchInput", () => {
     await waitFor(() => {
       expect(screen.getByText("No places found.")).toBeInTheDocument();
     });
+  });
+
+  it("starts a new Mapbox session after an unselected search is abandoned", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.searchPlaces).mockResolvedValue({ suggestions: [] });
+    render(<LocationSearchInput onPick={vi.fn()} picked={null} />);
+
+    const input = screen.getByLabelText("Search location");
+    await user.type(input, "RMIT");
+    await waitFor(() => expect(api.searchPlaces).toHaveBeenCalledWith("RMIT", expect.any(String), expect.any(String)));
+    const firstToken = vi.mocked(api.searchPlaces).mock.calls.at(-1)?.[2];
+
+    fireEvent.blur(input, { relatedTarget: document.body });
+    fireEvent.focus(input);
+    await user.type(input, " ");
+
+    await waitFor(() => expect(api.searchPlaces).toHaveBeenLastCalledWith("RMIT ", expect.any(String), expect.any(String)));
+    expect(vi.mocked(api.searchPlaces).mock.calls.at(-1)?.[2]).not.toBe(firstToken);
   });
 
   it("renders dismissible error banner when search fails", async () => {
