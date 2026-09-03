@@ -26,7 +26,7 @@ import type {
 } from "../application/analytics.repository";
 import { analyticsMetrics } from "./analytics.tables";
 import { analyticsActionMetrics } from "./action-metrics.tables";
-import { analyticsContractState } from "./action-event.tables";
+import { actionEvents, analyticsContractState } from "./action-event.tables";
 
 export class DrizzleAnalyticsRepository implements AnalyticsRepository, ActionMetricsRepository {
   private readonly executor: Database;
@@ -283,6 +283,12 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository, ActionMe
     const startedAt = rows[0]?.recordingStartedAt;
     if (startedAt === undefined) throw new Error("Analytics contract state is not initialized");
     return startedAt;
+  }
+  async deleteIngestedBefore(cutoff: Date): Promise<number> {
+    const deleted = await this.executor.delete(actionEvents)
+      .where(lt(actionEvents.ingestedAt, cutoff))
+      .returning({ eventId: actionEvents.eventId });
+    return deleted.length;
   }
 }
 

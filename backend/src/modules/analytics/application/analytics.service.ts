@@ -8,6 +8,7 @@ import type { MembershipRepository } from "../../societies/application/membershi
 import { isActiveModerator } from "../../societies/domain/membership";
 import {
   AnalyticsForbiddenError,
+  AnalyticsRangeUnavailableError,
   AnalyticsSocietyNotModeratedError,
 } from "../domain/analytics.errors";
 import {
@@ -138,6 +139,12 @@ export class AnalyticsService {
     const account = await this.accountReader.findAccountByUserId(principal.userId);
     assertTargetExists(account);
     assertSystemAdmin(account);
+    if (range !== undefined && this.actionMetricsRepository?.getRecordingStartedAt !== undefined) {
+      const recordingStartedAt = await this.actionMetricsRepository.getRecordingStartedAt(2);
+      if (new Date(`${range.periodStart}T00:00:00.000Z`) < recordingStartedAt) {
+        throw new AnalyticsRangeUnavailableError();
+      }
+    }
 
     const result = this.onRefreshRequested === undefined
       ? undefined

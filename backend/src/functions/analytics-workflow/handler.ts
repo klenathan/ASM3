@@ -97,6 +97,13 @@ export async function handler(event: WorkflowEvent): Promise<{
         updatedAt: now,
       };
     }));
+    const retentionDays = Number(process.env.ANALYTICS_RAW_RETENTION_DAYS ?? "30");
+    if (!Number.isFinite(retentionDays) || retentionDays < 0) {
+      throw new Error("ANALYTICS_RAW_RETENTION_DAYS must be a non-negative number");
+    }
+    await dependencies.repository.deleteIngestedBefore(
+      new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000),
+    );
   } else {
     const rows: AthenaMetricRow[] = [];
     for (const query of queryIds) {
