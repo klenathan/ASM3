@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, lte, sql, type SQL } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import type { Database } from "../../../db/client";
@@ -230,6 +230,27 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository, ActionMe
     await this.executor.transaction(async (transaction) => {
       for (const metric of metrics) {
         const parsed = actionMetricDataSchema.safeParse(metric.data);
+        let uniqueDimensions: SQL;
+        if (metric.grain === "platform") {
+          uniqueDimensions = isNull(analyticsActionMetrics.societyId);
+        } else if (metric.grain === "society") {
+          if (metric.societyId === null) throw new Error("Society metrics require a society ID");
+          uniqueDimensions = eq(analyticsActionMetrics.societyId, metric.societyId);
+        } else {
+          if (metric.targetType === null || metric.targetId === null) {
+            throw new Error("Content metrics require a target");
+          }
+          uniqueDimensions = and(
+            eq(analyticsActionMetrics.targetType, metric.targetType),
+            eq(analyticsActionMetrics.targetId, metric.targetId),
+          )!;
+        }
+        await transaction.delete(analyticsActionMetrics).where(and(
+          eq(analyticsActionMetrics.contractVersion, 2),
+          eq(analyticsActionMetrics.metricKind, metric.metricKind),
+          eq(analyticsActionMetrics.periodStart, metric.periodStart),
+          uniqueDimensions,
+        ));
         if (!parsed.success) throw new Error("Invalid v2 analytics metric payload");
         await transaction.insert(analyticsActionMetrics).values({
           id: metric.id,

@@ -1,4 +1,5 @@
 import type { AthenaMetricRow } from "../application/refresh-run.ports";
+import type { AthenaActionMetricRow } from "../application/refresh-run.ports";
 import type {
   ContentVolumeData,
   MetricPayload,
@@ -51,6 +52,69 @@ export function parseAthenaResultRows(
       data: payload,
     };
   });
+}
+
+export function parseActionAthenaResultRows(
+  columnNames: readonly string[],
+  rows: readonly AthenaResultRow[],
+): readonly AthenaActionMetricRow[] {
+  const indexes = new Map(columnNames.map((name, index) => [name, index]));
+  for (const name of [
+    "metric_kind", "grain", "society_id", "target_type", "target_id",
+    "thread_id", "period_start", "period_end", "snapshot_at", "data",
+  ]) {
+    if (!indexes.has(name)) throw new Error(`Athena action result is missing column: ${name}`);
+  }
+  const dataRows = rows.length > 0 && isHeaderRow(rows[0]!, columnNames) ? rows.slice(1) : rows;
+  return dataRows.map((row, index) => {
+    const metricKind = requiredValue(row, indexes.get("metric_kind")!, index, "metric_kind");
+    const grain = requiredValue(row, indexes.get("grain")!, index, "grain");
+    if (!["activity", "current_state", "reconciliation"].includes(metricKind)) {
+      throw new Error(`Athena action result row ${index + 1} has invalid metric_kind`);
+    }
+    if (!["platform", "society", "content"].includes(grain)) {
+      throw new Error(`Athena action result row ${index + 1} has invalid grain`);
+    }
+    const rawData = requiredValue(row, indexes.get("data")!, index, "data");
+    let data: unknown;
+    try { data = JSON.parse(rawData); } catch (error) {
+      throw new Error(`Athena action result row ${index + 1} has invalid data JSON`, { cause: error });
+    }
+    if (data === null || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error(`Athena action result row ${index + 1} data must be an object`);
+    }
+    return {
+      metricKind: metricKind as AthenaActionMetricRow["metricKind"],
+      grain: grain as AthenaActionMetricRow["grain"],
+      societyId: parseOptionalUuid(row[indexes.get("society_id")!], "society_id", index),
+      targetType: parseTargetType(row[indexes.get("target_type")!], index),
+      targetId: parseOptionalUuid(row[indexes.get("target_id")!], "target_id", index),
+      threadId: parseOptionalUuid(row[indexes.get("thread_id")!], "thread_id", index),
+      periodStart: parseDate(requiredValue(row, indexes.get("period_start")!, index, "period_start"), "period_start"),
+      periodEnd: parseDate(requiredValue(row, indexes.get("period_end")!, index, "period_end"), "period_end"),
+      snapshotAt: parseOptionalDate(row[indexes.get("snapshot_at")!], "snapshot_at"),
+      data: data as Record<string, unknown>,
+    };
+  });
+}
+
+function parseOptionalUuid(value: string | null | undefined, column: string, rowIndex: number): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (!UUID_PATTERN.test(value)) throw new Error(`Athena action result row ${rowIndex + 1} has invalid ${column}`);
+  return value;
+}
+
+function parseTargetType(value: string | null | undefined, rowIndex: number): "thread" | "comment" | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (value !== "thread" && value !== "comment") {
+    throw new Error(`Athena action result row ${rowIndex + 1} has invalid target_type`);
+  }
+  return value;
+}
+
+function parseOptionalDate(value: string | null | undefined, column: string): Date | null {
+  if (value === undefined || value === null || value === "") return null;
+  return parseDate(value, column);
 }
 
 function isHeaderRow(row: AthenaResultRow, columnNames: readonly string[]): boolean {

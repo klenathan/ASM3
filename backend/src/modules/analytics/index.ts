@@ -52,6 +52,8 @@ export {
   createAthenaMetricSqlCatalog,
   METRIC_SQL_TYPES,
 } from "./infrastructure/athena-sql-catalog";
+export { createActionAthenaSqlCatalog } from "./infrastructure/action-athena-sql-catalog";
+export type { ActionMetricSqlCatalog } from "./infrastructure/action-athena-sql-catalog";
 export type {
   AthenaMetricRow,
   MetricSqlCatalog,

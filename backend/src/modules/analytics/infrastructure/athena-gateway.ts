@@ -4,10 +4,15 @@ import {
 } from "@aws-sdk/client-athena";
 
 import type {
+  AthenaActionMetricRow,
   AthenaGateway,
   AthenaMetricRow,
 } from "../application/refresh-run.ports";
-import { parseAthenaResultRows, type AthenaResultRow } from "./athena-result-parser";
+import {
+  parseActionAthenaResultRows,
+  parseAthenaResultRows,
+  type AthenaResultRow,
+} from "./athena-result-parser";
 
 export interface AthenaGatewayConfig {
   readonly region: string;
@@ -23,12 +28,23 @@ export class AthenaGatewayAdapter implements AthenaGateway {
     this.send = send ?? ((command) => client.send(command as never));
   }
 
-
   async getResults(queryExecutionId: string): Promise<readonly AthenaMetricRow[]> {
+    const { columnNames, rows } = await this.readRows(queryExecutionId);
+    return parseAthenaResultRows(columnNames, rows);
+  }
+
+  async getActionResults(queryExecutionId: string): Promise<readonly AthenaActionMetricRow[]> {
+    const { columnNames, rows } = await this.readRows(queryExecutionId);
+    return parseActionAthenaResultRows(columnNames, rows);
+  }
+
+  private async readRows(queryExecutionId: string): Promise<{
+    readonly columnNames: string[];
+    readonly rows: readonly AthenaResultRow[];
+  }> {
     const rows: AthenaResultRow[] = [];
     let columnNames: string[] | undefined;
     let nextToken: string | undefined;
-
     do {
       const response = await this.send(
         new GetQueryResultsCommand({
@@ -42,19 +58,14 @@ export class AthenaGatewayAdapter implements AthenaGateway {
         };
         NextToken?: string;
       };
-
-      const pageColumns = response.ResultSet?.ResultSetMetadata?.ColumnInfo
-        ?.map((column) => column.Name);
+      const pageColumns = response.ResultSet?.ResultSetMetadata?.ColumnInfo?.map((column) => column.Name);
       if (columnNames === undefined && pageColumns !== undefined && pageColumns.every((name): name is string => name !== undefined)) {
         columnNames = pageColumns;
       }
-      for (const row of response.ResultSet?.Rows ?? []) {
-        rows.push((row.Data ?? []).map((cell) => cell.VarCharValue));
-      }
+      for (const row of response.ResultSet?.Rows ?? []) rows.push((row.Data ?? []).map((cell) => cell.VarCharValue));
       nextToken = response.NextToken;
     } while (nextToken !== undefined);
-
     if (columnNames === undefined) throw new Error("Athena returned no result column metadata");
-    return parseAthenaResultRows(columnNames, rows);
+    return { columnNames, rows };
   }
 }

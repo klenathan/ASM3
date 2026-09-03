@@ -21,7 +21,7 @@ export interface RefreshRunRecord {
   readonly attempts: number;
   readonly lastError: string | null;
   readonly glueJobRunId: string | null;
-  readonly athenaQueryExecutionIds: Readonly<Partial<Record<MetricType, string>>>;
+  readonly athenaQueryExecutionIds: Readonly<Partial<Record<string, string>>>;
 }
 
 /** Durable refresh records shared by the API and workflow callback Lambda. */
@@ -39,9 +39,22 @@ export interface AthenaMetricRow {
   readonly periodEnd: Date;
   readonly data: MetricPayload;
 }
+export interface AthenaActionMetricRow {
+  readonly metricKind: "activity" | "current_state" | "reconciliation";
+  readonly grain: "platform" | "society" | "content";
+  readonly societyId: string | null;
+  readonly targetType: "thread" | "comment" | null;
+  readonly targetId: string | null;
+  readonly threadId: string | null;
+  readonly periodStart: Date;
+  readonly periodEnd: Date;
+  readonly snapshotAt: Date | null;
+  readonly data: Record<string, unknown>;
+}
 
 export interface AthenaGateway {
   getResults(queryExecutionId: string): Promise<readonly AthenaMetricRow[]>;
+  getActionResults(queryExecutionId: string): Promise<readonly AthenaActionMetricRow[]>;
 }
 
 export type MetricSqlCatalog = Readonly<Partial<Record<MetricType, string>>>;
