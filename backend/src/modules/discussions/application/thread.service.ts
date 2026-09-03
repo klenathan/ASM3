@@ -57,7 +57,7 @@ export interface ThreadServiceDependencies extends DiscussionAuthorizationDepend
   readonly profile: DiscussionProfilePort;
   readonly media: ThreadMediaPort;
   readonly events: ThreadEventPublisher;
-  readonly placesPort?: PlacesPort;
+  readonly placesPort?: PlacesPort | undefined;
   /**
    * Optional read-only source of the latest automated content-analysis outcome
    * for a thread, used to surface a verification badge.

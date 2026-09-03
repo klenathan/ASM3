@@ -452,7 +452,7 @@ function createThreadService(
     events,
     membershipRepository: new FakeMembershipRepository(),
     societyRepository: new FakeSocietyRepository(),
-    placesPort,
+    ...(placesPort !== undefined ? { placesPort } : {}),
   });
 }
 
