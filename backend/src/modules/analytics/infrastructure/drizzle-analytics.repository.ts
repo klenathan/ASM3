@@ -228,7 +228,6 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository, ActionMe
 
   async upsertActionMetrics(metrics: readonly UpsertActionMetricsInput[]): Promise<void> {
     await this.executor.transaction(async (transaction) => {
-      const repository = new DrizzleAnalyticsRepository(transaction as unknown as Database);
       for (const metric of metrics) {
         const parsed = actionMetricDataSchema.safeParse(metric.data);
         if (!parsed.success) throw new Error("Invalid v2 analytics metric payload");
@@ -253,7 +252,6 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository, ActionMe
           set: { data: parsed.data.data, updatedAt: metric.updatedAt, periodEnd: metric.periodEnd, snapshotAt: metric.snapshotAt },
         });
       }
-      void repository;
     });
   }
   async getRecordingStartedAt(contractVersion: 2): Promise<Date> {
