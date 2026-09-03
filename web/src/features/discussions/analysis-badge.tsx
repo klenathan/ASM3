@@ -74,7 +74,8 @@ export function AnalysisBadge({
           status === "failed" ||
           status === "rejected") &&
           "border-primary/45 bg-accent text-primary",
-        status === "approved" && "border-green/35 bg-accent text-foreground",
+        status === "approved" &&
+          "border-green-200/35 bg-green-200/20 text-foreground",
         status === "pending" && "border-foreground/20 text-muted-foreground",
         className,
       )}
