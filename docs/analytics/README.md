@@ -24,8 +24,9 @@ predates the retained recording window, the API clamps the effective start to
 the first retained UTC date and returns a warning; a range ending before that
 date is accepted as a no-op with the same warning. One active run is allowed
 per range; a same-range request coalesces and a different-range request returns
-`409 ANALYTICS_REFRESH_BUSY`. The v2 status endpoint is scoped to the returned
-run ID. `GET /api/v2/admin/analytics` serves activity, current-state, and
+`409 ANALYTICS_REFRESH_BUSY`. `GET /api/v2/admin/analytics/refresh/status`
+returns the latest v2 run for the admin dashboard; the run-specific status
+endpoint remains available at `/api/v2/admin/analytics/refresh/:runId`.
 reconciliation rows with platform, society, and content grains. Activity
 metrics are additive event counts; current-state metrics are authoritative RDS
 balances; reconciliation metrics expose mismatches instead of silently

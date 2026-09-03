@@ -34,6 +34,8 @@ export interface RefreshStatusDto {
   readonly lastError: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly periodStart?: string;
+  readonly periodEnd?: string;
 }
 
 export interface RefreshResponse {

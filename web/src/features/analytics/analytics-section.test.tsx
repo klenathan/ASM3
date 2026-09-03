@@ -197,4 +197,27 @@ describe("AnalyticsSection", () => {
       ),
     ).toBeInTheDocument();
   });
+  it("shows the latest v2 refresh status after loading the admin panel", async () => {
+    mockFetch((url) => {
+      if (url.endsWith("/api/v2/admin/analytics/refresh/status")) {
+        return jsonResponse({
+          runId: "33333333-3333-4333-8333-333333333333",
+          trigger: "admin",
+          status: "exporting",
+          attempts: 1,
+          lastError: null,
+          createdAt: "2026-09-03T00:00:00.000Z",
+          updatedAt: "2026-09-03T00:01:00.000Z",
+          periodStart: "2026-09-01",
+          periodEnd: "2026-09-04",
+        });
+      }
+      return jsonResponse(emptyPage());
+    });
+    setup();
+
+    expect(await screen.findByText("Exporting snapshot")).toBeInTheDocument();
+    expect(await screen.findByText("2026-09-01 to 2026-09-04")).toBeInTheDocument();
+  });
+
 });

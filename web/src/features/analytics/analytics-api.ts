@@ -63,6 +63,8 @@ export interface RefreshRun {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+  periodStart?: string;
+  periodEnd?: string;
 }
 
 export interface RefreshResponse {
@@ -133,6 +135,9 @@ export function refreshActionAnalytics(periodStart: string, periodEnd: string): 
 
 export function getActionAnalyticsRefreshStatus(runId: string): Promise<RefreshRun | null> {
   return request<RefreshRun | null>(`/api/v2/admin/analytics/refresh/${runId}`);
+}
+export function getLatestActionAnalyticsRefreshStatus(): Promise<RefreshRun | null> {
+  return request<RefreshRun | null>("/api/v2/admin/analytics/refresh/status");
 }
 
 export function queryHistoricalBaseline(params: QueryParams = {}): Promise<AnalyticsPage> {

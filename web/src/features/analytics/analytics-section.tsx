@@ -32,6 +32,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import {
   getActionAnalyticsRefreshStatus,
   getAnalyticsRefreshStatus,
+  getLatestActionAnalyticsRefreshStatus,
   queryActionMetrics,
   refreshActionAnalytics,
   queryMetrics,
@@ -111,6 +112,9 @@ function refreshStatusVariant(status: RefreshStatus): "default" | "secondary" | 
   if (status === "failed") return "destructive";
   if (status === "completed") return "default";
   return "secondary";
+}
+function isRefreshActive(status: RefreshStatus | undefined): boolean {
+  return status === "requested" || status === "exporting" || status === "querying";
 }
 
 
@@ -393,10 +397,12 @@ function ActionAnalyticsPanel() {
     queryKey: ["analytics", "action-refresh-status", runId],
     queryFn: () => getActionAnalyticsRefreshStatus(runId as string),
     enabled: runId !== null,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === "requested" || status === "exporting" || status === "querying" ? 5_000 : false;
-    },
+    refetchInterval: (query) => isRefreshActive(query.state.data?.status) ? 5_000 : false,
+  });
+  const latestStatusQuery = useQuery({
+    queryKey: ["analytics", "action-refresh-status", "latest"],
+    queryFn: getLatestActionAnalyticsRefreshStatus,
+    refetchInterval: (query) => isRefreshActive(query.state.data?.status) ? 5_000 : false,
   });
   const refreshMutation = useMutation({
     mutationFn: () => refreshActionAnalytics(periodStart, periodEnd),
@@ -404,9 +410,11 @@ function ActionAnalyticsPanel() {
       setRefreshWarnings(result.warnings ?? []);
       if (result.runId) setRunId(result.runId);
       void queryClient.invalidateQueries({ queryKey: ["analytics", "action-events"] });
+      void queryClient.invalidateQueries({ queryKey: ["analytics", "action-refresh-status", "latest"] });
     },
   });
-  const active = statusQuery.data?.status === "requested" || statusQuery.data?.status === "exporting" || statusQuery.data?.status === "querying";
+  const currentStatus = statusQuery.data ?? latestStatusQuery.data;
+  const active = isRefreshActive(currentStatus?.status);
   const metrics = actionQuery.data?.metrics ?? [];
   const currentState = metrics.filter((metric) => metric.metricKind === "current_state");
   const reconciliation = metrics.filter((metric) => metric.metricKind === "reconciliation" && metric.data.status === "mismatch");
@@ -417,19 +425,47 @@ function ActionAnalyticsPanel() {
           <p className="text-sm text-muted-foreground">Durable product actions, aggregated by UTC day.</p>
           <h2 id="action-analytics-heading" className="text-xl font-semibold">Action analytics</h2>
         </div>
-        <Button type="button" onClick={() => { setRefreshWarnings([]); refreshMutation.mutate(); }} disabled={active || refreshMutation.isPending}>
+        <Button
+          type="button"
+          onClick={() => { setRefreshWarnings([]); refreshMutation.mutate(); }}
+          disabled={active || refreshMutation.isPending}
+        >
           <RefreshCw className={refreshMutation.isPending ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
-          {active ? "Refresh in progress" : statusQuery.data?.status === "failed" ? "Retry refresh" : "Refresh analytics"}
+          {active ? "Refresh in progress" : currentStatus?.status === "failed" ? "Retry refresh" : "Refresh analytics"}
         </Button>
       </div>
+      <div className="rounded border border-border bg-muted/30 p-3 text-sm" aria-live="polite">
+        {latestStatusQuery.isLoading ? (
+          <span className="text-muted-foreground">Checking latest refresh status…</span>
+        ) : latestStatusQuery.isError ? (
+          <span className="text-destructive">Unable to load the latest refresh status.</span>
+        ) : currentStatus ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">Latest refresh:</span>
+            <Badge variant={refreshStatusVariant(currentStatus.status)}>
+              {REFRESH_STATUS_LABEL[currentStatus.status]}
+            </Badge>
+            {currentStatus.periodStart && currentStatus.periodEnd ? (
+              <span className="text-muted-foreground">
+                {currentStatus.periodStart} to {currentStatus.periodEnd}
+              </span>
+            ) : null}
+            {currentStatus.status === "failed" && currentStatus.lastError ? (
+              <span className="text-destructive">{currentStatus.lastError}</span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">No V2 analytics refresh has run yet.</span>
+        )}
+      </div>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="grid gap-1 text-sm">Period start<input aria-label="Period start" type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
-        <label className="grid gap-1 text-sm">Period end<input aria-label="Period end" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
-        <label className="grid gap-1 text-sm">Grain<select aria-label="Analytics grain" value={grain} onChange={(event) => setGrain(event.target.value as typeof grain)} className="rounded border bg-background px-2 py-1"><option value="platform">Platform</option><option value="society">Society</option><option value="content">Content</option></select></label>
+        <label className="grid gap-1 text-sm"><span>Period start</span><input aria-label="Period start" type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
+        <label className="grid gap-1 text-sm"><span>Period end</span><input aria-label="Period end" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
+        <label className="grid gap-1 text-sm"><span>Grain</span><select aria-label="Analytics grain" value={grain} onChange={(event) => setGrain(event.target.value as typeof grain)} className="rounded border bg-background px-2 py-1"><option value="platform">Platform</option><option value="society">Society</option><option value="content">Content</option></select></label>
       </div>
       {refreshMutation.isError ? <p role="alert" className="text-sm text-destructive">{refreshMutation.error instanceof Error ? refreshMutation.error.message : "Unable to refresh analytics."}</p> : null}
       {refreshWarnings.map((warning) => <p key={warning} role="status" className="text-sm text-amber-700 dark:text-amber-300">Warning: {warning}</p>)}
-      {statusQuery.data?.status === "failed" && statusQuery.data.lastError ? <p role="alert" className="text-sm text-destructive">Refresh failed: {statusQuery.data.lastError}</p> : null}
+      {currentStatus?.status === "failed" && currentStatus.lastError ? <p role="alert" className="text-sm text-destructive">Refresh failed: {currentStatus.lastError}</p> : null}
       {actionQuery.isLoading ? <Skeleton className="h-40" /> : actionQuery.isError ? <p role="alert" className="text-sm text-destructive">Unable to load action analytics.</p> : metrics.length === 0 ? <MetricCardEmpty title="Action analytics" /> : <ActionActivitySummary metrics={metrics} />}
       {metrics.length > 0 ? <div className="grid gap-4 md:grid-cols-2">
         <Card><CardHeader><CardTitle className="text-sm">Thread reactions</CardTitle><CardDescription>Likes/dislikes added, removed, and score delta</CardDescription></CardHeader><CardContent className="text-sm">Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesRemoved") : 0), 0)}</CardContent></Card>

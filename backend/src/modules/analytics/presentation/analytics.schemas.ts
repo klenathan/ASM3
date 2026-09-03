@@ -113,6 +113,8 @@ export const refreshStatusSchema = z
     lastError: z.string().nullable(),
     createdAt: isoDate,
     updatedAt: isoDate,
+    periodStart: calendarDate.optional(),
+    periodEnd: calendarDate.optional(),
   })
   .openapi("AnalyticsRefreshStatus");
 

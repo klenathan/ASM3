@@ -302,6 +302,8 @@ function toRefreshStatusDto(run: {
   readonly lastError: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  readonly periodStart?: string;
+  readonly periodEnd?: string;
 }): RefreshStatusDto {
   return {
     runId: run.runId,
@@ -311,6 +313,8 @@ function toRefreshStatusDto(run: {
     lastError: run.lastError,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
+    ...(run.periodStart === undefined ? {} : { periodStart: run.periodStart }),
+    ...(run.periodEnd === undefined ? {} : { periodEnd: run.periodEnd }),
   };
 }
 

@@ -109,6 +109,17 @@ const v2RefreshRoute = createRoute({
     403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
   },
 });
+const v2LatestRefreshStatusRoute = createRoute({
+  method: "get",
+  path: "/api/v2/admin/analytics/refresh/status",
+  tags: ["Analytics"],
+  summary: "Get the latest action-event analytics refresh status",
+  responses: {
+    200: { description: "Latest refresh run", content: { "application/json": { schema: refreshStatusSchema.nullable() } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
 
 const v2RefreshStatusRoute = createRoute({
   method: "get",
@@ -155,6 +166,7 @@ export function registerAnalyticsRoutes(
   );
   app.openapi(v2QueryMetricsRoute, (context) => controller.queryActionMetrics(context) as never);
   app.openapi(v2RefreshRoute, (context) => controller.refreshV2(context) as never);
+  app.openapi(v2LatestRefreshStatusRoute, (context) => controller.refreshStatus(context) as never);
   app.openapi(v2RefreshStatusRoute, (context) => controller.refreshStatusById(context) as never);
   app.openapi(v2BaselineRoute, (context) => controller.historicalBaseline(context) as never);
 }
