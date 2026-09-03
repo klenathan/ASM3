@@ -38,15 +38,35 @@ WHERE event_date >= CAST(${start} AS date)
     joins BIGINT, leaves BIGINT, activations BIGINT, bans BIGINT, active_membership_delta BIGINT,
     first_activity_at timestamp, last_activity_at timestamp))`;
   const period = `CAST(${start} AS timestamp), CAST(${end} AS timestamp)`;
+  const currentStateData = `json_format(CAST(ROW(CAST(${end} AS timestamp), positive_reactions, negative_reactions, positive_reactions - negative_reactions, active_memberships) AS ROW(snapshot_at timestamp, positive_reactions BIGINT, negative_reactions BIGINT, reaction_score BIGINT, active_memberships BIGINT)))`;
+  const currentStateRows = `(SELECT
+      CAST(NULL AS varchar) AS society_id,
+      coalesce(sum(if(v.value = 1, v.vote_count, 0)), 0) positive_reactions,
+      coalesce(sum(if(v.value = -1, v.vote_count, 0)), 0) negative_reactions,
+      m.active_memberships
+    FROM analytics.votes v
+    CROSS JOIN (SELECT coalesce(sum(member_count), 0) active_memberships
+      FROM analytics.memberships WHERE status = 'active' AND snapshot_id = ${snapshot}) m
+    WHERE v.snapshot_id = ${snapshot}
+    GROUP BY m.active_memberships
+    UNION ALL
+    SELECT v.society_id, coalesce(sum(if(v.value = 1, v.vote_count, 0)), 0),
+      coalesce(sum(if(v.value = -1, v.vote_count, 0)), 0),
+      coalesce(sum(m.member_count), 0)
+    FROM analytics.votes v LEFT JOIN analytics.memberships m ON m.society_id = v.society_id
+      AND m.status = 'active' AND m.snapshot_id = ${snapshot}
+    WHERE v.snapshot_id = ${snapshot}
+    GROUP BY v.society_id)`;
+  const currentStateSql = `SELECT 'current_state' metric_kind,
+      CASE WHEN society_id IS NULL THEN 'platform' ELSE 'society' END grain,
+      society_id, CAST(NULL AS varchar) target_type, CAST(NULL AS varchar) target_id,
+      CAST(NULL AS varchar) thread_id, ${period}, CAST(${end} AS timestamp) snapshot_at,
+      ${currentStateData} data FROM ${currentStateRows}`;
   return {
     activity: `SELECT 'activity' metric_kind, 'platform' grain, CAST(NULL AS varchar) society_id,
       CAST(NULL AS varchar) target_type, CAST(NULL AS varchar) target_id, CAST(NULL AS varchar) thread_id,
       ${period}, CAST(NULL AS timestamp) snapshot_at, json_format(${row}) data FROM ${source}`,
-    current_state: `SELECT 'current_state' metric_kind, 'platform' grain, CAST(NULL AS varchar) society_id,
-      CAST(NULL AS varchar) target_type, CAST(NULL AS varchar) target_id, CAST(NULL AS varchar) thread_id,
-      ${period}, CAST(${end} AS timestamp) snapshot_at,
-      json_format(CAST(ROW(CAST(${end} AS timestamp), 0, 0, 0, CAST(NULL AS BIGINT)) AS ROW(snapshot_at timestamp, positive_reactions BIGINT, negative_reactions BIGINT, reaction_score BIGINT, active_memberships BIGINT))) data
-      FROM analytics.action_events WHERE 1 = 0`,
+    current_state: currentStateSql,
     reconciliation: `SELECT 'reconciliation' metric_kind, 'platform' grain, CAST(NULL AS varchar) society_id,
       CAST(NULL AS varchar) target_type, CAST(NULL AS varchar) target_id, CAST(NULL AS varchar) thread_id,
       ${period}, CAST(${end} AS timestamp) snapshot_at,
