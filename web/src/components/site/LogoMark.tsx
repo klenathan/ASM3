@@ -17,7 +17,7 @@ export function LogoMark({ to = "/" }: LogoMarkProps) {
       >
         RS
       </span>
-      <span className="font-heading text-2xl leading-none font-bold tracking-[-0.025em] uppercase">
+      <span className="hidden font-heading text-2xl leading-none font-bold tracking-[-0.025em] uppercase sm:inline">
         <span>RMIT</span>{" "}
         <span className="text-primary transition-colors group-hover:text-foreground">
           Society

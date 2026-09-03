@@ -3,7 +3,6 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/ui/button";
-import { Card, CardContent } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Spinner } from "../../components/ui/spinner";
 import { DiscussionCard } from "../discussions/thread-card";
@@ -34,16 +33,14 @@ function toDiscussionItem(thread: HomeFeedThread): DiscussionItem {
 
 function FeedSkeleton() {
   return (
-    <div aria-label="Loading your feed" className="space-y-4">
+    <div aria-label="Loading your feed">
       {[0, 1, 2].map((item) => (
-        <Card key={item} className="gap-3">
-          <CardContent className="space-y-3">
-            <Skeleton className="h-3 w-48" />
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-          </CardContent>
-        </Card>
+        <div key={item} className="space-y-3 border-b border-foreground/15 py-6">
+          <Skeleton className="h-3 w-48" />
+          <Skeleton className="h-6 w-3/4" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
       ))}
     </div>
   );
@@ -80,9 +77,10 @@ export function HomeFeed() {
 
   if (query.status === "error") {
     return (
-      <div className="py-14">
+      <div role="alert" className="border-b border-foreground/15 py-14">
         <p className="max-w-md leading-7 text-muted-foreground">
-          {query.error?.message ?? "Your feed couldn't be loaded right now."}
+          We couldn't load your feed right now. Check your connection and try
+          again.
         </p>
         <Button
           type="button"
@@ -95,7 +93,6 @@ export function HomeFeed() {
       </div>
     );
   }
-
   if (threads.length === 0) {
     return (
       <div className="py-14">
@@ -119,7 +116,7 @@ export function HomeFeed() {
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       {threads.map((thread) => (
         <DiscussionCard
           key={thread.id}
