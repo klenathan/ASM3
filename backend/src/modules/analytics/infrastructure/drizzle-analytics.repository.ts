@@ -215,7 +215,7 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository, ActionMe
     const limit = Math.min(query.limit ?? 20, 100);
     const rows = await this.executor.select().from(analyticsActionMetrics)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(analyticsActionMetrics.periodStart), desc(analyticsActionMetrics.id))
+      .orderBy(desc(analyticsActionMetrics.id))
       .limit(limit + 1);
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
