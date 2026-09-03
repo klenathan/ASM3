@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
+import { migrateWithLock } from "../../../../test/database";
 import { DrizzleAuditEventRepository } from "./drizzle-audit-events.repository";
 
 // PostgreSQL integration coverage for the audit table's unique event-ID
@@ -34,7 +34,7 @@ describeWithDb("integration_audit_events unique constraint", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const db = drizzle({ client: pool });
-    await migrate(db, { migrationsFolder: "./drizzle" });
+    await migrateWithLock(pool);
     repository = new DrizzleAuditEventRepository(db);
   });
 

@@ -37,6 +37,63 @@ describe("action event contract", () => {
     );
   });
 
+  it("accepts valid society membership joined and left events with empty metadata", () => {
+    const joinedEvent: ActionEventInput<"society_membership_joined"> = {
+      eventId: "123e4567-e89b-12d3-a456-426614174010",
+      eventType: "society_membership_joined",
+      schemaVersion: 1,
+      actorUserId: "123e4567-e89b-12d3-a456-426614174001",
+      actorPlatformRole: "student",
+      actorSocietyRole: null,
+      occurredAt: new Date("2026-08-27T12:00:00.000Z"),
+      targetType: "society",
+      targetId: "123e4567-e89b-12d3-a456-426614174003",
+      societyId: "123e4567-e89b-12d3-a456-426614174003",
+      threadId: null,
+      commentId: null,
+      reportId: null,
+      correlationId: "request-join-1",
+      fromReaction: null,
+      toReaction: null,
+      metadata: {},
+    };
+    expect(() => validateActionEvent(joinedEvent)).not.toThrow();
+
+    const leftEvent: ActionEventInput<"society_membership_left"> = {
+      ...joinedEvent,
+      eventId: "123e4567-e89b-12d3-a456-426614174011",
+      eventType: "society_membership_left",
+      actorSocietyRole: "member",
+      metadata: {},
+    };
+    expect(() => validateActionEvent(leftEvent)).not.toThrow();
+  });
+
+  it("rejects society_membership_joined when metadata contains subjectRole", () => {
+    const invalidJoinedEvent = {
+      eventId: "123e4567-e89b-12d3-a456-426614174010",
+      eventType: "society_membership_joined" as const,
+      schemaVersion: 1 as const,
+      actorUserId: "123e4567-e89b-12d3-a456-426614174001",
+      actorPlatformRole: "student" as const,
+      actorSocietyRole: null,
+      occurredAt: new Date("2026-08-27T12:00:00.000Z"),
+      targetType: "society" as const,
+      targetId: "123e4567-e89b-12d3-a456-426614174003",
+      societyId: "123e4567-e89b-12d3-a456-426614174003",
+      threadId: null,
+      commentId: null,
+      reportId: null,
+      correlationId: "request-join-1",
+      fromReaction: null,
+      toReaction: null,
+      metadata: { subjectRole: "member" },
+    };
+    expect(() => validateActionEvent(invalidJoinedEvent as unknown as ActionEventInput)).toThrow(
+      "metadata does not match the society_membership_joined metadata schema",
+    );
+  });
+
   it("produces deterministic, key-versioned pseudonyms without exposing user IDs", () => {
     const pseudonymizer = createHmacPseudonymizer(Buffer.alloc(32, 7), "v1");
     const first = pseudonymizer.pseudonymize(baseEvent.actorUserId);

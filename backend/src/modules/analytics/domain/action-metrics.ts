@@ -50,7 +50,12 @@ export type ReconciliationMetricData = z.infer<typeof reconciliationMetricDataSc
 export type ActionMetricData = z.infer<typeof actionMetricDataSchema>;
 
 export type ActionMetricGrain = "platform" | "society" | "content";
-export type ActionMetricKind = ActionMetricData["metricKind"];
+export const ACTION_METRIC_KINDS = [
+  "activity",
+  "current_state",
+  "reconciliation",
+] as const;
+export type ActionMetricKind = (typeof ACTION_METRIC_KINDS)[number];
 
 export interface ActionMetricRecord {
   readonly id: string;

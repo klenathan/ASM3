@@ -79,6 +79,58 @@ describe("AuthService registration domain resolution", () => {
     ).rejects.toMatchObject({ code: "REGISTRATION_CLOSED" });
   });
 });
+describe("AuthService sessions and credentials", () => {
+  it("rejects invalid credentials and authenticates an issued session", async () => {
+    const repository = new FakeIdentityRepository();
+    const service = new AuthService({
+      repository,
+      transactions: immediateTransaction(repository),
+      passwordAdapter: new FakePasswordAdapter(),
+      sessionAdapter: new FakeSessionAdapter(),
+      clock,
+      allowedEmailDomains: ["rmit.edu.au"],
+    });
+
+    await service.register({
+      email: "student@rmit.edu.au",
+      password: "password123",
+      displayName: "Student",
+    });
+
+    await expect(
+      service.signIn({ email: "student@rmit.edu.au", password: "wrong-password" }),
+    ).rejects.toMatchObject({ code: "AUTH_INVALID_CREDENTIALS" });
+    await expect(service.authenticateSession("session-token")).resolves.toEqual({
+      userId: expect.any(String),
+      platformRole: "student",
+    });
+  });
+
+  it("rejects empty sign-out tokens and expired sessions", async () => {
+    let currentTime = now;
+    const repository = new FakeIdentityRepository();
+    const service = new AuthService({
+      repository,
+      transactions: immediateTransaction(repository),
+      passwordAdapter: new FakePasswordAdapter(),
+      sessionAdapter: new FakeSessionAdapter(),
+      clock: { now: () => currentTime },
+      allowedEmailDomains: ["rmit.edu.au"],
+    });
+
+    await service.register({
+      email: "student@rmit.edu.au",
+      password: "password123",
+      displayName: "Student",
+    });
+    await expect(service.signOut("  ")).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
+
+    currentTime = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 31);
+    await expect(service.authenticateSession("session-token")).rejects.toMatchObject({
+      code: "AUTH_REQUIRED",
+    });
+  });
+});
 
 function buildService(
   repository: FakeIdentityRepository,
@@ -185,7 +237,9 @@ class FakeSessionAdapter implements SessionTokenAdapter {
   }
 
   hash(token: string): string {
-    return token;
+    return token === "session-token"
+      ? "00000000-0000-4000-8000-000000000001"
+      : token;
   }
 }
 

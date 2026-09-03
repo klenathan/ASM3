@@ -254,4 +254,80 @@ describe("AnalyticsSection", () => {
     expect(await screen.findByText("Analytics refresh was cancelled.")).toBeInTheDocument();
   });
 
+  it("does not render Historical snapshot baseline anywhere on the page", async () => {
+    mockFetch(() => jsonResponse(emptyPage()));
+    setup();
+
+    expect(screen.queryByText(/historical snapshot baseline/i)).not.toBeInTheDocument();
+    expect(await screen.findByText("Platform analytics")).toBeInTheDocument();
+    expect(screen.getByText("Action analytics")).toBeInTheDocument();
+  });
+
+  it("renders metric cards with icons and info tooltip explanations", async () => {
+    mockFetch((url) => {
+      if (url.includes("/api/v2/admin/analytics?") || url.endsWith("/api/v2/admin/analytics")) {
+        return jsonResponse({
+          source: "action_events",
+          contractVersion: 2,
+          grain: "platform",
+          metrics: [
+            {
+              id: "metric-1",
+              contractVersion: 2,
+              metricKind: "activity",
+              grain: "platform",
+              societyId: null,
+              targetType: null,
+              targetId: null,
+              threadId: null,
+              periodStart: "2026-09-01T00:00:00.000Z",
+              periodEnd: "2026-09-04T00:00:00.000Z",
+              snapshotAt: null,
+              data: {
+                eventCounts: {},
+                distinctActors: 12,
+                likesAdded: 45,
+                likesRemoved: 5,
+                dislikesAdded: 2,
+                dislikesRemoved: 1,
+                reactionScoreDelta: 39,
+                joins: 8,
+                leaves: 3,
+                activations: 4,
+                bans: 0,
+                activeMembershipDelta: 5,
+                firstActivityAt: null,
+                lastActivityAt: null,
+              },
+              refreshRunId: "run-1",
+              createdAt: "2026-09-04T00:00:00.000Z",
+              updatedAt: "2026-09-04T00:00:00.000Z",
+            },
+          ],
+          page: { cursor: null, hasMore: false },
+        });
+      }
+      return jsonResponse(emptyPage());
+    });
+    setup();
+
+    // Action totals cards
+    expect(await screen.findByLabelText("Explanation for Distinct actors")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Likes added")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Likes removed")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Dislikes added")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Dislikes removed")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Reaction score delta")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Joins")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Leaves")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Activations")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Bans")).toBeInTheDocument();
+
+    // Platform cards
+    expect(screen.getByLabelText("Explanation for User Growth")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Content Volume")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Top Societies")).toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation for Moderation")).toBeInTheDocument();
+  });
+
 });

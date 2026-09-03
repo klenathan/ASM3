@@ -1,6 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BarChart3, RefreshCw, XCircle } from "lucide-react";
+import {
+  Activity,
+  Award,
+  Ban,
+  BarChart3,
+  Database,
+  FileText,
+  Info,
+  MessageCircle,
+  MessageSquare,
+  MinusCircle,
+  PlusCircle,
+  RefreshCw,
+  Shield,
+  ThumbsDown,
+  ThumbsUp,
+  TrendingUp,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  Users,
+  XCircle,
+} from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -29,6 +51,12 @@ import {
 } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import {
   cancelLatestActionAnalyticsRefresh,
   getActionAnalyticsRefreshStatus,
@@ -118,6 +146,53 @@ function isRefreshActive(status: RefreshStatus | undefined): boolean {
   return status === "requested" || status === "exporting" || status === "querying";
 }
 
+function MetricTooltip({ explanation, label }: { explanation: string; label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label={`Explanation for ${label}`}
+        >
+          <Info className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-xs font-normal">
+        {explanation}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+const PLATFORM_METRIC_CONFIG: Record<
+  string,
+  {
+    icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+    explanation: string;
+  }
+> = {
+  "User Growth": {
+    icon: TrendingUp,
+    explanation:
+      "Platform-wide user registration totals, active accounts, total users, and suspension counts aggregated nightly via AWS Glue and Athena.",
+  },
+  "Content Volume": {
+    icon: FileText,
+    explanation:
+      "Total platform engagement volume showing cumulative threads created, comments posted, reaction votes cast, and moderation reports filed.",
+  },
+  "Top Societies": {
+    icon: Award,
+    explanation:
+      "Leading RMIT societies ranked by active enrolled members and thread discussion activity.",
+  },
+  Moderation: {
+    icon: Shield,
+    explanation:
+      "Platform moderation report queue health, showing pending vs. resolved reports, today's resolved count, and average resolution turnaround.",
+  },
+};
 
 function UserGrowthChart({ data }: { data: UserGrowthData }) {
   const chartData = [
@@ -130,7 +205,16 @@ function UserGrowthChart({ data }: { data: UserGrowthData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">User Growth</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <CardTitle className="text-sm">User Growth</CardTitle>
+          </div>
+          <MetricTooltip
+            label="User Growth"
+            explanation={PLATFORM_METRIC_CONFIG["User Growth"].explanation}
+          />
+        </div>
         <CardDescription>Platform-wide user metrics</CardDescription>
       </CardHeader>
       <CardContent>
@@ -170,7 +254,16 @@ function ContentVolumeChart({ data }: { data: ContentVolumeData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Content Volume</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <CardTitle className="text-sm">Content Volume</CardTitle>
+          </div>
+          <MetricTooltip
+            label="Content Volume"
+            explanation={PLATFORM_METRIC_CONFIG["Content Volume"].explanation}
+          />
+        </div>
         <CardDescription>Platform-wide engagement metrics</CardDescription>
       </CardHeader>
       <CardContent>
@@ -206,7 +299,16 @@ function TopSocietiesChart({ data }: { data: TopSocietiesData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Top Societies</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Award className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <CardTitle className="text-sm">Top Societies</CardTitle>
+          </div>
+          <MetricTooltip
+            label="Top Societies"
+            explanation={PLATFORM_METRIC_CONFIG["Top Societies"].explanation}
+          />
+        </div>
         <CardDescription>By members and activity</CardDescription>
       </CardHeader>
       <CardContent>
@@ -279,7 +381,16 @@ function ModerationChart({ data }: { data: ModerationData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Moderation</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <CardTitle className="text-sm">Moderation</CardTitle>
+          </div>
+          <MetricTooltip
+            label="Moderation"
+            explanation={PLATFORM_METRIC_CONFIG["Moderation"].explanation}
+          />
+        </div>
         <CardDescription>
           {data.pendingReports} pending · {data.totalReports} total
         </CardDescription>
@@ -352,31 +463,100 @@ function numberValue(data: Record<string, unknown>, key: string): number {
   return typeof value === "number" ? value : 0;
 }
 
+interface ActionMetricCardConfig {
+  key: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+  explanation: string;
+}
+
+const ACTION_METRIC_CARDS: readonly ActionMetricCardConfig[] = [
+  {
+    key: "distinctActors",
+    label: "Distinct actors",
+    icon: Users,
+    explanation:
+      "Count of unique active users who performed at least one recorded action during the selected period.",
+  },
+  {
+    key: "likesAdded",
+    label: "Likes added",
+    icon: ThumbsUp,
+    explanation: "Total positive reaction upvotes applied to threads or comments.",
+  },
+  {
+    key: "likesRemoved",
+    label: "Likes removed",
+    icon: MinusCircle,
+    explanation: "Total positive reaction upvotes withdrawn or cleared by users.",
+  },
+  {
+    key: "dislikesAdded",
+    label: "Dislikes added",
+    icon: ThumbsDown,
+    explanation: "Total negative reaction downvotes applied to threads or comments.",
+  },
+  {
+    key: "dislikesRemoved",
+    label: "Dislikes removed",
+    icon: PlusCircle,
+    explanation: "Total negative reaction downvotes withdrawn or cleared by users.",
+  },
+  {
+    key: "reactionScoreDelta",
+    label: "Reaction score delta",
+    icon: Activity,
+    explanation:
+      "Net change in total reaction score (likes added − likes removed − dislikes added + dislikes removed).",
+  },
+  {
+    key: "joins",
+    label: "Joins",
+    icon: UserPlus,
+    explanation: "Total member join events recorded across all societies during the period.",
+  },
+  {
+    key: "leaves",
+    label: "Leaves",
+    icon: UserMinus,
+    explanation: "Total member departure or unenrollment events across all societies.",
+  },
+  {
+    key: "activations",
+    label: "Activations",
+    icon: UserCheck,
+    explanation: "Total suspended user accounts restored to active status.",
+  },
+  {
+    key: "bans",
+    label: "Bans",
+    icon: Ban,
+    explanation: "Total accounts suspended or banned by moderators or system administrators.",
+  },
+];
+
 function ActionActivitySummary({ metrics }: { metrics: ActionMetric[] }) {
   const activity = metrics.filter((metric) => metric.metricKind === "activity");
   const totals = activity.reduce<Record<string, number>>((result, metric) => {
-    for (const key of [
-      "likesAdded", "likesRemoved", "dislikesAdded", "dislikesRemoved",
-      "reactionScoreDelta", "joins", "leaves", "activations", "bans", "distinctActors",
-    ]) result[key] = (result[key] ?? 0) + numberValue(metric.data, key);
+    for (const { key } of ACTION_METRIC_CARDS) {
+      result[key] = (result[key] ?? 0) + numberValue(metric.data, key);
+    }
     return result;
   }, {});
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Action totals">
-      {[
-        ["Distinct actors", "distinctActors"],
-        ["Likes added", "likesAdded"],
-        ["Likes removed", "likesRemoved"],
-        ["Dislikes added", "dislikesAdded"],
-        ["Dislikes removed", "dislikesRemoved"],
-        ["Reaction score delta", "reactionScoreDelta"],
-        ["Joins", "joins"],
-        ["Leaves", "leaves"],
-        ["Activations", "activations"],
-        ["Bans", "bans"],
-      ].map(([label, key]) => (
+      {ACTION_METRIC_CARDS.map(({ key, label, icon: Icon, explanation }) => (
         <Card key={key}>
-          <CardHeader className="p-4"><CardDescription>{label}</CardDescription><CardTitle>{totals[key] ?? 0}</CardTitle></CardHeader>
+          <CardHeader className="p-4">
+            <div className="flex items-center justify-between gap-1 text-muted-foreground">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <CardDescription className="truncate">{label}</CardDescription>
+              </div>
+              <MetricTooltip label={label} explanation={explanation} />
+            </div>
+            <CardTitle className="mt-1 text-2xl font-bold">{totals[key] ?? 0}</CardTitle>
+          </CardHeader>
         </Card>
       ))}
     </div>
@@ -494,13 +674,76 @@ function ActionAnalyticsPanel() {
       {refreshWarnings.map((warning) => <p key={warning} role="status" className="text-sm text-amber-700 dark:text-amber-300">Warning: {warning}</p>)}
       {currentStatus?.status === "failed" && currentStatus.lastError ? <p role="alert" className="text-sm text-destructive">Refresh failed: {currentStatus.lastError}</p> : null}
       {actionQuery.isLoading ? <Skeleton className="h-40" /> : actionQuery.isError ? <p role="alert" className="text-sm text-destructive">Unable to load action analytics.</p> : metrics.length === 0 ? <MetricCardEmpty title="Action analytics" /> : <ActionActivitySummary metrics={metrics} />}
-      {metrics.length > 0 ? <div className="grid gap-4 md:grid-cols-2">
-        <Card><CardHeader><CardTitle className="text-sm">Thread reactions</CardTitle><CardDescription>Likes/dislikes added, removed, and score delta</CardDescription></CardHeader><CardContent className="text-sm">Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesRemoved") : 0), 0)}</CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Comment reactions</CardTitle><CardDescription>Likes/dislikes added, removed, and score delta</CardDescription></CardHeader><CardContent className="text-sm">Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "comment" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "comment" ? numberValue(metric.data, "likesRemoved") : 0), 0)}</CardContent></Card>
-      </div> : null}
-      {currentState.length > 0 ? <Card><CardHeader><CardTitle className="text-sm">Current-state balances</CardTitle><CardDescription>Authoritative RDS snapshot, separate from activity</CardDescription></CardHeader><CardContent className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">{currentState.map((metric) => <div key={metric.id}><span className="text-muted-foreground">{metric.targetType ?? metric.grain} reactions</span><strong className="block">{numberValue(metric.data, "reactionScore")}</strong></div>)}</CardContent></Card> : null}
-      {reconciliation.length > 0 ? <div role="alert" className="rounded border border-destructive/50 p-4 text-sm text-destructive">Reconciliation mismatch detected in {reconciliation.length} snapshot row(s).</div> : null}
-      <details><summary className="cursor-pointer font-medium">Historical snapshot baseline</summary><p className="mt-2 text-sm text-muted-foreground">Historical snapshot baseline — not reconstructed action history</p></details>
+      {metrics.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <CardTitle className="text-sm">Thread reactions</CardTitle>
+                </div>
+                <MetricTooltip
+                  label="Thread reactions"
+                  explanation="Aggregated reaction volume (likes and dislikes added or removed) specifically on thread posts."
+                />
+              </div>
+              <CardDescription>Likes/dislikes added, removed, and score delta</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm">
+              Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesRemoved") : 0), 0)}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <CardTitle className="text-sm">Comment reactions</CardTitle>
+                </div>
+                <MetricTooltip
+                  label="Comment reactions"
+                  explanation="Aggregated reaction volume (likes and dislikes added or removed) specifically on comments."
+                />
+              </div>
+              <CardDescription>Likes/dislikes added, removed, and score delta</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm">
+              Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "comment" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "comment" ? numberValue(metric.data, "likesRemoved") : 0), 0)}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+      {currentState.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <CardTitle className="text-sm">Current-state balances</CardTitle>
+              </div>
+              <MetricTooltip
+                label="Current-state balances"
+                explanation="Authoritative reaction balance snapshot read directly from the PostgreSQL database, separate from the action event stream."
+              />
+            </div>
+            <CardDescription>Authoritative RDS snapshot, separate from activity</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+            {currentState.map((metric) => (
+              <div key={metric.id}>
+                <span className="text-muted-foreground">{metric.targetType ?? metric.grain} reactions</span>
+                <strong className="block">{numberValue(metric.data, "reactionScore")}</strong>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+      {reconciliation.length > 0 ? (
+        <div role="alert" className="rounded border border-destructive/50 p-4 text-sm text-destructive">
+          Reconciliation mismatch detected in {reconciliation.length} snapshot row(s).
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -557,17 +800,23 @@ export function AnalyticsSection() {
   const moderationData = platformMetricData(moderationQuery.data);
 
   return (
-    <div>
-      <ActionAnalyticsPanel />
-      <details className="mt-8">
-        <summary className="cursor-pointer text-sm font-medium">Historical snapshot baseline</summary>
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Platform-wide usage metrics computed nightly through Glue and Athena.
-            </p>
-          </div>
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-10">
+        <ActionAnalyticsPanel />
+        <section
+          aria-labelledby="platform-analytics-heading"
+          className="space-y-6 border-t border-border pt-8"
+        >
+          <div className="mb-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Platform-wide usage metrics computed nightly through Glue and Athena.
+                </p>
+                <h2 id="platform-analytics-heading" className="text-xl font-semibold">
+                  Platform analytics
+                </h2>
+              </div>
           <Button
             variant="outline"
             size="sm"
@@ -661,8 +910,9 @@ export function AnalyticsSection() {
           <MetricCardEmpty title="Moderation" />
         )}
       </div>
-</details>
-    </div>
+        </section>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -678,10 +928,18 @@ function MetricCardError({
   onRetry: () => void;
   isRetrying: boolean;
 }) {
+  const config = PLATFORM_METRIC_CONFIG[title];
+  const Icon = config?.icon;
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {Icon ? <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> : null}
+            <CardTitle className="text-sm">{title}</CardTitle>
+          </div>
+          {config ? <MetricTooltip label={title} explanation={config.explanation} /> : null}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex h-[200px] flex-col items-center justify-center gap-3">
@@ -701,10 +959,18 @@ function MetricCardError({
 }
 
 function MetricCardEmpty({ title }: { title: string }) {
+  const config = PLATFORM_METRIC_CONFIG[title];
+  const Icon = config?.icon;
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {Icon ? <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> : null}
+            <CardTitle className="text-sm">{title}</CardTitle>
+          </div>
+          {config ? <MetricTooltip label={title} explanation={config.explanation} /> : null}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex h-[200px] items-center justify-center">

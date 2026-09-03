@@ -1,3 +1,5 @@
+import type { ActionEventWriter } from "../../../modules/analytics/application/action-event.ports";
+import { validateActionEvent, type ActionEventInput } from "../../../modules/analytics/domain/action-event";
 import { describe, expect, it } from "vitest";
 
 import type { Clock } from "../../../shared/application/clock";
@@ -23,24 +25,28 @@ import type { PageRequest, PageResult } from "../../../shared/application/pagina
 
 const AVATAR_ID = "00000000-0000-4000-8000-00000000000a";
 
+const studentId = "00000000-0000-4000-8000-000000000001";
+const moderatorId = "00000000-0000-4000-8000-000000000002";
+const adminId = "00000000-0000-4000-8000-000000000003";
+const societyId = "00000000-0000-4000-8000-000000000010";
+
 const society: SocietyRecord = {
-  id: "society-id",
+  id: societyId,
   slug: "cloud",
   name: "Cloud Computing",
   description: "Cloud Computing students",
   avatarMediaId: AVATAR_ID,
   status: "active",
-  createdBy: "admin-id",
+  createdBy: adminId,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 
 const now = new Date("2026-01-02T00:00:00.000Z");
 const clock: Clock = { now: () => now };
-const student: RequestPrincipal = { userId: "student-id", platformRole: "student" };
-const moderator: RequestPrincipal = { userId: "moderator-id", platformRole: "student" };
-const admin: RequestPrincipal = { userId: "admin-id", platformRole: "system_admin" };
-
+const student: RequestPrincipal = { userId: studentId, platformRole: "student" };
+const moderator: RequestPrincipal = { userId: moderatorId, platformRole: "student" };
+const admin: RequestPrincipal = { userId: adminId, platformRole: "system_admin" };
 describe("SocietyService", () => {
   it("allows only system admins to create societies", async () => {
     const repository = new FakeSocietyRepository();
@@ -176,6 +182,99 @@ describe("MembershipService", () => {
     expect(result).toMatchObject({ userId: student.userId, role: "moderator", status: "active" });
     expect(await service.hasModeratorAuthority(student, society.id)).toBe(true);
   });
+
+  it("joins a society and records a valid action event", async () => {
+    const societies = new FakeSocietyRepository(society);
+    const recordedEvents: ActionEventInput[] = [];
+    const actionEvents: ActionEventWriter = {
+      append: async (event) => {
+        validateActionEvent(event);
+        recordedEvents.push(event);
+        return {
+          ...event,
+          actorPseudonym: "fake-pseudonym",
+          pseudonymKeyVersion: "v1",
+          ingestedAt: new Date(),
+        };
+      },
+    };
+    const memberships = new FakeMembershipRepository([], actionEvents);
+    const service = new MembershipService({
+      repository: memberships,
+      societyRepository: societies,
+      transactions: immediateTransaction(memberships),
+      clock,
+    });
+
+    const result = await service.join(student, society.slug);
+    expect(result.status).toBe("active");
+    expect(recordedEvents[0]?.eventType).toBe("society_membership_joined");
+    expect(recordedEvents[0]?.metadata).toEqual({});
+  });
+
+  it("leaves a society and records a valid action event", async () => {
+    const societies = new FakeSocietyRepository(society);
+    const recordedEvents: ActionEventInput[] = [];
+    const actionEvents: ActionEventWriter = {
+      append: async (event) => {
+        validateActionEvent(event);
+        recordedEvents.push(event);
+        return {
+          ...event,
+          actorPseudonym: "fake-pseudonym",
+          pseudonymKeyVersion: "v1",
+          ingestedAt: new Date(),
+        };
+      },
+    };
+    const memberships = new FakeMembershipRepository(
+      [membership(student.userId, "member")],
+      actionEvents,
+    );
+    const service = new MembershipService({
+      repository: memberships,
+      societyRepository: societies,
+      transactions: immediateTransaction(memberships),
+      clock,
+    });
+
+    await service.leave(student, society.slug);
+    expect(recordedEvents[0]?.eventType).toBe("society_membership_left");
+    expect(recordedEvents[0]?.metadata).toEqual({});
+  });
+
+  it("reactivates a left membership on rejoin and records a valid action event", async () => {
+    const societies = new FakeSocietyRepository(society);
+    const recordedEvents: ActionEventInput[] = [];
+    const actionEvents: ActionEventWriter = {
+      append: async (event) => {
+        validateActionEvent(event);
+        recordedEvents.push(event);
+        return {
+          ...event,
+          actorPseudonym: "fake-pseudonym",
+          pseudonymKeyVersion: "v1",
+          ingestedAt: new Date(),
+        };
+      },
+    };
+    const previousLeftMembership: MembershipRecord = {
+      ...membership(student.userId, "member"),
+      status: "left",
+    };
+    const memberships = new FakeMembershipRepository([previousLeftMembership], actionEvents);
+    const service = new MembershipService({
+      repository: memberships,
+      societyRepository: societies,
+      transactions: immediateTransaction(memberships),
+      clock,
+    });
+
+    const result = await service.join(student, society.slug);
+    expect(result.status).toBe("active");
+    expect(recordedEvents[0]?.eventType).toBe("society_membership_activated");
+    expect(recordedEvents[0]?.metadata).toEqual({ subjectRole: "member" });
+  });
 });
 
 class FakeSocietyRepository implements SocietyRepository {
@@ -252,8 +351,15 @@ class FakeSocietyRepository implements SocietyRepository {
 
 class FakeMembershipRepository implements MembershipRepository {
   private readonly memberships = new Map<string, MembershipRecord>();
+  readonly actionEvents?: ActionEventWriter;
 
-  constructor(initial: readonly MembershipRecord[] = []) {
+  constructor(
+    initial: readonly MembershipRecord[] = [],
+    actionEvents?: ActionEventWriter,
+  ) {
+    if (actionEvents !== undefined) {
+      this.actionEvents = actionEvents;
+    }
     for (const item of initial) this.memberships.set(key(item.societyId, item.userId), item);
   }
 

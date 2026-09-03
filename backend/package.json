@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.13.1",
   "engines": {
     "node": ">=22.0.0 <23",
-    "pnpm": ">=10.13.1 <11"
+    "pnpm": ">=10.13.1 <12"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",

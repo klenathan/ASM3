@@ -142,7 +142,7 @@ export class MembershipService {
         correlationId: societyId,
         fromReaction: null,
         toReaction: null,
-        metadata: { subjectRole: "member" },
+        metadata: {},
       });
       return created;
     });
@@ -194,7 +194,7 @@ export class MembershipService {
         correlationId: societyId,
         fromReaction: null,
         toReaction: null,
-        metadata: { subjectRole: current.role },
+        metadata: {},
       });
     });
   }

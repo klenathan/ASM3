@@ -6,6 +6,7 @@ import { DrizzleRefreshRunStore } from "../../modules/analytics/infrastructure/d
 import type {
   AthenaMetricRow,
   RefreshRunStatus,
+  RefreshRunStore,
 } from "../../modules/analytics/application/refresh-run.ports";
 import { createActionAthenaSqlCatalog } from "../../modules/analytics/infrastructure/action-athena-sql-catalog";
 import { createAthenaMetricSqlCatalog } from "../../modules/analytics/infrastructure/athena-sql-catalog";
@@ -13,7 +14,7 @@ import { actionMetricDataSchema } from "../../modules/analytics/domain/action-me
 import { drizzle } from "drizzle-orm/node-postgres";
 import { createWorkflowPool } from "./workflow-database";
 import type { Pool } from "pg";
-interface WorkflowEvent {
+export interface WorkflowEvent {
   readonly action: "mark" | "prepare" | "persist";
   readonly runId: string;
   readonly status?: RefreshRunStatus;
@@ -24,6 +25,15 @@ interface WorkflowEvent {
     readonly queryExecutionId: string;
   }[];
 }
+export interface WorkflowDependencies {
+  readonly runStore: Pick<RefreshRunStore, "get" | "save">;
+  readonly repository: Pick<
+    DrizzleAnalyticsRepository,
+    "upsertActionMetrics" | "upsertMetrics" | "deleteIngestedBefore"
+  >;
+  readonly athena: Pick<AthenaGatewayAdapter, "getActionResults" | "getResults">;
+}
+
 
 const secrets = new SecretsManagerClient({});
 let databaseUrl: string | undefined;
@@ -38,6 +48,17 @@ export async function handler(event: WorkflowEvent): Promise<{
   readonly queries?: readonly { readonly metricType: string; readonly sql: string }[];
 }> {
   const dependencies = await getDependencies();
+  return processWorkflowEvent(event, dependencies);
+}
+
+export async function processWorkflowEvent(
+  event: WorkflowEvent,
+  dependencies: WorkflowDependencies,
+): Promise<{
+  readonly runId: string;
+  readonly status: RefreshRunStatus;
+  readonly queries?: readonly { readonly metricType: string; readonly sql: string }[];
+}> {
   const run = await dependencies.runStore.get(event.runId);
   if (run === null) throw new Error(`analytics refresh run ${event.runId} was not found`);
   if (run.status === "cancelled") return { runId: run.runId, status: run.status };
@@ -98,9 +119,12 @@ export async function handler(event: WorkflowEvent): Promise<{
         updatedAt: now,
       };
     }));
-    const retentionDays = Number(process.env.ANALYTICS_RAW_RETENTION_DAYS ?? "30");
+    const rawRetentionDays = process.env.ANALYTICS_RAW_EVENT_RETENTION_DAYS
+      ?? process.env.ANALYTICS_RAW_RETENTION_DAYS
+      ?? "30";
+    const retentionDays = Number(rawRetentionDays);
     if (!Number.isFinite(retentionDays) || retentionDays < 0) {
-      throw new Error("ANALYTICS_RAW_RETENTION_DAYS must be a non-negative number");
+      throw new Error("ANALYTICS_RAW_EVENT_RETENTION_DAYS must be a non-negative number");
     }
     await dependencies.repository.deleteIngestedBefore(
       new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000),

@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
+import { migrateWithLock } from "../../../../test/database";
 import type { RefreshRunRecord } from "../application/refresh-run.ports";
 import { DrizzleRefreshRunStore } from "./drizzle-refresh-run.store";
 
@@ -16,7 +16,7 @@ describeWithDb("DrizzleRefreshRunStore", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString });
     const database = drizzle({ client: pool });
-    await migrate(database, { migrationsFolder: "./drizzle" });
+    await migrateWithLock(pool);
     store = new DrizzleRefreshRunStore(database);
   });
 

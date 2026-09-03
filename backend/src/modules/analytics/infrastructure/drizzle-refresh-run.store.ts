@@ -1,7 +1,8 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
-import { METRIC_TYPES, type MetricType } from "../domain/analytics";
+import { METRIC_TYPES } from "../domain/analytics";
+import { ACTION_METRIC_KINDS } from "../domain/action-metrics";
 import type {
   RefreshRunRecord,
   RefreshRunStore,
@@ -15,6 +16,11 @@ const UNFINISHED_STATUSES: readonly RefreshRunStatus[] = [
   "exporting",
   "querying",
 ];
+export const VALID_QUERY_METRIC_KEYS: readonly string[] = [
+  ...METRIC_TYPES,
+  ...ACTION_METRIC_KINDS,
+];
+
 
 export class DrizzleRefreshRunStore implements RefreshRunStore {
   private readonly database: Database;
@@ -125,19 +131,19 @@ function toRecord(row: typeof analyticsRefreshRuns.$inferSelect): RefreshRunReco
   };
 }
 
-function validateQueryIds(
+export function validateQueryIds(
   queryIds: unknown,
   runId: string,
-): Partial<Record<MetricType, string>> {
+): Readonly<Partial<Record<string, string>>> {
   if (queryIds === null || typeof queryIds !== "object" || Array.isArray(queryIds)) {
     throw new Error(`invalid Athena query id map for refresh run ${runId}`);
   }
-  const safeQueryIds: Partial<Record<MetricType, string>> = {};
+  const safeQueryIds: Record<string, string> = {};
   for (const [key, value] of Object.entries(queryIds)) {
-    if (!METRIC_TYPES.includes(key as MetricType) || typeof value !== "string" || value.length === 0) {
+    if (!VALID_QUERY_METRIC_KEYS.includes(key) || typeof value !== "string" || value.length === 0) {
       throw new Error(`invalid Athena query id map for refresh run ${runId}`);
     }
-    safeQueryIds[key as MetricType] = value;
+    safeQueryIds[key] = value;
   }
   return safeQueryIds;
 }

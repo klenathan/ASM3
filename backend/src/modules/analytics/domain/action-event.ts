@@ -151,8 +151,7 @@ export function parseActionEventMetadata<E extends ActionEventType>(
   return result.data as ActionEventMetadataFor<E>;
 }
 
-/** The append payload a product transaction hands to the writer. */
-export interface ActionEventInput<E extends ActionEventType = ActionEventType> {
+interface BaseActionEventInput<E extends ActionEventType> {
   readonly eventId: string;
   readonly eventType: E;
   readonly schemaVersion: typeof ACTION_EVENT_SCHEMA_VERSION;
@@ -172,6 +171,10 @@ export interface ActionEventInput<E extends ActionEventType = ActionEventType> {
   readonly toReaction: ReactionValue | null;
   readonly metadata: ActionEventMetadataFor<E>;
 }
+
+/** The append payload a product transaction hands to the writer. */
+export type ActionEventInput<E extends ActionEventType = ActionEventType> =
+  E extends unknown ? BaseActionEventInput<E> : never;
 
 /** Row shape Glue may read: the direct actor identifier is stripped. */
 export interface ExportableActionEvent {
@@ -195,11 +198,12 @@ export interface ExportableActionEvent {
   readonly metadata: ActionEventMetadata;
 }
 
-export interface PersistedActionEvent extends ActionEventInput {
-  readonly actorPseudonym: string;
-  readonly pseudonymKeyVersion: string;
-  readonly ingestedAt: Date;
-}
+export type PersistedActionEvent<E extends ActionEventType = ActionEventType> =
+  ActionEventInput<E> & {
+    readonly actorPseudonym: string;
+    readonly pseudonymKeyVersion: string;
+    readonly ingestedAt: Date;
+  };
 
 /** Projection used by the export path; drops the direct actor identifier. */
 export function toExportRow(event: PersistedActionEvent): ExportableActionEvent {

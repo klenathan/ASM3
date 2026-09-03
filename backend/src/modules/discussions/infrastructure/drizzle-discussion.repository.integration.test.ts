@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
+import { migrateWithLock } from "../../../../test/database";
 import { DrizzleDiscussionRepository } from "./drizzle-discussion.repository";
 
 // PostgreSQL integration coverage for the atomic `published -> removed`
@@ -22,23 +22,30 @@ describeWithDb("removePublishedThreadIfActive conditional transition", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const db = drizzle({ client: pool });
-    await migrate(db, { migrationsFolder: "./drizzle" });
+    await migrateWithLock(pool);
     repository = new DrizzleDiscussionRepository(db);
     societyId = randomUUID();
     authorId = randomUUID();
+    const avatarMediaId = randomUUID();
 
     await pool.query(
-      "insert into societies (id, name, slug, description, created_at, updated_at) values ($1, $2, $3, $4, now(), now()) on conflict (id) do nothing",
+      "insert into auth_users (id, email) values ($1, $2) on conflict (id) do nothing",
+      [authorId, `member-${authorId.slice(0, 8)}@example.com`],
+    );
+    await pool.query(
+      "insert into media_assets (id, owner_id, object_key, purpose, content_type, byte_size, status) values ($1, $2, $3, 'avatar', 'image/png', 1, 'ready')",
+      [avatarMediaId, authorId, `avatar-${avatarMediaId}`],
+    );
+    await pool.query(
+      "insert into societies (id, name, slug, description, created_by, avatar_media_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, now(), now()) on conflict (id) do nothing",
       [
         societyId,
         `Society ${societyId.slice(0, 8)}`,
         `slug-${societyId.slice(0, 8)}`,
         "Integration testing society",
+        authorId,
+        avatarMediaId,
       ],
-    );
-    await pool.query(
-      "insert into auth_users (id, email) values ($1, $2) on conflict (id) do nothing",
-      [authorId, `member-${authorId.slice(0, 8)}@example.com`],
     );
   });
 

@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
+import { migrateWithLock } from "../../../../test/database";
 import { DrizzlePlatformConfigRepository } from "./drizzle-platform.repository";
 
 // PostgreSQL integration coverage for the platform_config upsert/primary-key
@@ -17,7 +17,7 @@ describeWithDb("platform_config repository", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const db = drizzle({ client: pool });
-    await migrate(db, { migrationsFolder: "./drizzle" });
+    await migrateWithLock(pool);
     repository = new DrizzlePlatformConfigRepository(db);
   });
 
