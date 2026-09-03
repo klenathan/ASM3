@@ -83,6 +83,8 @@ const environmentSchema = z
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
     ANALYTICS_REFRESH_STATE_MACHINE_ARN: z.string().trim().min(1).optional(),
     ANALYTICS_SCHEDULER_SECRET: z.string().trim().min(1).optional(),
+    ANALYTICS_PSEUDONYM_KEY: z.string().trim().min(1).optional(),
+    ANALYTICS_PSEUDONYM_KEY_VERSION: z.string().trim().min(1).default("v1"),
     MAPBOX_SECRET_TOKEN: z.string().trim().min(1).optional(),
     MAPBOX_PUBLIC_TOKEN: z.string().trim().min(1).optional(),
   })
@@ -146,6 +148,27 @@ const environmentSchema = z
         path: ["MEDIA_BUCKET"],
         message: "is required in production",
       });
+    }
+    if (value.NODE_ENV === "production" && value.ANALYTICS_PSEUDONYM_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ANALYTICS_PSEUDONYM_KEY"],
+        message: "is required in production",
+      });
+    }
+    if (value.ANALYTICS_PSEUDONYM_KEY !== undefined) {
+      const encoded = value.ANALYTICS_PSEUDONYM_KEY;
+      const decoded =
+        /^[0-9a-fA-F]+$/.test(encoded) && encoded.length % 2 === 0
+          ? Buffer.from(encoded, "hex")
+          : Buffer.from(encoded, "base64");
+      if (decoded.length < 32) {
+        context.addIssue({
+          code: "custom",
+          path: ["ANALYTICS_PSEUDONYM_KEY"],
+          message: "must encode at least 32 bytes",
+        });
+      }
     }
     if (
       value.NODE_ENV === "production" &&
@@ -221,6 +244,8 @@ export interface AppConfig {
   readonly analysisMaxTotalImageBytes: number;
   readonly analyticsRefreshStateMachineArn: string | null;
   readonly analyticsSchedulerSecret: string | null;
+  readonly analyticsPseudonymKey: string | null;
+  readonly analyticsPseudonymKeyVersion: string;
   readonly mapboxSecretToken: string | null;
   readonly mapboxPublicToken: string | null;
 }
@@ -272,6 +297,8 @@ export function loadConfig(
     analyticsRefreshStateMachineArn:
       result.data.ANALYTICS_REFRESH_STATE_MACHINE_ARN ?? null,
     analyticsSchedulerSecret: result.data.ANALYTICS_SCHEDULER_SECRET ?? null,
+    analyticsPseudonymKey: result.data.ANALYTICS_PSEUDONYM_KEY ?? null,
+    analyticsPseudonymKeyVersion: result.data.ANALYTICS_PSEUDONYM_KEY_VERSION,
     mapboxSecretToken: result.data.MAPBOX_SECRET_TOKEN ?? null,
     mapboxPublicToken: result.data.MAPBOX_PUBLIC_TOKEN ?? null,
   };

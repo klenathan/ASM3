@@ -66,3 +66,20 @@ export {
   SCHEDULER_SECRET_HEADER,
   type AnalyticsRouteDependencies,
 } from "./presentation/analytics.routes";
+export type {
+  ActionEventWriter,
+  ActionEventRetention,
+} from "./application/action-event.ports";
+export {
+  ACTION_EVENT_SCHEMA_VERSION,
+  ACTION_EVENT_TYPES,
+  validateActionEvent,
+  type ActionEventInput,
+  type PersistedActionEvent,
+} from "./domain/action-event";
+export {
+  createHmacPseudonymizer,
+  decodePseudonymKey,
+  type ActionEventPseudonymizer,
+} from "./domain/pseudonymizer";
+export { DrizzleActionEventWriter } from "./infrastructure/drizzle-action-event.writer";

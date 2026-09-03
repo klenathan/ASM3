@@ -23,3 +23,7 @@ export { contentAnalysisRuns } from "../modules/content-analysis/infrastructure/
 export { contentAnalysisOverrides } from "../modules/content-analysis/infrastructure/content-analysis.tables";
 export { analyticsMetrics } from "../modules/analytics/infrastructure/analytics.tables";
 export { analyticsRefreshRuns } from "../modules/analytics/infrastructure/refresh-run.tables";
+export {
+  actionEvents,
+  analyticsContractState,
+} from "../modules/analytics/infrastructure/action-event.tables";
