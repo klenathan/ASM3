@@ -1,3 +1,18 @@
+resource "random_password" "analytics_pseudonym_key" {
+  length  = 64
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "analytics_pseudonym_key" {
+  name_prefix = "${local.name}-analytics-pseudonym-"
+  description = "HMAC key for privacy-safe analytics actor pseudonyms"
+}
+
+resource "aws_secretsmanager_secret_version" "analytics_pseudonym_key" {
+  secret_id     = aws_secretsmanager_secret.analytics_pseudonym_key.id
+  secret_string = random_password.analytics_pseudonym_key.result
+}
+
 resource "aws_ecs_cluster" "this" {
   name = local.name
 
@@ -81,6 +96,7 @@ locals {
     { name = "CONTENT_ANALYSIS_MODEL_ID", value = local.content_analysis_model_id },
     { name = "ANALYSIS_MAX_COMMENTS", value = "40" },
     { name = "ANALYSIS_TIMEOUT_MS", value = "50000" },
+    { name = "ANALYTICS_PSEUDONYM_KEY_VERSION", value = "v1" },
     ], var.enable_analytics_pipeline ? [
     { name = "ANALYTICS_REFRESH_STATE_MACHINE_ARN", value = local.analytics_refresh_state_machine_arn },
   ] : [])
@@ -111,6 +127,10 @@ resource "aws_ecs_task_definition" "backend" {
       {
         name      = "DATABASE_URL"
         valueFrom = aws_secretsmanager_secret.database_url.arn
+      },
+      {
+        name      = "ANALYTICS_PSEUDONYM_KEY"
+        valueFrom = aws_secretsmanager_secret.analytics_pseudonym_key.arn
       }
       ], var.enable_analytics_pipeline ? [{
         name      = "ANALYTICS_SCHEDULER_SECRET"
@@ -156,11 +176,18 @@ resource "aws_ecs_task_definition" "database_bootstrap" {
       { name = "AWS_REGION", value = var.aws_region },
       { name = "MEDIA_BUCKET", value = aws_s3_bucket.media.bucket },
       { name = "THREAD_EVENTS_QUEUE_URL", value = aws_sqs_queue.thread_events.url },
+      { name = "ANALYTICS_PSEUDONYM_KEY_VERSION", value = "v1" },
     ]
-    secrets = [{
-      name      = "DATABASE_URL"
-      valueFrom = aws_secretsmanager_secret.database_url.arn
-    }]
+    secrets = [
+      {
+        name      = "DATABASE_URL"
+        valueFrom = aws_secretsmanager_secret.database_url.arn
+      },
+      {
+        name      = "ANALYTICS_PSEUDONYM_KEY"
+        valueFrom = aws_secretsmanager_secret.analytics_pseudonym_key.arn
+      }
+    ]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
