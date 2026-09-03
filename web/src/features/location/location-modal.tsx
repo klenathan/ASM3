@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import type { ThreadLocation } from "./types";
@@ -11,39 +11,42 @@ interface Props {
 
 export function LocationModal({ location, open, onOpenChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
-    if (!open || !location || !containerRef.current) return;
+    let cancelled = false;
+    if (!open || !location) return;
     const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
-    if (!token) return;
+    if (!token) {
+      setMapFailed(true);
+      return;
+    }
+    if (!containerRef.current) return;
     let map: unknown;
     (async () => {
       try {
+        // Dynamic import mapbox-gl to avoid heavy WebGL bundle on initial load and handle missing WebGL
         const mod = await import("mapbox-gl");
-        const mapboxgl = (mod as unknown as { default: typeof import("mapbox-gl").default }).default ?? (mod as unknown as typeof import("mapbox-gl").default);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mapboxgl as any).accessToken = token;
+        const mapboxgl = (mod as unknown as { default: { accessToken: string; Map: new (opts: unknown) => { remove: () => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => void } } } }).default;
+        mapboxgl.accessToken = token;
         const isDark = document.documentElement.classList.contains("dark");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const m = new (mapboxgl as any).Map({
+        const m = new mapboxgl.Map({
           container: containerRef.current!,
           style: isDark ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v12",
           center: [location.longitude, location.latitude],
           zoom: 14,
-          attributionControl: false,
+          attributionControl: true,
         });
         map = m;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const markerColor = isDark ? "oklch(0.72 0.17 32)" : "oklch(0.53 0.18 32)";
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        new (mapboxgl as any).Marker({ color: markerColor }).setLngLat([location.longitude, location.latitude]).addTo(m);
+        new mapboxgl.Marker({ color: markerColor }).setLngLat([location.longitude, location.latitude]).addTo(m);
       } catch {
-        // fallback to text
+        if (!cancelled) setMapFailed(true);
       }
     })();
     return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const m = map as any;
+      cancelled = true;
+      const m = map as { remove?: () => void } | undefined;
       if (m?.remove) m.remove();
     };
   }, [open, location]);
@@ -51,7 +54,9 @@ export function LocationModal({ location, open, onOpenChange }: Props) {
   if (!location) return null;
 
   const mapboxUrl = `https://www.mapbox.com/search/${encodeURIComponent(location.name)}/${location.longitude},${location.latitude}`;
-
+  const displayAddress =
+    (location.address as { full_address?: string } | null)?.full_address ??
+    `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0 sm:max-w-2xl max-sm:h-[100dvh] max-sm:max-w-none max-sm:rounded-none">
@@ -61,11 +66,18 @@ export function LocationModal({ location, open, onOpenChange }: Props) {
             <span className="truncate">{location.name}</span>
           </DialogTitle>
         </DialogHeader>
-        <div ref={containerRef} className="h-[400px] w-full bg-muted max-sm:h-[55dvh]" aria-label="Location map" />
+        {mapFailed ? (
+          <div className="flex h-[400px] w-full flex-col items-center justify-center bg-muted p-6 text-center max-sm:h-[55dvh]" role="region" aria-label="Location details fallback">
+            <MapPin className="size-8 text-muted-foreground/60" />
+            <p className="mt-2 text-sm font-semibold">{location.name}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{displayAddress}</p>
+            <p className="mt-3 text-xs text-muted-foreground/80">Interactive map preview unavailable</p>
+          </div>
+        ) : (
+          <div ref={containerRef} className="h-[400px] w-full bg-muted max-sm:h-[55dvh]" aria-label="Location map" />
+        )}
         <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-          <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {(location.address as unknown as { full_address?: string } | null)?.full_address ?? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`}
-          </p>
+          <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{displayAddress}</p>
           <a
             href={mapboxUrl}
             target="_blank"
