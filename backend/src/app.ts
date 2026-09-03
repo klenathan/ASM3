@@ -196,6 +196,8 @@ export function createApp(dependencies: AppDependencies) {
       });
       app.use("/api/v1/admin/analytics", principalMiddleware);
       app.use("/api/v1/admin/analytics/*", principalMiddleware);
+      app.use("/api/v2/admin/analytics", principalMiddleware);
+      app.use("/api/v2/admin/analytics/*", principalMiddleware);
     }
     registerAnalyticsRoutes(app, dependencies.analytics);
   }
