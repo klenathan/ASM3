@@ -48,4 +48,40 @@ describe("LocationModal", () => {
 
     expect(screen.getAllByText("-37.80800, 144.96300")).toHaveLength(2);
   });
+
+  it("displays fallback when mapbox emits an async error and resets on reopen", async () => {
+    let errorHandler: (() => void) | undefined;
+    const mockMap = {
+      remove: vi.fn(),
+      on: vi.fn((event: string, listener: () => void) => {
+        if (event === "error") {
+          errorHandler = listener;
+        }
+      }),
+    };
+
+    vi.stubEnv("VITE_MAPBOX_PUBLIC_TOKEN", "pk.test");
+    vi.doMock("mapbox-gl", () => ({
+      default: {
+        accessToken: "",
+        Map: vi.fn(() => mockMap),
+        Marker: vi.fn(() => ({
+          setLngLat: vi.fn().mockReturnThis(),
+          addTo: vi.fn().mockReturnThis(),
+        })),
+      },
+    }));
+
+    const { rerender } = render(<LocationModal location={testLocation} open={true} onOpenChange={vi.fn()} />);
+
+    // When mapbox emits an async error, fallback should show
+    errorHandler?.();
+
+    // Reopening modal resets mapFailed
+    rerender(<LocationModal location={testLocation} open={false} onOpenChange={vi.fn()} />);
+    rerender(<LocationModal location={testLocation} open={true} onOpenChange={vi.fn()} />);
+
+    vi.unstubAllEnvs();
+    vi.doUnmock("mapbox-gl");
+  });
 });

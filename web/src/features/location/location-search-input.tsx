@@ -54,7 +54,7 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
   }
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isFetching, setIsFetching] = useState(false);
-
+  const [retryCount, setRetryCount] = useState(0);
   useEffect(() => {
     if (debounced.trim().length < 2) {
       setSuggestions([]);
@@ -75,7 +75,7 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
     return () => {
       cancelled = true;
     };
-  }, [debounced, proximity, sessionToken]);
+  }, [debounced, proximity, sessionToken, retryCount]);
 
   const hasQuery = debounced.trim().length >= 2;
 
@@ -120,12 +120,26 @@ export function LocationSearchInput({ onPick, onClear, picked, disabled }: Props
   return (
     <div className="space-y-2">
       {errorBanner && (
-        <p role="alert" className="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-          {errorBanner}{" "}
-          <button type="button" className="underline" onClick={() => setErrorBanner(null)}>
-            Dismiss
-          </button>
-        </p>
+        <div role="alert" className="flex items-center justify-between gap-2 border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <span>{errorBanner}</span>
+          <span className="flex shrink-0 gap-2">
+            {debounced.trim().length >= 2 && (
+              <button
+                type="button"
+                className="font-medium underline hover:no-underline"
+                onClick={() => {
+                  setErrorBanner(null);
+                  setRetryCount((c) => c + 1);
+                }}
+              >
+                Retry
+              </button>
+            )}
+            <button type="button" className="underline hover:no-underline" onClick={() => setErrorBanner(null)}>
+              Dismiss
+            </button>
+          </span>
+        </div>
       )}
       <div className="relative flex items-center">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

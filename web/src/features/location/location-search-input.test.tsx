@@ -170,6 +170,35 @@ describe("LocationSearchInput", () => {
     expect(onPick).not.toHaveBeenCalled();
   });
 
+  it("allows retrying a failed search query", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.searchPlaces)
+      .mockRejectedValueOnce(new Error("Network glitch"))
+      .mockResolvedValueOnce({
+        suggestions: [
+          {
+            mapboxId: "mbx.retry",
+            name: "RMIT Library",
+            placeType: "poi",
+            address: null,
+          },
+        ],
+      });
+
+    render(<LocationSearchInput onPick={vi.fn()} picked={null} />);
+    const input = screen.getByLabelText("Search location");
+    await user.type(input, "Library");
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Search unavailable");
+    });
+
+    const retryBtn = screen.getByRole("button", { name: "Retry" });
+    await user.click(retryBtn);
+
+    expect(await screen.findByText("RMIT Library")).toBeInTheDocument();
+  });
+
   it("renders picked location with remove button", async () => {
     const user = userEvent.setup();
     const onClear = vi.fn();

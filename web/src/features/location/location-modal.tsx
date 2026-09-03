@@ -16,18 +16,19 @@ export function LocationModal({ location, open, onOpenChange }: Props) {
   useEffect(() => {
     let cancelled = false;
     if (!open || !location) return;
+    setMapFailed(false);
     const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
     if (!token) {
       setMapFailed(true);
       return;
     }
     if (!containerRef.current) return;
-    let map: unknown;
+    let map: { remove?: () => void } | undefined;
     (async () => {
       try {
         // Dynamic import mapbox-gl to avoid heavy WebGL bundle on initial load and handle missing WebGL
         const mod = await import("mapbox-gl");
-        const mapboxgl = (mod as unknown as { default: { accessToken: string; Map: new (opts: unknown) => { remove: () => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => void } } } }).default;
+        const mapboxgl = (mod as unknown as { default: { accessToken: string; Map: new (opts: unknown) => { remove: () => void; on: (event: string, listener: (e: unknown) => void) => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => void } } } }).default;
         mapboxgl.accessToken = token;
         const isDark = document.documentElement.classList.contains("dark");
         const m = new mapboxgl.Map({
@@ -36,6 +37,9 @@ export function LocationModal({ location, open, onOpenChange }: Props) {
           center: [location.longitude, location.latitude],
           zoom: 14,
           attributionControl: true,
+        });
+        m.on("error", () => {
+          if (!cancelled) setMapFailed(true);
         });
         map = m;
         const markerColor = isDark ? "oklch(0.72 0.17 32)" : "oklch(0.53 0.18 32)";
@@ -46,8 +50,7 @@ export function LocationModal({ location, open, onOpenChange }: Props) {
     })();
     return () => {
       cancelled = true;
-      const m = map as { remove?: () => void } | undefined;
-      if (m?.remove) m.remove();
+      if (map?.remove) map.remove();
     };
   }, [open, location]);
 

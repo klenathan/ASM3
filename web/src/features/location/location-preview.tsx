@@ -21,13 +21,15 @@ export function LocationPreview({ location, onUpdate }: Props) {
       setMapFailed(true);
       return;
     }
+    setMapFailed(false);
     if (!containerRef.current) return;
-    let map: unknown;
+    let map: { remove?: () => void } | undefined;
     (async () => {
       try {
         // Dynamic import mapbox-gl to avoid heavy WebGL bundle on initial load and handle missing WebGL
         const mod = await import("mapbox-gl");
-        const mapboxgl = (mod as unknown as { default: { accessToken: string; Map: new (opts: unknown) => { remove: () => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => { on: (event: string, handler: () => void) => void; getLngLat: () => { lat: number; lng: number } } } } } }).default;
+        type MapboxType = { accessToken: string; Map: new (opts: unknown) => { remove: () => void }; Marker: new (opts: unknown) => { setLngLat: (coords: [number, number]) => { addTo: (map: unknown) => { on: (event: string, handler: () => void) => void; getLngLat: () => { lat: number; lng: number } } } } };
+        const mapboxgl = ((mod as unknown as { default: MapboxType }).default ?? mod) as MapboxType;
         mapboxgl.accessToken = token;
         const isDark = document.documentElement.classList.contains("dark");
         const m = new mapboxgl.Map({
@@ -54,7 +56,10 @@ export function LocationPreview({ location, onUpdate }: Props) {
             setAddressText((rev.address as unknown as { full_address?: string } | null)?.full_address ?? rev.name ?? null);
             onUpdate({ ...location, latitude: lat, longitude: lng, address: rev.address });
           } catch {
-            if (!cancelled) onUpdate({ ...location, latitude: lat, longitude: lng });
+            if (!cancelled) {
+              setAddressText(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+              onUpdate({ ...location, latitude: lat, longitude: lng, address: null });
+            }
           }
         });
       } catch {
