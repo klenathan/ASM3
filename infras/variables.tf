@@ -43,6 +43,12 @@ variable "learner_lab_instance_profile_name" {
   default     = "LabInstanceProfile"
 }
 
+variable "analytics_learner_lab_permissions_confirmed" {
+  description = "Set true only after verifying LabRole trust for glue.amazonaws.com and scheduler.amazonaws.com and the Glue, Athena, S3, Secrets Manager, EventBridge, and SQS permissions required by analytics. No custom IAM role is created."
+  type        = bool
+  default     = false
+}
+
 variable "api_custom_domain_name" {
   description = "Optional DNS name for the HTTPS API Gateway endpoint, such as community.example.com."
   type        = string

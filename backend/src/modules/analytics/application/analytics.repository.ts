@@ -29,5 +29,6 @@ export interface AnalyticsPageResult {
 export interface AnalyticsRepository {
   findMetrics(query: AnalyticsQuery): Promise<AnalyticsPageResult>;
   upsertMetric(input: UpsertAnalyticsMetricInput): Promise<AnalyticsMetricRecord>;
+  upsertMetrics(inputs: readonly UpsertAnalyticsMetricInput[]): Promise<readonly AnalyticsMetricRecord[]>;
   findLatestPeriod(): Promise<Date | null>;
 }

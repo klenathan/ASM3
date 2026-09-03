@@ -1,0 +1,136 @@
+# ---------------------------------------------------------------------------
+# Analytics refresh scheduling and workflow.
+#
+# EventBridge invokes the backend only to create a durable run. The backend
+# starts a Standard Step Functions execution; Step Functions waits for Glue and
+# Athena and invokes the workflow Lambda to update the run and persist metrics.
+#
+# GATE (Academy Learner Lab):
+#   - Confirm EventBridge scheduled rules + API destinations are available in the
+#     active lab (Associate Services) in us-east-1.
+#   - EventBridge assumes role_arn; LabRole must trust events.amazonaws.com
+#     and be permitted to call events:InvokeApiDestination. The DLQ queue
+#     policy separately permits EventBridge to send failed events. The Glue job also
+#     requires glue.amazonaws.com trust plus Glue, Athena, S3, and Secrets
+#     Manager access. Set the explicit confirmation variable only after
+#     checking the active lab; the configuration fails closed otherwise.
+#   - No IAM roles/users are created here; everything reuses data.aws_iam_role.learner_lab.
+#
+# Teardown: `tofu destroy` removes schedule + destination + connection;
+# the random secret has no cost.
+# ---------------------------------------------------------------------------
+
+variable "analytics_glue_job_name" {
+  description = "Optional name override for the Glue job that exports RDS data to S3 for Athena."
+  type        = string
+  default     = ""
+}
+
+variable "analytics_refresh_schedule_expression" {
+  description = "EventBridge schedule expression for the nightly analytics refresh."
+  type        = string
+  default     = "cron(0 2 * * ? *)"
+}
+
+resource "terraform_data" "analytics_scheduler_permissions" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  input = var.analytics_learner_lab_permissions_confirmed
+
+  lifecycle {
+    precondition {
+      condition = var.analytics_learner_lab_permissions_confirmed && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "events.amazonaws.com",
+        ) && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "glue.amazonaws.com",
+        ) && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "states.amazonaws.com",
+        ) && strcontains(
+        data.aws_iam_role.learner_lab.assume_role_policy,
+        "lambda.amazonaws.com",
+      )
+      error_message = "Analytics is disabled: verify LabRole trust for EventBridge, Glue, Step Functions, and Lambda plus the required Glue, Athena, S3, Secrets Manager, EventBridge, SQS, and RDS permissions, then set analytics_learner_lab_permissions_confirmed=true."
+    }
+  }
+}
+
+resource "random_password" "analytics_scheduler_secret" {
+  count   = var.enable_analytics_pipeline ? 1 : 0
+  length  = 40
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "analytics_scheduler_secret" {
+  count       = var.enable_analytics_pipeline ? 1 : 0
+  name_prefix = "${local.name}-analytics-scheduler-"
+  description = "Shared secret for the internal analytics scheduler API destination"
+  tags        = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "analytics_scheduler_secret" {
+  count         = var.enable_analytics_pipeline ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.analytics_scheduler_secret[0].id
+  secret_string = random_password.analytics_scheduler_secret[0].result
+}
+
+resource "aws_cloudwatch_event_connection" "analytics_scheduler" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  name               = "${local.name}-analytics-scheduler"
+  description        = "API-key connection used by the nightly analytics refresh API destination"
+  authorization_type = "API_KEY"
+
+  auth_parameters {
+    api_key {
+      key   = "x-analytics-scheduler-secret"
+      value = random_password.analytics_scheduler_secret[0].result
+    }
+  }
+
+}
+
+resource "aws_cloudwatch_event_api_destination" "analytics_scheduled_refresh" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  name                = "${local.name}-analytics-scheduled-refresh"
+  description         = "Points the nightly scheduler at the backend internal scheduled-refresh route"
+  invocation_endpoint = "${local.api_origin}/api/v1/admin/analytics/scheduled-refresh"
+  http_method         = "POST"
+  connection_arn      = aws_cloudwatch_event_connection.analytics_scheduler[0].arn
+
+}
+
+resource "aws_cloudwatch_event_rule" "analytics_nightly_refresh" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  name                = "${local.name}-analytics-nightly-refresh"
+  description         = "Triggers the nightly analytics refresh"
+  schedule_expression = var.analytics_refresh_schedule_expression
+  state               = "ENABLED"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "analytics_nightly_refresh" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.analytics_nightly_refresh[0].name
+  target_id = "analytics-scheduled-refresh"
+  arn       = aws_cloudwatch_event_api_destination.analytics_scheduled_refresh[0].arn
+  role_arn  = data.aws_iam_role.learner_lab.arn
+  input     = jsonencode({})
+
+  dead_letter_config {
+    arn = aws_sqs_queue.analytics_scheduler_dlq[0].arn
+  }
+
+  retry_policy {
+    maximum_retry_attempts       = 3
+    maximum_event_age_in_seconds = 3600
+  }
+
+  depends_on = [aws_sqs_queue_policy.analytics_scheduler_dlq]
+}

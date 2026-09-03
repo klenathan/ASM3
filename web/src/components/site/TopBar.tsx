@@ -1,4 +1,12 @@
-import { Bell, ChevronDown, LogOut, Search, Settings, Shield, UserRound, type LucideIcon } from "lucide-react";
+import {
+  ChevronDown,
+  LogOut,
+  Search,
+  Settings,
+  Shield,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
@@ -55,10 +63,12 @@ export function TopBar() {
           role="search"
           className="relative mx-auto w-full max-w-xl flex-1"
           onSubmit={(event) => {
-            event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            const query = String(form.get("q") ?? "").trim()
-            navigate(`/societies${query === "" ? "" : `?q=${encodeURIComponent(query)}`}`)
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const query = String(form.get("q") ?? "").trim();
+            navigate(
+              `/societies${query === "" ? "" : `?q=${encodeURIComponent(query)}`}`,
+            );
           }}
         >
           <Search
@@ -75,20 +85,6 @@ export function TopBar() {
         </form>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Notifications"
-            className="relative rounded-full"
-          >
-            <Bell aria-hidden="true" className="size-5" />
-            <span
-              aria-hidden="true"
-              className="absolute top-2 right-2.5 size-2 rounded-full bg-signal"
-            />
-          </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger
               asChild
@@ -118,10 +114,7 @@ export function TopBar() {
               <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {menuItems.map(({ label, icon: Icon, onClick }) => (
-                <DropdownMenuItem
-                  key={label}
-                  onSelect={() => onClick?.()}
-                >
+                <DropdownMenuItem key={label} onSelect={() => onClick?.()}>
                   <Icon aria-hidden="true" /> {label}
                 </DropdownMenuItem>
               ))}

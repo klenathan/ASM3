@@ -81,7 +81,8 @@ const environmentSchema = z
     ANALYSIS_MAX_IMAGES: z.coerce.number().int().min(0).max(20).default(4),
     ANALYSIS_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * 1024 * 1024),
     ANALYSIS_MAX_TOTAL_IMAGE_BYTES: z.coerce.number().int().min(1).default(40 * 1024 * 1024),
-    ANALYTICS_DUMP_LAMBDA_FUNCTION: z.string().trim().min(1).optional(),
+    ANALYTICS_REFRESH_STATE_MACHINE_ARN: z.string().trim().min(1).optional(),
+    ANALYTICS_SCHEDULER_SECRET: z.string().trim().min(1).optional(),
     MAPBOX_SECRET_TOKEN: z.string().trim().min(1).optional(),
     MAPBOX_PUBLIC_TOKEN: z.string().trim().min(1).optional(),
   })
@@ -116,6 +117,27 @@ const environmentSchema = z
         path: ["CONTENT_ANALYSIS_QUEUE_URL"],
         message:
           "AWS_REGION is required when CONTENT_ANALYSIS_QUEUE_URL is configured",
+      });
+    }
+    if (
+      value.ANALYTICS_REFRESH_STATE_MACHINE_ARN !== undefined &&
+      value.AWS_REGION === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["ANALYTICS_REFRESH_STATE_MACHINE_ARN"],
+        message: "AWS_REGION is required when analytics orchestration is enabled",
+      });
+    }
+    if (
+      value.ANALYTICS_SCHEDULER_SECRET !== undefined &&
+      value.ANALYTICS_REFRESH_STATE_MACHINE_ARN === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["ANALYTICS_SCHEDULER_SECRET"],
+        message:
+          "ANALYTICS_REFRESH_STATE_MACHINE_ARN is required when a scheduler secret is configured",
       });
     }
     if (value.NODE_ENV === "production" && value.MEDIA_BUCKET === undefined) {
@@ -197,7 +219,8 @@ export interface AppConfig {
   readonly analysisMaxImages: number;
   readonly analysisMaxImageBytes: number;
   readonly analysisMaxTotalImageBytes: number;
-  readonly analyticsDumpLambdaFunction: string | null;
+  readonly analyticsRefreshStateMachineArn: string | null;
+  readonly analyticsSchedulerSecret: string | null;
   readonly mapboxSecretToken: string | null;
   readonly mapboxPublicToken: string | null;
 }
@@ -246,7 +269,9 @@ export function loadConfig(
     analysisMaxImages: result.data.ANALYSIS_MAX_IMAGES,
     analysisMaxImageBytes: result.data.ANALYSIS_MAX_IMAGE_BYTES,
     analysisMaxTotalImageBytes: result.data.ANALYSIS_MAX_TOTAL_IMAGE_BYTES,
-    analyticsDumpLambdaFunction: result.data.ANALYTICS_DUMP_LAMBDA_FUNCTION ?? null,
+    analyticsRefreshStateMachineArn:
+      result.data.ANALYTICS_REFRESH_STATE_MACHINE_ARN ?? null,
+    analyticsSchedulerSecret: result.data.ANALYTICS_SCHEDULER_SECRET ?? null,
     mapboxSecretToken: result.data.MAPBOX_SECRET_TOKEN ?? null,
     mapboxPublicToken: result.data.MAPBOX_PUBLIC_TOKEN ?? null,
   };

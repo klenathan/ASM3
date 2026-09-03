@@ -15,6 +15,8 @@ import type {
   AnalyticsRepository,
   UpsertAnalyticsMetricInput,
 } from "./analytics.repository";
+import type { RefreshRunRecord } from "./refresh-run.ports";
+import type { RequestRefreshResult } from "./refresh-workflow";
 
 const now = new Date("2026-09-15T00:00:00.000Z");
 const clock: Clock = { now: () => now };
@@ -205,10 +207,89 @@ describe("AnalyticsService", () => {
     expect(refreshCalled).toBe(true);
   });
 
-  it("accepts admin refresh without a publisher", async () => {
-    const service = createService();
-    const response = await service.refresh(admin);
-    expect(response.accepted).toBe(true);
+  it("returns the latest durable refresh status to system admins", async () => {
+    const latestRun: RefreshRunRecord = {
+      runId: "123e4567-e89b-12d3-a456-426614174000",
+      trigger: "admin",
+      status: "querying",
+      attempts: 1,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+      glueJobRunId: "jr_1",
+      athenaQueryExecutionIds: {},
+    };
+    const service = createService(undefined, false, undefined, undefined, undefined, {
+      findLatestRun: async () => latestRun,
+    });
+
+    await expect(service.refreshStatus(admin)).resolves.toEqual({
+      runId: latestRun.runId,
+      trigger: "admin",
+      status: "querying",
+      attempts: 1,
+      lastError: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+  });
+
+  it("returns no status when the refresh store has no runs", async () => {
+    const service = createService(undefined, false, undefined, undefined, undefined, {
+      findLatestRun: async () => null,
+    });
+
+    await expect(service.refreshStatus(admin)).resolves.toBeNull();
+  });
+
+  it("rejects refresh status for non-admins", async () => {
+    const service = createService(undefined, false, undefined, undefined, undefined, {
+      findLatestRun: async () => null,
+    });
+
+    await expect(service.refreshStatus(moderator)).rejects.toMatchObject({ code: "ADMIN_REQUIRED" });
+  });
+
+
+  it("validates scheduled refresh secrets in the application layer", async () => {
+    const service = createService(undefined, false, undefined, "scheduler-secret");
+
+    await expect(service.scheduledRefresh(undefined)).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
+    await expect(service.scheduledRefresh("wrong-secret")).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
+  });
+
+  it("accepts a valid scheduled refresh secret and reports an unconfigured pipeline", async () => {
+    const service = createService(undefined, false, undefined, "scheduler-secret");
+
+    await expect(service.scheduledRefresh("scheduler-secret")).resolves.toEqual({
+      accepted: true,
+      message: "Analytics refresh orchestration is not configured; nothing was started.",
+    });
+  });
+  it("publishes a valid scheduled refresh to the workflow", async () => {
+    let scheduled = false;
+    const service = createService(
+      undefined,
+      false,
+      undefined,
+      "scheduler-secret",
+      async () => {
+        scheduled = true;
+        return {
+          runId: "123e4567-e89b-12d3-a456-426614174000",
+          status: "requested",
+          coalesced: false,
+        };
+      },
+    );
+
+    await expect(service.scheduledRefresh("scheduler-secret")).resolves.toMatchObject({
+      accepted: true,
+      message: "Scheduled analytics refresh started.",
+      runId: "123e4567-e89b-12d3-a456-426614174000",
+      status: "requested",
+    });
+    expect(scheduled).toBe(true);
   });
 
   it("supports pagination", async () => {
@@ -238,6 +319,9 @@ function createService(
   repository?: AnalyticsRepository | undefined,
   isModeratorOfSociety = false,
   onRefreshRequested?: (() => Promise<void>) | undefined,
+  schedulerSecret?: string | undefined,
+  onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined,
+  runStore?: { findLatestRun: () => Promise<RefreshRunRecord | null> } | undefined,
 ): AnalyticsService {
   return new AnalyticsService({
     repository: repository ?? new FakeAnalyticsRepository(),
@@ -260,7 +344,10 @@ function createService(
       },
     },
     clock,
+    runStore,
     onRefreshRequested,
+    schedulerSecret,
+    onScheduledRefresh,
   });
 }
 
@@ -366,6 +453,14 @@ class FakeAnalyticsRepository implements AnalyticsRepository {
       this.records.push(record);
     }
     return record;
+  }
+
+  async upsertMetrics(
+    inputs: readonly UpsertAnalyticsMetricInput[],
+  ): Promise<readonly AnalyticsMetricRecord[]> {
+    const records: AnalyticsMetricRecord[] = [];
+    for (const input of inputs) records.push(await this.upsertMetric(input));
+    return records;
   }
 
   async findLatestPeriod(): Promise<Date | null> {

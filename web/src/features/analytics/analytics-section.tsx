@@ -7,12 +7,18 @@ import {
   Cell,
   Pie,
   PieChart,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-
 import { Button } from "../../components/ui/button";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "../../components/ui/chart";
+
+import { Badge } from "../../components/ui/badge";
 import {
   Card,
   CardContent,
@@ -22,10 +28,47 @@ import {
 } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 
-import { queryMetrics, refreshAnalytics } from "./analytics-api";
-import type { UserGrowthData, ContentVolumeData, TopSocietiesData, ModerationData, MetricPayload } from "./analytics-api";
+import { getAnalyticsRefreshStatus, queryMetrics, refreshAnalytics } from "./analytics-api";
+import type {
+  AnalyticsPage,
+  ContentVolumeData,
+  MetricPayload,
+  ModerationData,
+  RefreshRun,
+  RefreshStatus,
+  TopSocietiesData,
+  UserGrowthData,
+} from "./analytics-api";
 
-const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
+const USER_GROWTH_CHART_CONFIG = {
+  value: { label: "Users", color: "var(--chart-1)" },
+  registrations: { label: "Registrations", color: "var(--chart-1)" },
+  active: { label: "Active", color: "var(--chart-3)" },
+  total: { label: "Total", color: "var(--chart-4)" },
+  suspended: { label: "Suspended", color: "var(--destructive)" },
+} satisfies ChartConfig;
+
+const CONTENT_VOLUME_CHART_CONFIG = {
+  value: { label: "Activity", color: "var(--chart-1)" },
+  threads: { label: "Threads", color: "var(--chart-1)" },
+  comments: { label: "Comments", color: "var(--chart-4)" },
+  votes: { label: "Votes", color: "var(--signal)" },
+  reports: { label: "Reports", color: "var(--destructive)" },
+} satisfies ChartConfig;
+
+const MEMBERS_CHART_CONFIG = {
+  value: { label: "Members", color: "var(--chart-1)" },
+} satisfies ChartConfig;
+
+const THREADS_CHART_CONFIG = {
+  value: { label: "Threads", color: "var(--signal)" },
+} satisfies ChartConfig;
+
+const MODERATION_CHART_CONFIG = {
+  value: { label: "Reports", color: "var(--chart-3)" },
+  pending: { label: "Pending", color: "var(--signal)" },
+  resolved: { label: "Resolved", color: "var(--chart-3)" },
+} satisfies ChartConfig;
 
 function isUserGrowth(data: MetricPayload): data is UserGrowthData {
   return "registrations" in data;
@@ -43,12 +86,31 @@ function isModeration(data: MetricPayload): data is ModerationData {
   return "pendingReports" in data;
 }
 
+function platformMetricData(page: AnalyticsPage | undefined): MetricPayload | undefined {
+  return page?.metrics.find((metric) => metric.societyId === null)?.data;
+}
+
+const REFRESH_STATUS_LABEL: Record<RefreshStatus, string> = {
+  requested: "Queued",
+  exporting: "Exporting snapshot",
+  querying: "Running metrics",
+  completed: "Completed",
+  failed: "Failed",
+};
+
+function refreshStatusVariant(status: RefreshStatus): "default" | "secondary" | "destructive" {
+  if (status === "failed") return "destructive";
+  if (status === "completed") return "default";
+  return "secondary";
+}
+
+
 function UserGrowthChart({ data }: { data: UserGrowthData }) {
   const chartData = [
-    { label: "Registrations", value: data.registrations },
-    { label: "Active", value: data.activeUsers },
-    { label: "Total", value: data.totalUsers },
-    { label: "Suspended", value: data.suspensions },
+    { label: "Registrations", value: data.registrations, color: "var(--color-registrations)" },
+    { label: "Active", value: data.activeUsers, color: "var(--color-active)" },
+    { label: "Total", value: data.totalUsers, color: "var(--color-total)" },
+    { label: "Suspended", value: data.suspensions, color: "var(--color-suspended)" },
   ];
 
   return (
@@ -59,13 +121,24 @@ function UserGrowthChart({ data }: { data: UserGrowthData }) {
       </CardHeader>
       <CardContent>
         <div className="h-[200px]">
-          <BarChart width={400} height={200} data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="label" fontSize={12} />
-            <YAxis fontSize={12} />
-            <Tooltip />
-            <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
-          </BarChart>
+          <ChartContainer
+            config={USER_GROWTH_CHART_CONFIG}
+            className="h-full w-full aspect-auto"
+            role="img"
+            aria-label="User growth metrics bar chart"
+          >
+            <BarChart accessibilityLayer data={chartData}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis dataKey="label" fontSize={12} />
+              <YAxis fontSize={12} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry) => (
+                  <Cell key={entry.label} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
         </div>
       </CardContent>
     </Card>
@@ -74,10 +147,10 @@ function UserGrowthChart({ data }: { data: UserGrowthData }) {
 
 function ContentVolumeChart({ data }: { data: ContentVolumeData }) {
   const chartData = [
-    { label: "Threads", value: data.threads },
-    { label: "Comments", value: data.comments },
-    { label: "Votes", value: data.votes },
-    { label: "Reports", value: data.reports },
+    { label: "Threads", value: data.threads, color: "var(--color-threads)" },
+    { label: "Comments", value: data.comments, color: "var(--color-comments)" },
+    { label: "Votes", value: data.votes, color: "var(--color-votes)" },
+    { label: "Reports", value: data.reports, color: "var(--color-reports)" },
   ];
 
   return (
@@ -88,13 +161,24 @@ function ContentVolumeChart({ data }: { data: ContentVolumeData }) {
       </CardHeader>
       <CardContent>
         <div className="h-[200px]">
-          <BarChart width={400} height={200} data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="label" fontSize={12} />
-            <YAxis fontSize={12} />
-            <Tooltip />
-            <Bar dataKey="value" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} />
-          </BarChart>
+          <ChartContainer
+            config={CONTENT_VOLUME_CHART_CONFIG}
+            className="h-full w-full aspect-auto"
+            role="img"
+            aria-label="Content volume metrics bar chart"
+          >
+            <BarChart accessibilityLayer data={chartData}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis dataKey="label" fontSize={12} />
+              <YAxis fontSize={12} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry) => (
+                  <Cell key={entry.label} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
         </div>
       </CardContent>
     </Card>
@@ -116,25 +200,51 @@ function TopSocietiesChart({ data }: { data: TopSocietiesData }) {
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">By Members</p>
             <div className="h-[150px]">
-              <BarChart width={400} height={150} data={byMembers.map((s) => ({ label: s.name || s.societyId.slice(0, 8), value: s.memberCount }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" fontSize={10} />
-                <YAxis fontSize={10} />
-                <Tooltip />
-                <Bar dataKey="value" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
-              </BarChart>
+              <ChartContainer
+                config={MEMBERS_CHART_CONFIG}
+                className="h-full w-full aspect-auto"
+                role="img"
+                aria-label="Top societies by member count bar chart"
+              >
+                <BarChart
+                  accessibilityLayer
+                  data={byMembers.map((s) => ({
+                    label: s.name || s.societyId.slice(0, 8),
+                    value: s.memberCount,
+                  }))}
+                >
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" fontSize={10} />
+                  <YAxis fontSize={10} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
             </div>
           </div>
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">By Threads</p>
             <div className="h-[150px]">
-              <BarChart width={400} height={150} data={byThreads.map((s) => ({ label: s.name || s.societyId.slice(0, 8), value: s.threadCount }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" fontSize={10} />
-                <YAxis fontSize={10} />
-                <Tooltip />
-                <Bar dataKey="value" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
-              </BarChart>
+              <ChartContainer
+                config={THREADS_CHART_CONFIG}
+                className="h-full w-full aspect-auto"
+                role="img"
+                aria-label="Top societies by thread count bar chart"
+              >
+                <BarChart
+                  accessibilityLayer
+                  data={byThreads.map((s) => ({
+                    label: s.name || s.societyId.slice(0, 8),
+                    value: s.threadCount,
+                  }))}
+                >
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" fontSize={10} />
+                  <YAxis fontSize={10} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
             </div>
           </div>
         </div>
@@ -142,11 +252,14 @@ function TopSocietiesChart({ data }: { data: TopSocietiesData }) {
     </Card>
   );
 }
-
 function ModerationChart({ data }: { data: ModerationData }) {
   const pieData = [
-    { name: "Pending", value: data.pendingReports },
-    { name: "Resolved", value: data.totalReports - data.pendingReports },
+    { name: "Pending", value: data.pendingReports, color: "var(--color-pending)" },
+    {
+      name: "Resolved",
+      value: Math.max(data.totalReports - data.pendingReports, 0),
+      color: "var(--color-resolved)",
+    },
   ];
 
   return (
@@ -159,24 +272,46 @@ function ModerationChart({ data }: { data: ModerationData }) {
       </CardHeader>
       <CardContent>
         <div className="flex h-[200px] items-center justify-center">
-          <PieChart width={200} height={200}>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={80}
-              paddingAngle={2}
-              dataKey="value"
-            >
-              {pieData.map((entry, idx) => (
-                <Cell key={entry.name} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
+          <ChartContainer
+            config={MODERATION_CHART_CONFIG}
+            className="h-full w-full aspect-auto"
+            role="img"
+            aria-label="Moderation report status donut chart"
+          >
+            <PieChart accessibilityLayer>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={80}
+                paddingAngle={2}
+                dataKey="value"
+              >
+                {pieData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Pie>
+              <ChartTooltip content={<ChartTooltipContent />} />
+            </PieChart>
+          </ChartContainer>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-muted-foreground">
+          {pieData.map((entry) => (
+            <div key={entry.name}>
+              <div className="mb-1 flex items-center justify-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="font-medium text-foreground">{entry.name}</span>
+              </div>
+              <p>{entry.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-center text-xs text-muted-foreground">
           <div>
             <p className="font-medium text-foreground">{data.avgResolutionHours.toFixed(1)}h</p>
             <p>Avg resolution</p>
@@ -190,6 +325,7 @@ function ModerationChart({ data }: { data: ModerationData }) {
     </Card>
   );
 }
+
 
 export function AnalyticsSection() {
   const queryClient = useQueryClient();
@@ -218,45 +354,81 @@ export function AnalyticsSection() {
     refetchInterval: 30_000,
   });
 
-  const refreshMutation = useMutation({
-    mutationFn: refreshAnalytics,
-    onSuccess: () => {
-      // Refetch all metrics after a delay to allow pipeline to complete
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["analytics"] });
-      }, 60_000);
+  const refreshStatusQuery = useQuery<RefreshRun | null>({
+    queryKey: ["analytics", "refresh-status"],
+    queryFn: getAnalyticsRefreshStatus,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "requested" || status === "exporting" || status === "querying"
+        ? 5_000
+        : false;
     },
   });
 
-  const userGrowthData = userGrowthQuery.data?.metrics[0]?.data;
-  const contentVolumeData = contentVolumeQuery.data?.metrics[0]?.data;
-  const topSocietiesData = topSocietiesQuery.data?.metrics[0]?.data;
-  const moderationData = moderationQuery.data?.metrics[0]?.data;
+  const refreshMutation = useMutation({
+    mutationFn: refreshAnalytics,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      void queryClient.invalidateQueries({ queryKey: ["analytics", "refresh-status"] });
+    },
+  });
+
+  const userGrowthData = platformMetricData(userGrowthQuery.data);
+  const contentVolumeData = platformMetricData(contentVolumeQuery.data);
+  const topSocietiesData = platformMetricData(topSocietiesQuery.data);
+  const moderationData = platformMetricData(moderationQuery.data);
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Platform-wide usage metrics computed nightly via the EMR pipeline.
-          </p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Platform-wide usage metrics computed nightly through Glue and Athena.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshMutation.mutate()}
+            disabled={refreshMutation.isPending}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? "animate-spin" : ""}`}
+            />
+            {refreshMutation.isPending ? "Refreshing…" : "Refresh Analytics"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refreshMutation.mutate()}
-          disabled={refreshMutation.isPending}
-        >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? "animate-spin" : ""}`}
-          />
-          {refreshMutation.isPending ? "Refreshing…" : "Refresh Analytics"}
-        </Button>
+        {refreshMutation.isError ? (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {refreshMutation.error instanceof Error && refreshMutation.error.message
+              ? refreshMutation.error.message
+              : "Unable to refresh analytics. Try again."}
+          </p>
+        ) : null}
+        {refreshStatusQuery.data ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" role="status" aria-live="polite">
+            <span className="text-muted-foreground">Latest refresh:</span>
+            <Badge variant={refreshStatusVariant(refreshStatusQuery.data.status)}>
+              {REFRESH_STATUS_LABEL[refreshStatusQuery.data.status]}
+            </Badge>
+            {refreshStatusQuery.data.status === "failed" && refreshStatusQuery.data.lastError ? (
+              <span className="text-destructive">{refreshStatusQuery.data.lastError}</span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {userGrowthQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : userGrowthQuery.isError ? (
+          <MetricCardError
+            title="User Growth"
+            error={userGrowthQuery.error}
+            onRetry={() => void userGrowthQuery.refetch()}
+            isRetrying={userGrowthQuery.isFetching}
+          />
         ) : userGrowthData && isUserGrowth(userGrowthData) ? (
           <UserGrowthChart data={userGrowthData} />
         ) : (
@@ -265,6 +437,13 @@ export function AnalyticsSection() {
 
         {contentVolumeQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : contentVolumeQuery.isError ? (
+          <MetricCardError
+            title="Content Volume"
+            error={contentVolumeQuery.error}
+            onRetry={() => void contentVolumeQuery.refetch()}
+            isRetrying={contentVolumeQuery.isFetching}
+          />
         ) : contentVolumeData && isContentVolume(contentVolumeData) ? (
           <ContentVolumeChart data={contentVolumeData} />
         ) : (
@@ -273,6 +452,13 @@ export function AnalyticsSection() {
 
         {topSocietiesQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : topSocietiesQuery.isError ? (
+          <MetricCardError
+            title="Top Societies"
+            error={topSocietiesQuery.error}
+            onRetry={() => void topSocietiesQuery.refetch()}
+            isRetrying={topSocietiesQuery.isFetching}
+          />
         ) : topSocietiesData && isTopSocieties(topSocietiesData) ? (
           <TopSocietiesChart data={topSocietiesData} />
         ) : (
@@ -281,6 +467,13 @@ export function AnalyticsSection() {
 
         {moderationQuery.isLoading ? (
           <Skeleton className="h-[300px]" />
+        ) : moderationQuery.isError ? (
+          <MetricCardError
+            title="Moderation"
+            error={moderationQuery.error}
+            onRetry={() => void moderationQuery.refetch()}
+            isRetrying={moderationQuery.isFetching}
+          />
         ) : moderationData && isModeration(moderationData) ? (
           <ModerationChart data={moderationData} />
         ) : (
@@ -288,6 +481,40 @@ export function AnalyticsSection() {
         )}
       </div>
     </div>
+  );
+}
+
+
+function MetricCardError({
+  title,
+  error,
+  onRetry,
+  isRetrying,
+}: {
+  title: string;
+  error: unknown;
+  onRetry: () => void;
+  isRetrying: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex h-[200px] flex-col items-center justify-center gap-3">
+          <p role="alert" className="text-center text-sm text-destructive">
+            {error instanceof Error && error.message
+              ? error.message
+              : "Unable to load analytics. Try again."}
+          </p>
+          <Button type="button" variant="outline" onClick={onRetry} disabled={isRetrying}>
+            <RefreshCw aria-hidden="true" className={isRetrying ? "animate-spin" : undefined} />
+            Retry
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

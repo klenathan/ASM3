@@ -76,7 +76,7 @@ resource "aws_security_group" "ecs" {
 
 resource "aws_security_group" "database" {
   name_prefix = "${local.name}-database-"
-  description = "PostgreSQL access from ECS only"
+  description = "PostgreSQL access from ECS and Glue"
   vpc_id      = aws_vpc.this.id
 
   ingress {
@@ -85,6 +85,28 @@ resource "aws_security_group" "database" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
+  }
+
+  dynamic "ingress" {
+    for_each = var.enable_analytics_pipeline ? [true] : []
+    content {
+      description     = "Glue analytics export PostgreSQL access"
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [aws_security_group.analytics_glue[0].id]
+    }
+  }
+
+  dynamic "ingress" {
+    for_each = var.enable_analytics_pipeline ? [true] : []
+    content {
+      description     = "Analytics workflow Lambda PostgreSQL access"
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [aws_security_group.analytics_workflow[0].id]
+    }
   }
 
   egress {

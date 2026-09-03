@@ -53,9 +53,23 @@ export interface AnalyticsPage {
   };
 }
 
+export type RefreshStatus = "requested" | "exporting" | "querying" | "completed" | "failed";
+
+export interface RefreshRun {
+  runId: string;
+  trigger: "admin" | "nightly";
+  status: RefreshStatus;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RefreshResponse {
   accepted: boolean;
   message: string;
+  runId?: string;
+  status?: RefreshStatus;
 }
 
 export interface QueryParams {
@@ -80,4 +94,7 @@ export function queryMetrics(params: QueryParams = {}): Promise<AnalyticsPage> {
 
 export function refreshAnalytics(): Promise<RefreshResponse> {
   return request<RefreshResponse>("/api/v1/admin/analytics/refresh", { method: "POST" });
+}
+export function getAnalyticsRefreshStatus(): Promise<RefreshRun | null> {
+  return request<RefreshRun | null>("/api/v1/admin/analytics/refresh/status");
 }

@@ -7,6 +7,8 @@ import type { z } from "@hono/zod-openapi";
 import type { queryAnalyticsQuerySchema } from "./analytics.schemas";
 import type { MetricType } from "../domain/analytics";
 
+export const SCHEDULER_SECRET_HEADER = "x-analytics-scheduler-secret";
+
 export interface AnalyticsControllerDependencies {
   readonly analyticsService: AnalyticsService;
 }
@@ -68,6 +70,37 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
           requestId: context.get("requestId"),
           error: error instanceof Error ? error.message : String(error),
         }, "analytics refresh failed");
+        return analyticsErrorResponse(context, error);
+      }
+    },
+    async refreshStatus(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const result = await dependencies.analyticsService.refreshStatus(principal);
+        return context.json(result, 200);
+      } catch (error) {
+        context.get("logger").warn({
+          requestId: context.get("requestId"),
+          error: error instanceof Error ? error.message : String(error),
+        }, "analytics refresh status failed");
+        return analyticsErrorResponse(context, error);
+      }
+    },
+
+    async scheduledRefresh(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const presented = context.req.header(SCHEDULER_SECRET_HEADER);
+        const result = await dependencies.analyticsService.scheduledRefresh(presented);
+        context.get("logger").info(
+          { requestId: context.get("requestId") },
+          "analytics scheduled refresh accepted",
+        );
+        return context.json(result, 202);
+      } catch (error) {
+        context.get("logger").warn({
+          requestId: context.get("requestId"),
+          error: error instanceof Error ? error.message : String(error),
+        }, "analytics scheduled refresh rejected");
         return analyticsErrorResponse(context, error);
       }
     },

@@ -1,44 +1,169 @@
-# Analytics — EMR Serverless Pipeline
+# Analytics — Glue + Athena Pipeline
 
-## Purpose (Analytics AWS category)
+## Purpose
 
-Assessment 3 requires an **Analytics**-category AWS service invoked automatically by application/UI code. The analytics pipeline satisfies this: a System Admin triggers `POST /api/v1/admin/analytics/refresh` (202 Accepted, `system_admin` only) or EventBridge cron `0 2 * * ? *` triggers the nightly run; S3 `_SUCCESS` chaining invokes the remaining stages automatically. Evidence is the UI action → Lambda → EMR Serverless → S3 → RDS metric upsert, plus CloudWatch logs and S3 `emr-serverless-logs`.
+Assessment 3 requires an Analytics-category AWS service invoked automatically
+by application or UI code. A system administrator can trigger
+`POST /api/v1/admin/analytics/refresh` and receive `202 Accepted`; a scheduled
+EventBridge rule invokes the nightly route at `cron(0 2 * * ? *)` UTC. Both
+triggers create a durable refresh run and start a Standard Step Functions
+workflow. The existing admin API, dashboard, four metric groups, and persisted
+`analytics_metrics` rows remain unchanged.
 
-## Architecture
+## Final Architecture
 
+Admin refresh or scheduled EventBridge rule
+  -> ECS backend creates a durable run
+  -> Standard Step Functions workflow
+  -> AWS Glue export job
+  -> private analytics S3 bucket
+     analytics/source/table=<name>/snapshot_at=<utc>/snapshot_id=<run-id>/
+      analytics/manifest/snapshot_id=<run-id>/
+  -> Glue Catalog external Parquet tables
+  -> four Athena metric queries in parallel
+  -> analytics workflow Lambda retrieves results and persists metrics
+  -> RDS analytics_metrics
+
+The scheduler calls
+`POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
+using the generated `x-analytics-scheduler-secret` header. The backend records
+one durable PostgreSQL refresh run and starts the workflow, then returns
+immediately. Step Functions owns Glue completion waiting, runs the four Athena
+queries in parallel, and invokes the analytics workflow Lambda to retrieve
+validated result pages and persist them through the existing repository.
+The backend does not poll Glue or Athena. The API exposes the latest durable
+workflow state for the Admin Center.
+
+The workflow Lambda runs in the private database subnets, uses the existing
+LabRole, and reaches RDS plus Athena through VPC interface endpoints. The
+content-analysis Lambda remains a separate moderation workflow.
+
+## Data Contract
+
+Glue reads `users`, `societies`, `threads`, `comments`, `memberships`, `votes`,
+and `reports` from PostgreSQL through separate JDBC reads. It writes Parquet
+partitions identified by `snapshot_at` and `snapshot_id`, then writes the
+manifest only after all source tables succeed. Athena receives the immutable
+refresh run ID and selects only that manifest identity, so a partial failed run
+is never queryable.
+
+The Glue Catalog database is `analytics`. It contains one external table per
+source table plus the unpartitioned `snapshot_manifest` table. The Athena SQL
+catalog in
+`backend/src/modules/analytics/infrastructure/athena-sql-catalog.ts` returns
+the existing four metric groups:
+
+- `user_growth`: registrations, active users, total users, and suspensions
+- `content_volume`: platform totals plus society-scoped threads, comments, votes, and reports
+- `top_societies`: top societies by members and threads
+- `moderation`: pending reports, resolved reports, average resolution hours, and total reports
+
+Every query returns `metric_type`, nullable `society_id`, UTC `period_start`,
+UTC inclusive `period_end`, and JSON-object `data`. The adapter ignores Athena
+header rows, consumes paginated results, converts empty society IDs to `null`,
+and rejects malformed rows before persistence.
+
+## Demo data seeding
+
+Use the checked-in seeder to populate PostgreSQL source tables with deterministic
+RMIT activity. It creates demo users, memberships, threads, comments, votes, and
+pending/resolved reports; it does **not** write `analytics_metrics` directly.
+The normal Glue snapshot and Athena queries therefore remain the source of the
+dashboard data.
+
+From `backend/`:
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+pnpm analytics:demo
 ```
-POST /api/v1/admin/analytics/refresh (system_admin)
-  → Lambda invoke (Event) analytics-dump-rds (VPC, RDS → S3 analytics/staging/<ts>/_SUCCESS)
-    → S3 ObjectCreated:Put analytics/staging/_SUCCESS
-      → analytics-start-serverless (StartJobRun + GetJobRun polling)
-        → EMR Serverless Spark (emr-7.2.0, SPARK, max 3 vCPU/7GB, driver 1c/3GB + executor 2c/4GB×1)
-          reads s3://analytics/staging/<ts>/ JSONL (6 tables) via SparkSession.getOrCreate(),
-          coalesce(1).write.json to s3://analytics/output/<ts>/metrics.jsonl
-            → S3 ObjectCreated:Put analytics/output/_SUCCESS
-              → analytics-load-results (VPC, S3 → RDS analytics_metrics upsert on metric_type, society_id, period_start)
-                → GET /api/v1/admin/analytics returns fresh metrics
+
+The script is repeatable. It uses a fixed ID namespace and upserts only its
+`analytics.demo.*@rmit.edu.au` users and related records. Use `--users 60` to
+increase the synthetic population (12–200 users are accepted). To seed and
+immediately request the authenticated scheduled-refresh route, configure
+`ANALYTICS_API_URL` (defaults to `http://localhost:3000`) and
+`ANALYTICS_SCHEDULER_SECRET`, then run:
+
+```bash
+pnpm analytics:demo -- --refresh
 ```
 
-- **S3 seams:** same bucket `${project}-analytics-${accountId}`, prefixes `analytics/staging/<ts>/`, `analytics/output/<ts>/`, `analytics/pyspark/compute_metrics.py`, `analytics/emr-serverless-logs`.
-- **Polling:** `GetJobRun` every 30s, 900s timeout, `CancelJobRun` on timeout; `SUCCESS`→ success, `FAILED`/`CANCELLED`→ failure (no output `_SUCCESS`, no load).
-- **Gate:** `enable_analytics_pipeline` (default `false`) controls the application + 3 Lambdas + notifications + EventBridge; destroy after demo (`tofu destroy`) since `End Lab` does not stop Serverless apps.
+Without `--refresh`, click **Refresh analytics** in Admin Center after the
+seeder completes. Wait for the refresh status to become `completed`, then
+reload the analytics dashboard. The refresh can take several minutes because
+it runs Glue, four parallel Athena queries, and the workflow persistence step.
 
-## Cost saving vs classic EMR
+The script requires at least five active societies, so run `pnpm db:seed` first
+against a new database. It is intended for a live coursework demo; remove the
+demo rows or destroy the demo stack afterward.
 
-|  | Classic EMR | EMR Serverless |
-|---|---|---|
-| Provisioning | Transient cluster 1× m5.large MASTER + 1× m5.large CORE (4 vCPU), `KeepJobFlowAliveWhenNoSteps=false`, ~5 min job + spin-up, `RunJobFlow`/`TerminateJobFlows`, `Ec2SubnetId`/`Ec2KeyName`, `ON_DEMAND` markup | `aws_emrserverless_application` `emr-7.2.0` `SPARK`, no instances/subnet, StartJobRun only |
-| Billing | EC2 + EMR markup for full cluster lifetime, 4 vCPU reserved even while idle | Pay-per-second for Spark `vCPU/memory/disk` only while job runs (~3 vCPU); idle auto-stop 15m (`auto_stop_configuration.idle_timeout_minutes=15`), no baseline cost |
-| Learner Lab fit | 2× m5.large consumes 4/32 vCPU and 2/9 instances simultaneously | ~3 vCPU max (`maximum_capacity { cpu="3 vCPU" memory="7 GB" disk="20 GB" }`), fits 32 vCPU/9 instance limit even with ECS `t3.micro` + RDS |
-| Networking | Subnet + security group + termination complexity | No EC2 networking; Lambda polls EMR Serverless API only |
-| IAM | LabRole reused | LabRole reused (`executionRoleArn` = LabRole, requires trust for `emr-serverless.amazonaws.com` – verified in `us-east-1` Learner Lab) |
+## AWS Resources And Cost
 
-No baseline proof is required; the migration is done directly for cost saving. PySpark script switches `s3a://` → `s3://` to use Serverless’ injected S3 connector, keeping `SparkSession.builder.getOrCreate()` and `argparse` flags unchanged.
+The `enable_analytics_pipeline` flag defaults to `false` and gates the shared
+analytics S3 bucket, Glue, Catalog, Athena, VPC endpoints, Step Functions,
+workflow Lambda, lifecycle, and scheduled EventBridge resources. EventBridge
+delivery retries use an SQS DLQ. The generated scheduler secret is stored in
+Secrets Manager and injected into ECS without exposing it in the task
+environment. ECS is permitted HTTPS access to the private interface endpoints;
+without that rule, ECS secret injection and `awslogs` delivery time out. The
+bucket is private and uses SSE-S3. Retention is 30 days for source snapshots
+and manifests, 7 days for Athena result files, and 1 day for Glue temporary
+files. RDS `analytics_metrics` is the durable dashboard history and is not
+subject to those S3 lifecycle rules.
 
-## Ops
+Glue uses two `G.1X` workers with concurrency one and Athena uses one
+configured workgroup. The deployment reuses `LabRole`, avoids additional IAM
+resources, and does not provision duplicate compute. The workflow Lambda is
+reserved to one concurrent invocation. Destroy the demo stack with
+`tofu destroy`; stopping the Learner Lab does not reliably stop RDS or clean up
+S3 data.
 
-- Build: `cd backend && pnpm build:analytics` (produces `analytics-dump-rds.zip`, `analytics-start-serverless.zip` (alias `analytics-start-emr.zip`), `analytics-load-results.zip`)
-- Deploy: `tofu plan/apply` with `enable_analytics_pipeline = true` (see `infras/terraform.tfvars.example`)
-- Verify: trigger refresh via Admin Center Analytics tab or `POST /api/v1/admin/analytics/refresh` → check `GET /api/v1/admin/analytics` and CloudWatch `/aws/lambda/*analytics*` (7-day retention)
-- Teardown: `tofu destroy` (or disable flag); `End Lab` stops EC2 but not RDS/Serverless
+## Verification And Rollback Boundary
 
+Before infrastructure cutover, verify against the same RDS fixture and UTC
+date that:
+
+1. All seven source tables and the manifest use one snapshot identity.
+2. The four metric groups have the expected payloads and daily periods.
+3. Society-scoped rows and platform totals match the existing dashboard.
+4. Top-society ordering and IDs remain stable under ties.
+5. Repeating a run ID reuses Glue/Athena work and the same persistence keys.
+6. Pagination produces the same result and an invalid row persists nothing.
+7. The admin API response shape and dashboard groups are unchanged.
+
+Database migrations are forward-only and applied in order through
+`pnpm db:migrate`. The current analytics boundary is migrations 0013
+(`analytics_metrics` nullable platform-key normalization), 0014 (durable
+refresh runs), and 0015 (refresh-run leases). The migration preflight retains
+the newest row per legacy `(metric_type, period_start)` platform key before
+0013 creates its unique index; it does not edit generated migration files.
+For rollback, deploy code compatible with the already-applied schema and
+restore data from the database backup if required. Do not delete or rewrite an
+applied Drizzle migration; roll forward with a new generated migration.
+
+After these checks pass, applying this cutover removes the previous analytics
+deployment resources and artifacts. Rollback is deliberately outside normal
+runtime behavior: restore the pre-cutover Git revision, rebuild from that
+revision, and reapply its infrastructure. The shared analytics bucket remains
+the durable handoff boundary; no automatic fallback deployment is maintained.
+
+## Operations
+
+1. Verify the active Learner Lab service list and LabRole trust/permissions.
+   Step Functions is not confirmed by the checked-in service list; do not
+   apply until the active lab explicitly provides it. Then set
+   `enable_analytics_pipeline = true`,
+   `analytics_learner_lab_permissions_confirmed = true`, and, for deployed
+   scheduling, set `analytics_glue_job_name` in `infras/terraform.tfvars`.
+2. From `backend/`, run `pnpm install --frozen-lockfile` and
+   `pnpm build:analytics-workflow`.
+3. Run `tofu plan` and `tofu apply` from `infras/`.
+4. Trigger the Admin Center refresh or call the admin refresh endpoint.
+5. Verify `GET /api/v1/admin/analytics`, the refresh status endpoint, Glue job
+   history, Athena query history, and the scheduler/API destination
+   configuration.
+6. Run `tofu destroy` after the demonstration, using
+   `force_destroy_buckets = true` only when deleting non-empty demo buckets is
+   intended.

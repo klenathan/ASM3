@@ -37,6 +37,20 @@ describe("environment configuration", () => {
     })).toThrow("AWS_REGION and MEDIA_BUCKET must be configured together");
   });
 
+  it("loads managed analytics workflow configuration", () => {
+    const stateMachineArn = "arn:aws:states:us-east-1:123456789012:stateMachine:analytics";
+    expect(loadConfig({
+      DATABASE_URL: databaseUrl,
+      AWS_REGION: "us-east-1",
+      MEDIA_BUCKET: "rmit-society-media",
+      ANALYTICS_REFRESH_STATE_MACHINE_ARN: stateMachineArn,
+      ANALYTICS_SCHEDULER_SECRET: "scheduler-secret",
+    })).toMatchObject({
+      analyticsRefreshStateMachineArn: stateMachineArn,
+      analyticsSchedulerSecret: "scheduler-secret",
+    });
+  });
+
   it("requires remote media storage in production", () => {
     expect(() => loadConfig({
       DATABASE_URL: databaseUrl,

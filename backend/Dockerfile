@@ -47,7 +47,7 @@ COPY --chown=node:node drizzle ./drizzle
 USER node
 
 # This target is run once by the ECS database-bootstrap task, never as a service.
-CMD ["sh", "-c", "./node_modules/.bin/drizzle-kit migrate && ./node_modules/.bin/tsx src/db/seed.ts"]
+CMD ["sh", "-c", "./node_modules/.bin/tsx src/db/migrate.ts && ./node_modules/.bin/tsx src/db/seed.ts"]
 
 FROM node:22.23.1-bookworm-slim AS runtime
 

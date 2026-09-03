@@ -16,9 +16,9 @@ import type {
 import { analyticsMetrics } from "./analytics.tables";
 
 export class DrizzleAnalyticsRepository implements AnalyticsRepository {
-  private readonly executor: Pick<Database, "select" | "insert" | "update" | "delete">;
+  private readonly executor: Database;
 
-  constructor(executor: Pick<Database, "select" | "insert" | "update" | "delete">) {
+  constructor(executor: Database) {
     this.executor = executor;
   }
 
@@ -82,6 +82,20 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository {
     const now = new Date();
     const data = input.data as unknown as Record<string, unknown>;
 
+    const conflictTarget = input.societyId === null
+      ? {
+          target: [analyticsMetrics.metricType, analyticsMetrics.periodStart],
+          targetWhere: sql`${analyticsMetrics.societyId} IS NULL`,
+        }
+      : {
+          target: [
+            analyticsMetrics.metricType,
+            analyticsMetrics.societyId,
+            analyticsMetrics.periodStart,
+          ],
+          targetWhere: sql`${analyticsMetrics.societyId} IS NOT NULL`,
+        };
+
     const rows = await this.executor
       .insert(analyticsMetrics)
       .values({
@@ -95,11 +109,7 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository {
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: [
-          analyticsMetrics.metricType,
-          analyticsMetrics.societyId,
-          analyticsMetrics.periodStart,
-        ],
+        ...conflictTarget,
         set: {
           data,
           periodEnd: input.periodEnd,
@@ -158,6 +168,17 @@ export class DrizzleAnalyticsRepository implements AnalyticsRepository {
     const insertedRow = inserted[0];
     if (insertedRow === undefined) throw new Error("Failed to insert analytics metric");
     return toRecord(insertedRow);
+  }
+
+  async upsertMetrics(
+    inputs: readonly UpsertAnalyticsMetricInput[],
+  ): Promise<readonly AnalyticsMetricRecord[]> {
+    return this.executor.transaction(async (transaction) => {
+      const repository = new DrizzleAnalyticsRepository(transaction as unknown as Database);
+      const records: AnalyticsMetricRecord[] = [];
+      for (const input of inputs) records.push(await repository.upsertMetric(input));
+      return records;
+    });
   }
 
   async findLatestPeriod(): Promise<Date | null> {

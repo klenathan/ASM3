@@ -2,13 +2,31 @@ import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 
 import type { AppEnvironment } from "../../../app-types";
 import type { AnalyticsService } from "../application/analytics.service";
-import { createAnalyticsController } from "./analytics.controller";
+import {
+  createAnalyticsController,
+} from "./analytics.controller";
 import {
   analyticsPageSchema,
   errorSchema,
   queryAnalyticsQuerySchema,
   refreshResponseSchema,
+  refreshStatusSchema,
 } from "./analytics.schemas";
+
+const refreshStatusRoute = createRoute({
+  method: "get",
+  path: "/api/v1/admin/analytics/refresh/status",
+  tags: ["Analytics"],
+  summary: "Get the latest analytics refresh status",
+  responses: {
+    200: {
+      description: "Latest analytics refresh status",
+      content: { "application/json": { schema: refreshStatusSchema.nullable() } },
+    },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
 
 const queryMetricsRoute = createRoute({
   method: "get",
@@ -43,6 +61,24 @@ const refreshRoute = createRoute({
   },
 });
 
+const scheduledRefreshRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/analytics/scheduled-refresh",
+  tags: ["Analytics"],
+  summary:
+    "Internal nightly refresh entry point invoked by an EventBridge scheduled rule via an API destination; authenticated with a shared secret header",
+  responses: {
+    202: {
+      description: "Scheduled refresh accepted",
+      content: { "application/json": { schema: refreshResponseSchema } },
+    },
+    401: {
+      description: "A valid scheduler secret header is required",
+      content: { "application/json": { schema: errorSchema } },
+    },
+  },
+});
+
 export interface AnalyticsRouteDependencies {
   readonly analyticsService: AnalyticsService;
 }
@@ -51,7 +87,15 @@ export function registerAnalyticsRoutes(
   app: OpenAPIHono<AppEnvironment>,
   dependencies: AnalyticsRouteDependencies,
 ): void {
-  const controller = createAnalyticsController(dependencies);
+  const controller = createAnalyticsController({
+    analyticsService: dependencies.analyticsService,
+  });
   app.openapi(queryMetricsRoute, (context) => controller.queryMetrics(context) as never);
+  app.openapi(refreshStatusRoute, (context) => controller.refreshStatus(context) as never);
   app.openapi(refreshRoute, (context) => controller.refresh(context) as never);
+  app.openapi(scheduledRefreshRoute, (context) =>
+    controller.scheduledRefresh(context) as never,
+  );
 }
+
+export { SCHEDULER_SECRET_HEADER } from "./analytics.controller";

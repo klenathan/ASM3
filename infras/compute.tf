@@ -81,8 +81,9 @@ locals {
     { name = "CONTENT_ANALYSIS_MODEL_ID", value = local.content_analysis_model_id },
     { name = "ANALYSIS_MAX_COMMENTS", value = "40" },
     { name = "ANALYSIS_TIMEOUT_MS", value = "50000" },
-    { name = "ANALYTICS_DUMP_LAMBDA_FUNCTION", value = local.analytics_dump_function },
-  ])
+    ], var.enable_analytics_pipeline ? [
+    { name = "ANALYTICS_REFRESH_STATE_MACHINE_ARN", value = local.analytics_refresh_state_machine_arn },
+  ] : [])
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -106,10 +107,15 @@ resource "aws_ecs_task_definition" "backend" {
       protocol      = "tcp"
     }]
     environment = local.backend_env_vars
-    secrets = [{
-      name      = "DATABASE_URL"
-      valueFrom = aws_secretsmanager_secret.database_url.arn
-    }]
+    secrets = concat([
+      {
+        name      = "DATABASE_URL"
+        valueFrom = aws_secretsmanager_secret.database_url.arn
+      }
+      ], var.enable_analytics_pipeline ? [{
+        name      = "ANALYTICS_SCHEDULER_SECRET"
+        valueFrom = aws_secretsmanager_secret.analytics_scheduler_secret[0].arn
+    }] : [])
     healthCheck = {
       command     = ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
       interval    = 30
@@ -172,6 +178,11 @@ resource "aws_ecs_service" "backend" {
   task_definition = aws_ecs_task_definition.backend.arn
   desired_count   = var.app_desired_count
   launch_type     = "EC2"
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100

@@ -26,7 +26,19 @@ export interface QueryMetricsRequest {
   readonly limit?: number | undefined;
 }
 
+export interface RefreshStatusDto {
+  readonly runId: string;
+  readonly trigger: "admin" | "nightly";
+  readonly status: "requested" | "exporting" | "querying" | "completed" | "failed";
+  readonly attempts: number;
+  readonly lastError: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export interface RefreshResponse {
   readonly accepted: boolean;
   readonly message: string;
+  readonly runId?: string;
+  readonly status?: RefreshStatusDto["status"];
 }

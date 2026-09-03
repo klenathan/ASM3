@@ -14,7 +14,11 @@ import { createSocietyModule } from "./modules/societies/index";
 import { createDiscussionsModule } from "./modules/discussions/index";
 import { createModerationModule } from "./modules/moderation/index";
 import { createAuditModule } from "./modules/audit/index";
-import { createAnalyticsModule } from "./modules/analytics/index";
+import {
+  AnalyticsRefreshWorkflow,
+  createAnalyticsModule,
+  StepFunctionsWorkflowStarter,
+} from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
 import { createMediaModule, RemoteMediaStorage, S3MediaStorage } from "./modules/media/index";
 import { DrizzleThreadAttachmentAdapter } from "./modules/discussions/infrastructure/drizzle-thread-attachment.adapter";
@@ -275,30 +279,42 @@ async function main(): Promise<void> {
   });
   audit.start();
 
-  // Analytics module: wire the refresh trigger to invoke the dump-rds Lambda
-  // when configured. In development, the callback is a no-op.
-  let analyticsRefreshTrigger: (() => Promise<void>) | undefined;
-  if (config.analyticsDumpLambdaFunction !== null && config.awsRegion !== null) {
-    const { LambdaClient, InvokeCommand } = await import("@aws-sdk/client-lambda");
-    const lambdaClient = new LambdaClient({ region: config.awsRegion });
-    analyticsRefreshTrigger = async () => {
-      await lambdaClient.send(
-        new InvokeCommand({
-          FunctionName: config.analyticsDumpLambdaFunction!,
-          InvocationType: "Event", // async, don't wait for response
-        }),
-      );
-    };
-  }
+  let analyticsRefreshWorkflow: AnalyticsRefreshWorkflow | undefined;
   const analytics = createAnalyticsModule({
     database: database.db,
     accountReader: identity.repository,
     membershipRepository: societies.membershipRepository,
-    onRefreshRequested: analyticsRefreshTrigger,
+    onRefreshRequested: async () =>
+      analyticsRefreshWorkflow?.requestRefresh("admin"),
+    ...(config.analyticsSchedulerSecret === null
+      ? {}
+      : {
+          schedulerSecret: config.analyticsSchedulerSecret,
+          onScheduledRefresh: async () => {
+            if (analyticsRefreshWorkflow === undefined) {
+              throw new Error("analytics refresh workflow is not configured");
+            }
+            return analyticsRefreshWorkflow.requestRefresh("nightly");
+          },
+        }),
   });
 
+  if (
+    config.analyticsRefreshStateMachineArn !== null &&
+    config.awsRegion !== null
+  ) {
+    analyticsRefreshWorkflow = new AnalyticsRefreshWorkflow({
+      runStore: analytics.refreshRunStore,
+      starter: new StepFunctionsWorkflowStarter({
+        region: config.awsRegion,
+        stateMachineArn: config.analyticsRefreshStateMachineArn,
+      }),
+    });
+  }
   const app = createApp({
-    analytics,
+    analytics: {
+      analyticsService: analytics.analyticsService,
+    },
     config,
     logger,
     checkReadiness: database.checkConnection,

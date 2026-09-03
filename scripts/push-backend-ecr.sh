@@ -85,10 +85,21 @@ echo "Pushed $IMAGE_URI"
 if [[ "$BUILD_TARGET" == "runtime" ]]; then
   CLUSTER=$(tofu -chdir="$INFRA_DIR" output -raw ecs_cluster_name)
   SERVICE=$(tofu -chdir="$INFRA_DIR" output -raw ecs_service_name)
-  aws ecs update-service \
+  DESIRED_COUNT=$(aws ecs describe-services \
     --region "$AWS_REGION" \
     --cluster "$CLUSTER" \
-    --service "$SERVICE" \
-    --force-new-deployment >/dev/null
-  echo "Forced a new task deployment for ECS service $SERVICE"
+    --services "$SERVICE" \
+    --query 'services[0].desiredCount' \
+    --output text)
+
+  if [[ "$DESIRED_COUNT" == "0" ]]; then
+    echo "Skipped ECS deployment for service $SERVICE because its desired count is 0"
+  else
+    aws ecs update-service \
+      --region "$AWS_REGION" \
+      --cluster "$CLUSTER" \
+      --service "$SERVICE" \
+      --force-new-deployment >/dev/null
+    echo "Forced a new task deployment for ECS service $SERVICE"
+  fi
 fi
