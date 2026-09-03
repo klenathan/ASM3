@@ -39,8 +39,10 @@ describe("LocationSearchInput", () => {
           altitudeAccuracy: null,
           heading: null,
           speed: null,
+          toJSON: () => ({}),
         },
         timestamp: Date.now(),
+        toJSON: () => ({}),
       });
     });
     Object.defineProperty(globalThis.navigator, "geolocation", {
