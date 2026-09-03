@@ -143,8 +143,9 @@ resource "aws_lambda_function" "analytics_workflow" {
 
   environment {
     variables = {
-      DATABASE_URL_SECRET_ARN = aws_secretsmanager_secret.database_url.arn
-      RDS_CA_BUNDLE_PATH      = "/var/task/rds-global-bundle.pem"
+      DATABASE_URL_SECRET_ARN             = aws_secretsmanager_secret.database_url.arn
+      RDS_CA_BUNDLE_PATH                  = "/var/task/rds-global-bundle.pem"
+      ANALYTICS_RAW_EVENT_RETENTION_DAYS = tostring(var.analytics_raw_event_retention_days)
     }
   }
 
@@ -188,6 +189,8 @@ locals {
           Arguments = {
             "--refresh-run-id.$" = "$.runId"
             "--snapshot-at.$"    = "$.snapshotAt"
+            "--period-start.$"   = "$.periodStart"
+            "--period-end.$"     = "$.periodEnd"
           }
         }
         ResultPath = "$.glue"

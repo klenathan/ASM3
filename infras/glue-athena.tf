@@ -16,7 +16,6 @@ locals {
   analytics_catalog_tables = {
     users = {
       columns = [
-        { name = "id", type = "string" },
         { name = "created_at", type = "timestamp" },
         { name = "status", type = "string" },
       ]
@@ -34,7 +33,6 @@ locals {
       columns = [
         { name = "id", type = "string" },
         { name = "society_id", type = "string" },
-        { name = "author_id", type = "string" },
         { name = "status", type = "string" },
         { name = "created_at", type = "timestamp" },
       ]
@@ -43,7 +41,6 @@ locals {
       columns = [
         { name = "id", type = "string" },
         { name = "thread_id", type = "string" },
-        { name = "author_id", type = "string" },
         { name = "status", type = "string" },
         { name = "created_at", type = "timestamp" },
         { name = "society_id", type = "string" },
@@ -52,19 +49,17 @@ locals {
     memberships = {
       columns = [
         { name = "society_id", type = "string" },
-        { name = "user_id", type = "string" },
         { name = "role", type = "string" },
         { name = "status", type = "string" },
-        { name = "joined_at", type = "timestamp" },
+        { name = "member_count", type = "bigint" },
       ]
     }
     votes = {
       columns = [
         { name = "target_id", type = "string" },
-        { name = "user_id", type = "string" },
         { name = "value", type = "bigint" },
-        { name = "created_at", type = "timestamp" },
         { name = "society_id", type = "string" },
+        { name = "vote_count", type = "bigint" },
       ]
     }
     reports = {
@@ -212,6 +207,119 @@ resource "aws_glue_catalog_table" "analytics" {
   }
 }
 
+resource "aws_glue_catalog_table" "analytics_action_events" {
+  count = var.enable_analytics_pipeline ? 1 : 0
+
+  name          = "action_events"
+  database_name = aws_glue_catalog_database.analytics[0].name
+  table_type    = "EXTERNAL_TABLE"
+
+  storage_descriptor {
+    location      = "s3://${aws_s3_bucket.analytics[0].id}/analytics/source/table=action_events/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      name                  = "action-events-parquet"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    }
+
+    columns {
+      name = "event_id"
+      type = "string"
+    }
+    columns {
+      name = "event_type"
+      type = "string"
+    }
+    columns {
+      name = "schema_version"
+      type = "int"
+    }
+    columns {
+      name = "actor_pseudonym"
+      type = "string"
+    }
+    columns {
+      name = "pseudonym_key_version"
+      type = "string"
+    }
+    columns {
+      name = "actor_platform_role"
+      type = "string"
+    }
+    columns {
+      name = "actor_society_role"
+      type = "string"
+    }
+    columns {
+      name = "occurred_at"
+      type = "timestamp"
+    }
+    columns {
+      name = "ingested_at"
+      type = "timestamp"
+    }
+    columns {
+      name = "target_type"
+      type = "string"
+    }
+    columns {
+      name = "target_id"
+      type = "string"
+    }
+    columns {
+      name = "society_id"
+      type = "string"
+    }
+    columns {
+      name = "thread_id"
+      type = "string"
+    }
+    columns {
+      name = "comment_id"
+      type = "string"
+    }
+    columns {
+      name = "report_id"
+      type = "string"
+    }
+    columns {
+      name = "correlation_id"
+      type = "string"
+    }
+    columns {
+      name = "from_reaction"
+      type = "int"
+    }
+    columns {
+      name = "to_reaction"
+      type = "int"
+    }
+    columns {
+      name = "metadata"
+      type = "string"
+    }
+  }
+
+  partition_keys {
+    name = "event_date"
+    type = "date"
+  }
+  partition_keys {
+    name = "snapshot_at"
+    type = "string"
+  }
+  partition_keys {
+    name = "snapshot_id"
+    type = "string"
+  }
+
+  parameters = {
+    classification = "parquet"
+  }
+}
+
 resource "aws_glue_catalog_table" "analytics_snapshot_manifest" {
   count = var.enable_analytics_pipeline ? 1 : 0
 
@@ -273,14 +381,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "analytics_retention" {
     id     = "expire-analytics-snapshots"
     status = "Enabled"
     filter { prefix = "analytics/source/" }
-    expiration { days = 30 }
+    expiration { days = var.analytics_raw_event_retention_days }
   }
 
   rule {
     id     = "expire-analytics-manifest"
     status = "Enabled"
     filter { prefix = "analytics/manifest/" }
-    expiration { days = 30 }
+    expiration { days = var.analytics_raw_event_retention_days }
   }
 
   rule {
