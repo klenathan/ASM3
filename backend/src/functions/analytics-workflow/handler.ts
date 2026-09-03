@@ -40,6 +40,7 @@ export async function handler(event: WorkflowEvent): Promise<{
   const dependencies = await getDependencies();
   const run = await dependencies.runStore.get(event.runId);
   if (run === null) throw new Error(`analytics refresh run ${event.runId} was not found`);
+  if (run.status === "cancelled") return { runId: run.runId, status: run.status };
   if (event.action === "prepare") {
     const saved = await dependencies.runStore.save({
       ...run,

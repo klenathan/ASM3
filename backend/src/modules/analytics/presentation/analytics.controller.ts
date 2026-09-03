@@ -70,8 +70,8 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         context.get("logger").info({
           requestId: context.get("requestId"),
           accepted: result.accepted,
-        }, "analytics refresh accepted");
-        return context.json(result, 202);
+        }, "analytics refresh response");
+        return context.json(result, result.accepted ? 202 : 200);
       } catch (error) {
         context.get("logger").warn({
           requestId: context.get("requestId"),
@@ -99,10 +99,10 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         const presented = context.req.header(SCHEDULER_SECRET_HEADER);
         const result = await dependencies.analyticsService.scheduledRefresh(presented);
         context.get("logger").info(
-          { requestId: context.get("requestId") },
-          "analytics scheduled refresh accepted",
+          { requestId: context.get("requestId"), accepted: result.accepted },
+          "analytics scheduled refresh response",
         );
-        return context.json(result, 202);
+        return context.json(result, result.accepted ? 202 : 200);
       } catch (error) {
         context.get("logger").warn({
           requestId: context.get("requestId"),
@@ -136,7 +136,16 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         const principal = requireInjectedPrincipal(context);
         const range = validated<RefreshRangeInput>(context, "json");
         const result = await dependencies.analyticsService.refresh(principal, range);
-        return context.json(result, 202);
+        return context.json(result, result.accepted ? 202 : 200);
+      } catch (error) {
+        return analyticsErrorResponse(context, error);
+      }
+    },
+    async cancelLatestRefresh(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const result = await dependencies.analyticsService.cancelLatestRefresh(principal);
+        return context.json(result, 200);
       } catch (error) {
         return analyticsErrorResponse(context, error);
       }

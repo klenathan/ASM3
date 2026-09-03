@@ -27,10 +27,11 @@ import {
   type AnalyticsMetricDto,
   type AnalyticsPageDto,
   type QueryMetricsRequest,
+  type RefreshCancellationResponse,
   type RefreshResponse,
   type RefreshStatusDto,
 } from "./analytics.dto";
-import type { RefreshRunStore } from "./refresh-run.ports";
+import type { RefreshRunRecord, RefreshRunStore } from "./refresh-run.ports";
 import type { RequestRefreshResult } from "./refresh-workflow";
 
 export interface AnalyticsServiceDependencies {
@@ -42,7 +43,10 @@ export interface AnalyticsServiceDependencies {
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly clock?: Clock | undefined;
   readonly onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
-  readonly runStore?: Pick<RefreshRunStore, "findLatestRun"> & Partial<Pick<RefreshRunStore, "get">> | undefined;
+  readonly runStore?: Pick<RefreshRunStore, "findLatestRun">
+    & Partial<Pick<RefreshRunStore, "findActiveRun" | "get" | "save">>
+    | undefined;
+  readonly onRefreshCancelled?: ((run: RefreshRunRecord) => Promise<void>) | undefined;
   readonly onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined;
   readonly schedulerSecret?: string | undefined;
 }
@@ -57,6 +61,7 @@ export class AnalyticsService {
   private readonly runStore: AnalyticsServiceDependencies["runStore"];
   private readonly clock: Clock;
   private readonly onRefreshRequested: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
+  private readonly onRefreshCancelled: ((run: RefreshRunRecord) => Promise<void>) | undefined;
   private readonly schedulerSecret: string | undefined;
   private readonly onScheduledRefresh: (() => Promise<RequestRefreshResult>) | undefined;
 
@@ -67,6 +72,7 @@ export class AnalyticsService {
     this.membershipRepository = dependencies.membershipRepository;
     this.runStore = dependencies.runStore;
     this.onRefreshRequested = dependencies.onRefreshRequested;
+    this.onRefreshCancelled = dependencies.onRefreshCancelled;
     this.schedulerSecret = dependencies.schedulerSecret;
     this.clock = dependencies.clock ?? { now: () => new Date() };
     this.onScheduledRefresh = dependencies.onScheduledRefresh;
@@ -154,7 +160,7 @@ export class AnalyticsService {
         ];
         if (firstAvailableDate >= requestedRange.periodEnd) {
           return {
-            accepted: true,
+            accepted: false,
             message: "No retained action events exist in the requested range; nothing was refreshed.",
             warnings,
           };
@@ -171,7 +177,7 @@ export class AnalyticsService {
       : await this.onRefreshRequested(effectiveRange);
 
     return {
-      accepted: true,
+      accepted: result !== undefined,
       message: result === undefined
         ? "Analytics refresh orchestration is not configured; nothing was started."
         : result.coalesced
@@ -196,6 +202,52 @@ export class AnalyticsService {
     return run === undefined || run === null ? null : toRefreshStatusDto(run);
   }
 
+  async cancelLatestRefresh(principal: RequestPrincipal): Promise<RefreshCancellationResponse> {
+    await this.requireSystemAdmin(principal);
+    const runStore = this.runStore;
+    if (runStore?.findActiveRun === undefined || runStore.save === undefined || this.onRefreshCancelled === undefined) {
+      return {
+        cancelled: false,
+        message: "Analytics refresh cancellation is not configured.",
+      };
+    }
+    const run = await runStore.findActiveRun();
+    if (run === null) {
+      return {
+        cancelled: false,
+        message: "No queued or running analytics refresh exists.",
+      };
+    }
+
+    await this.onRefreshCancelled(run);
+    const current = runStore.get === undefined ? run : await runStore.get(run.runId);
+    if (
+      current === null ||
+      current === undefined ||
+      (current.status !== "requested" && current.status !== "exporting" && current.status !== "querying")
+    ) {
+      return {
+        cancelled: false,
+        message: "The analytics refresh was no longer queued or running.",
+        ...(current === null || current === undefined ? {} : { runId: current.runId, status: current.status }),
+      };
+    }
+
+    const cancelled: RefreshRunRecord = {
+      ...current,
+      status: "cancelled",
+      lastError: "Cancelled by a system administrator",
+      updatedAt: this.clock.now(),
+    };
+    await runStore.save(cancelled);
+    return {
+      cancelled: true,
+      message: "Analytics refresh was cancelled.",
+      runId: cancelled.runId,
+      status: cancelled.status,
+    };
+  }
+
   async scheduledRefresh(presentedSecret: string | undefined): Promise<RefreshResponse> {
     if (
       this.schedulerSecret === undefined ||
@@ -207,7 +259,7 @@ export class AnalyticsService {
 
     if (this.onScheduledRefresh === undefined) {
       return {
-        accepted: true,
+        accepted: false,
         message: "Analytics refresh orchestration is not configured; nothing was started.",
       };
     }

@@ -1,0 +1,2 @@
+ALTER TABLE "analytics_refresh_runs" DROP CONSTRAINT "analytics_refresh_runs_active_status_check";--> statement-breakpoint
+ALTER TABLE "analytics_refresh_runs" ADD CONSTRAINT "analytics_refresh_runs_active_status_check" CHECK ("analytics_refresh_runs"."status" IN ('requested', 'exporting', 'querying') OR "analytics_refresh_runs"."status" IN ('completed', 'failed', 'cancelled'));

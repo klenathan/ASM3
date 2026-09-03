@@ -200,7 +200,9 @@ Athena results after 7 days, and Glue temporary files after 1 day. Destroy
 after a demo (`tofu destroy`); `End Lab` does not stop RDS or remove retained
 S3 objects unless force destroy is set.
 
-Build the workflow Lambda before planning:
+Build the workflow Lambda before planning. The build packages the AWS RDS global
+CA bundle alongside the handler; do not upload a zip produced by another
+process without that file.
 
 ```sh
 cd ../backend
@@ -209,6 +211,17 @@ pnpm build:analytics-workflow
 cd ../infras
 tofu plan
 tofu apply
+```
+
+For a code-only workflow Lambda rollout after the function already exists, use
+the dedicated publisher. It rebuilds the bundle, uploads it to the function,
+and waits for `$LATEST` to become available before returning:
+
+```sh
+cd ..
+./scripts/push-analytics-lambda.sh
+# or
+make push-analytics-lambda
 ```
 
 Use `GET /api/v1/admin/analytics` and the Admin Center Analytics tab to verify

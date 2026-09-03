@@ -22,11 +22,18 @@ IDs; production requires `ANALYTICS_PSEUDONYM_KEY` and a key version.
 range (`periodStart`, `periodEnd`, maximum 31 days). If the requested start
 predates the retained recording window, the API clamps the effective start to
 the first retained UTC date and returns a warning; a range ending before that
-date is accepted as a no-op with the same warning. One active run is allowed
-per range; a same-range request coalesces and a different-range request returns
-`409 ANALYTICS_REFRESH_BUSY`. `GET /api/v2/admin/analytics/refresh/status`
-returns the latest v2 run for the admin dashboard; the run-specific status
-endpoint remains available at `/api/v2/admin/analytics/refresh/:runId`.
+date is not started and returns `accepted: false` with the same warning. A
+refresh returns `accepted: true` with a `runId` only after its durable refresh
+record has been created; that response uses HTTP 202. A no-op or unconfigured
+refresh returns HTTP 200. One active run is allowed per range; a same-range
+request coalesces and a different-range request returns
+`409 ANALYTICS_REFRESH_BUSY`. `POST
+/api/v2/admin/analytics/refresh/cancel` lets a system administrator stop the
+latest queued or running refresh and marks it `cancelled`; cancelled workflow
+callbacks cannot resurrect the run. `GET
+/api/v2/admin/analytics/refresh/status` returns the latest v2 run for the admin
+dashboard; the run-specific status endpoint remains available at
+`/api/v2/admin/analytics/refresh/:runId`.
 reconciliation rows with platform, society, and content grains. Activity
 metrics are additive event counts; current-state metrics are authoritative RDS
 balances; reconciliation metrics expose mismatches instead of silently
@@ -192,10 +199,15 @@ the durable handoff boundary; no automatic fallback deployment is maintained.
 2. From `backend/`, run `pnpm install --frozen-lockfile` and
    `pnpm build:analytics-workflow`.
 3. Run `tofu plan` and `tofu apply` from `infras/`.
-4. Trigger the Admin Center refresh or call the admin refresh endpoint.
-5. Verify `GET /api/v1/admin/analytics`, the refresh status endpoint, Glue job
+4. For a code-only workflow Lambda update after provisioning, run
+   `./scripts/push-analytics-lambda.sh` from the repository root, or
+   `make push-analytics-lambda`. The script rebuilds the required zip,
+   uploads it to the Terraform-managed function, and waits for the update to
+   complete.
+5. Trigger the Admin Center refresh or call the admin refresh endpoint.
+6. Verify `GET /api/v1/admin/analytics`, the refresh status endpoint, Glue job
    history, Athena query history, and the scheduler/API destination
    configuration.
-6. Run `tofu destroy` after the demonstration, using
+7. Run `tofu destroy` after the demonstration, using
    `force_destroy_buckets = true` only when deleting non-empty demo buckets is
    intended.

@@ -219,5 +219,39 @@ describe("AnalyticsSection", () => {
     expect(await screen.findByText("Exporting snapshot")).toBeInTheDocument();
     expect(await screen.findByText("2026-09-01 to 2026-09-04")).toBeInTheDocument();
   });
+  it("cancels an active v2 refresh", async () => {
+    let cancelRequests = 0;
+    mockFetch((url, init) => {
+      if (url.endsWith("/api/v2/admin/analytics/refresh/status")) {
+        return jsonResponse({
+          runId: "44444444-4444-4444-8444-444444444444",
+          trigger: "admin",
+          status: "querying",
+          attempts: 1,
+          lastError: null,
+          createdAt: "2026-09-03T00:00:00.000Z",
+          updatedAt: "2026-09-03T00:01:00.000Z",
+          periodStart: "2026-09-03",
+          periodEnd: "2026-09-04",
+        });
+      }
+      if (url.endsWith("/api/v2/admin/analytics/refresh/cancel") && init?.method === "POST") {
+        cancelRequests += 1;
+        return jsonResponse({
+          cancelled: true,
+          message: "Analytics refresh was cancelled.",
+          runId: "44444444-4444-4444-8444-444444444444",
+          status: "cancelled",
+        });
+      }
+      return jsonResponse(emptyPage());
+    });
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Cancel refresh" }));
+
+    expect(cancelRequests).toBe(1);
+    expect(await screen.findByText("Analytics refresh was cancelled.")).toBeInTheDocument();
+  });
 
 });

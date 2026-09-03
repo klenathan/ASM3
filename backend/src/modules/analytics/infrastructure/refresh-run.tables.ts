@@ -10,7 +10,7 @@ export const analyticsRefreshRuns = pgTable(
     periodStart: timestamp("period_start", { withTimezone: true, mode: "date" }),
     periodEnd: timestamp("period_end", { withTimezone: true, mode: "date" }),
     status: text("status", {
-      enum: ["requested", "exporting", "querying", "completed", "failed"],
+      enum: ["requested", "exporting", "querying", "completed", "failed", "cancelled"],
     }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
@@ -26,7 +26,7 @@ export const analyticsRefreshRuns = pgTable(
     ),
     check(
       "analytics_refresh_runs_active_status_check",
-      sql`${table.status} IN ('requested', 'exporting', 'querying') OR ${table.status} IN ('completed', 'failed')`,
+      sql`${table.status} IN ('requested', 'exporting', 'querying') OR ${table.status} IN ('completed', 'failed', 'cancelled')`,
     ),
     uniqueIndex("idx_analytics_refresh_runs_one_active")
       .on(sql`(1)`)

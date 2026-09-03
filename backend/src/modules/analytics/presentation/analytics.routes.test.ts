@@ -44,6 +44,24 @@ describe("analytics scheduled-refresh route", () => {
     await expect(response.json()).resolves.toEqual({ accepted: true, message: "queued" });
     expect(presentedSecret).toBe("scheduler-secret");
   });
+  it("returns 200 when the scheduler does not create a refresh", async () => {
+    const app = createTestApp(async () => ({
+      accepted: false,
+      message: "Analytics refresh orchestration is not configured; nothing was started.",
+    }));
+    const response = await app.request(
+      new Request("http://localhost/api/v1/admin/analytics/scheduled-refresh", {
+        method: "POST",
+        headers: { [SCHEDULER_SECRET_HEADER]: "scheduler-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      accepted: false,
+      message: "Analytics refresh orchestration is not configured; nothing was started.",
+    });
+  });
 });
 
 function createTestApp(

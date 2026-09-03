@@ -23,6 +23,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:delete-refresh-requests": "node scripts/delete-analytics-refresh-runs.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

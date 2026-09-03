@@ -1,6 +1,7 @@
 import {
   SFNClient,
   StartExecutionCommand,
+  StopExecutionCommand,
 } from "@aws-sdk/client-sfn";
 
 import type { RefreshRunTrigger } from "../application/refresh-run.ports";
@@ -11,7 +12,7 @@ export interface StepFunctionsWorkflowStarterConfig {
   readonly stateMachineArn: string;
 }
 
-type SendStepFunctionsCommand = (command: StartExecutionCommand) => Promise<unknown>;
+type SendStepFunctionsCommand = (command: StartExecutionCommand | StopExecutionCommand) => Promise<unknown>;
 
 export class StepFunctionsWorkflowStarter implements RefreshWorkflowStarter {
   private readonly stateMachineArn: string;
@@ -20,7 +21,7 @@ export class StepFunctionsWorkflowStarter implements RefreshWorkflowStarter {
   constructor(config: StepFunctionsWorkflowStarterConfig, send?: SendStepFunctionsCommand) {
     this.stateMachineArn = config.stateMachineArn;
     const client = new SFNClient({ region: config.region });
-    this.send = send ?? ((command) => client.send(command));
+    this.send = send ?? ((command) => client.send(command as never));
   }
 
   async start(input: {
@@ -40,5 +41,27 @@ export class StepFunctionsWorkflowStarter implements RefreshWorkflowStarter {
       throw new Error("Step Functions did not return an execution ARN");
     }
     return response.executionArn;
+  }
+  async stop(runId: string): Promise<void> {
+    try {
+      await this.send(new StopExecutionCommand({
+        executionArn: this.executionArn(runId),
+        cause: "Cancelled by a system administrator",
+      }));
+    } catch (error) {
+      let name = "";
+      if (typeof error === "object" && error !== null && "name" in error && typeof error.name === "string") {
+        name = error.name;
+      }
+      if (name !== "ExecutionDoesNotExist" && name !== "ExecutionNotRunning") throw error;
+    }
+  }
+
+  private executionArn(runId: string): string {
+    const executionArn = this.stateMachineArn.replace(":stateMachine:", ":execution:");
+    if (executionArn === this.stateMachineArn) {
+      throw new Error("Step Functions state machine ARN is invalid");
+    }
+    return `${executionArn}:${runId}`;
   }
 }

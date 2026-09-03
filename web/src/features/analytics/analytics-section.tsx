@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw, XCircle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -30,6 +30,7 @@ import {
 import { Skeleton } from "../../components/ui/skeleton";
 
 import {
+  cancelLatestActionAnalyticsRefresh,
   getActionAnalyticsRefreshStatus,
   getAnalyticsRefreshStatus,
   getLatestActionAnalyticsRefreshStatus,
@@ -99,13 +100,13 @@ function isModeration(data: MetricPayload): data is ModerationData {
 function platformMetricData(page: AnalyticsPage | undefined): MetricPayload | undefined {
   return page?.metrics.find((metric) => metric.societyId === null)?.data;
 }
-
 const REFRESH_STATUS_LABEL: Record<RefreshStatus, string> = {
   requested: "Queued",
   exporting: "Exporting snapshot",
   querying: "Running metrics",
   completed: "Completed",
   failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 function refreshStatusVariant(status: RefreshStatus): "default" | "secondary" | "destructive" {
@@ -389,6 +390,7 @@ function ActionAnalyticsPanel() {
   const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
   const [runId, setRunId] = useState<string | null>(null);
   const [refreshWarnings, setRefreshWarnings] = useState<readonly string[]>([]);
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
   const actionQuery = useQuery({
     queryKey: ["analytics", "action-events", grain, periodStart, periodEnd],
     queryFn: () => queryActionMetrics({ grain, periodStart, periodEnd, limit: 100 }),
@@ -408,9 +410,19 @@ function ActionAnalyticsPanel() {
     mutationFn: () => refreshActionAnalytics(periodStart, periodEnd),
     onSuccess: (result) => {
       setRefreshWarnings(result.warnings ?? []);
+      setCancelMessage(null);
       if (result.runId) setRunId(result.runId);
       void queryClient.invalidateQueries({ queryKey: ["analytics", "action-events"] });
       void queryClient.invalidateQueries({ queryKey: ["analytics", "action-refresh-status", "latest"] });
+    },
+  });
+  const cancelMutation = useMutation({
+    mutationFn: cancelLatestActionAnalyticsRefresh,
+    onSuccess: (result) => {
+      setCancelMessage(result.message);
+      if (result.cancelled) setRunId(null);
+      void queryClient.invalidateQueries({ queryKey: ["analytics", "action-refresh-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["analytics", "action-events"] });
     },
   });
   const currentStatus = statusQuery.data ?? latestStatusQuery.data;
@@ -425,14 +437,27 @@ function ActionAnalyticsPanel() {
           <p className="text-sm text-muted-foreground">Durable product actions, aggregated by UTC day.</p>
           <h2 id="action-analytics-heading" className="text-xl font-semibold">Action analytics</h2>
         </div>
-        <Button
-          type="button"
-          onClick={() => { setRefreshWarnings([]); refreshMutation.mutate(); }}
-          disabled={active || refreshMutation.isPending}
-        >
-          <RefreshCw className={refreshMutation.isPending ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
-          {active ? "Refresh in progress" : currentStatus?.status === "failed" ? "Retry refresh" : "Refresh analytics"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {active ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => { setCancelMessage(null); cancelMutation.mutate(); }}
+              disabled={cancelMutation.isPending}
+            >
+              <XCircle className={cancelMutation.isPending ? "mr-2 h-4 w-4 animate-pulse" : "mr-2 h-4 w-4"} />
+              {cancelMutation.isPending ? "Cancelling…" : "Cancel refresh"}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            onClick={() => { setRefreshWarnings([]); setCancelMessage(null); refreshMutation.mutate(); }}
+            disabled={active || refreshMutation.isPending || cancelMutation.isPending}
+          >
+            <RefreshCw className={refreshMutation.isPending ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+            {active ? "Refresh in progress" : currentStatus?.status === "failed" ? "Retry refresh" : "Refresh analytics"}
+          </Button>
+        </div>
       </div>
       <div className="rounded border border-border bg-muted/30 p-3 text-sm" aria-live="polite">
         {latestStatusQuery.isLoading ? (
@@ -463,6 +488,8 @@ function ActionAnalyticsPanel() {
         <label className="grid gap-1 text-sm"><span>Period end</span><input aria-label="Period end" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
         <label className="grid gap-1 text-sm"><span>Grain</span><select aria-label="Analytics grain" value={grain} onChange={(event) => setGrain(event.target.value as typeof grain)} className="rounded border bg-background px-2 py-1"><option value="platform">Platform</option><option value="society">Society</option><option value="content">Content</option></select></label>
       </div>
+      {cancelMutation.isError ? <p role="alert" className="text-sm text-destructive">{cancelMutation.error instanceof Error ? cancelMutation.error.message : "Unable to cancel the refresh."}</p> : null}
+      {cancelMessage ? <p role="status" className="text-sm text-muted-foreground">{cancelMessage}</p> : null}
       {refreshMutation.isError ? <p role="alert" className="text-sm text-destructive">{refreshMutation.error instanceof Error ? refreshMutation.error.message : "Unable to refresh analytics."}</p> : null}
       {refreshWarnings.map((warning) => <p key={warning} role="status" className="text-sm text-amber-700 dark:text-amber-300">Warning: {warning}</p>)}
       {currentStatus?.status === "failed" && currentStatus.lastError ? <p role="alert" className="text-sm text-destructive">Refresh failed: {currentStatus.lastError}</p> : null}

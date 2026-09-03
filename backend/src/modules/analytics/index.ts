@@ -6,12 +6,14 @@ import { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.r
 import { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
 import type { RefreshRange } from "./application/refresh-range";
 import type { RequestRefreshResult } from "./application/refresh-workflow";
+import type { RefreshRunRecord } from "./application/refresh-run.ports";
 
 export interface AnalyticsModuleDependencies {
   readonly database: Database;
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
+  readonly onRefreshCancelled?: ((run: RefreshRunRecord) => Promise<void>) | undefined;
   readonly schedulerSecret?: string | undefined;
   readonly onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined;
 }
@@ -19,7 +21,6 @@ export interface AnalyticsModuleDependencies {
 export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies) {
   const repository = new DrizzleAnalyticsRepository(dependencies.database);
   const refreshRunStore = new DrizzleRefreshRunStore(dependencies.database);
-
   const analyticsService = new AnalyticsService({
     repository,
     actionMetricsRepository: repository,
@@ -27,6 +28,7 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
     membershipRepository: dependencies.membershipRepository,
     runStore: refreshRunStore,
     onRefreshRequested: dependencies.onRefreshRequested,
+    onRefreshCancelled: dependencies.onRefreshCancelled,
     schedulerSecret: dependencies.schedulerSecret,
     onScheduledRefresh: dependencies.onScheduledRefresh,
   });

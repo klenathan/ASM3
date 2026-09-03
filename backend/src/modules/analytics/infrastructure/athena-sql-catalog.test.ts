@@ -30,4 +30,10 @@ describe("ATHENA_METRIC_SQL", () => {
     expect(sql).toContain("FROM latest_votes GROUP BY society_id");
     expect(sql).toContain("FROM latest_reports GROUP BY society_id");
   });
+  it("uses the aggregated membership column from the Glue contract", () => {
+    const sql = createAthenaMetricSqlCatalog("123e4567-e89b-12d3-a456-426614174000").top_societies!;
+
+    expect(sql).toContain("sum(m.member_count)");
+    expect(sql).not.toContain("m.user_id");
+  });
 });

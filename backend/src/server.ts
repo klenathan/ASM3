@@ -299,6 +299,12 @@ async function main(): Promise<void> {
   });
   audit.start();
 
+  const analyticsWorkflowStarter = config.analyticsRefreshStateMachineArn !== null && config.awsRegion !== null
+    ? new StepFunctionsWorkflowStarter({
+        region: config.awsRegion,
+        stateMachineArn: config.analyticsRefreshStateMachineArn,
+      })
+    : undefined;
   let analyticsRefreshWorkflow: AnalyticsRefreshWorkflow | undefined;
   const analytics = createAnalyticsModule({
     database: database.db,
@@ -306,6 +312,9 @@ async function main(): Promise<void> {
     membershipRepository: societies.membershipRepository,
     onRefreshRequested: async (range) =>
       analyticsRefreshWorkflow?.requestRefresh("admin", range),
+    ...(analyticsWorkflowStarter === undefined ? {} : {
+      onRefreshCancelled: async (run) => analyticsWorkflowStarter.stop(run.runId),
+    }),
     ...(config.analyticsSchedulerSecret === null
       ? {}
       : {
@@ -319,16 +328,10 @@ async function main(): Promise<void> {
         }),
   });
 
-  if (
-    config.analyticsRefreshStateMachineArn !== null &&
-    config.awsRegion !== null
-  ) {
+  if (analyticsWorkflowStarter !== undefined) {
     analyticsRefreshWorkflow = new AnalyticsRefreshWorkflow({
       runStore: analytics.refreshRunStore,
-      starter: new StepFunctionsWorkflowStarter({
-        region: config.awsRegion,
-        stateMachineArn: config.analyticsRefreshStateMachineArn,
-      }),
+      starter: analyticsWorkflowStarter,
     });
   }
   const app = createApp({

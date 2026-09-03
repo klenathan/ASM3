@@ -16,7 +16,7 @@ import type {
   UpsertAnalyticsMetricInput,
 } from "./analytics.repository";
 import type { RefreshRange } from "./refresh-range";
-import type { RefreshRunRecord } from "./refresh-run.ports";
+import type { RefreshRunRecord, RefreshRunStore } from "./refresh-run.ports";
 import type { RequestRefreshResult } from "./refresh-workflow";
 
 const now = new Date("2026-09-15T00:00:00.000Z");
@@ -200,12 +200,27 @@ describe("AnalyticsService", () => {
     const service = createService(
       undefined,
       false,
-      async () => { refreshCalled = true; },
+      async () => {
+        refreshCalled = true;
+        return {
+          runId: "123e4567-e89b-12d3-a456-426614174000",
+          status: "requested",
+          coalesced: false,
+        };
+      },
     );
 
     const response = await service.refresh(admin);
     expect(response.accepted).toBe(true);
     expect(refreshCalled).toBe(true);
+  });
+  it("does not accept refresh when no workflow is configured", async () => {
+    const service = createService();
+
+    await expect(service.refresh(admin)).resolves.toEqual({
+      accepted: false,
+      message: "Analytics refresh orchestration is not configured; nothing was started.",
+    });
   });
   it("clamps ranges before the recording boundary and warns about skipped dates", async () => {
     let requestedRange: RefreshRange | undefined;
@@ -218,8 +233,8 @@ describe("AnalyticsService", () => {
           runId: "123e4567-e89b-12d3-a456-426614174000",
           status: "requested",
           coalesced: false,
-          periodStart: range?.periodStart,
-          periodEnd: range?.periodEnd,
+          ...(range?.periodStart === undefined ? {} : { periodStart: range.periodStart }),
+          ...(range?.periodEnd === undefined ? {} : { periodEnd: range.periodEnd }),
         };
       },
       undefined,
@@ -263,7 +278,7 @@ describe("AnalyticsService", () => {
     });
 
     expect(response).toEqual({
-      accepted: true,
+      accepted: false,
       message: "No retained action events exist in the requested range; nothing was refreshed.",
       warnings: ["Requested range starts before retained action events; skipped dates before 2026-09-03."],
     });
@@ -296,6 +311,51 @@ describe("AnalyticsService", () => {
       updatedAt: now.toISOString(),
     });
   });
+  it("cancels the latest queued or running refresh and releases the active slot", async () => {
+    let stopped = false;
+    let persisted: RefreshRunRecord = {
+      runId: "123e4567-e89b-12d3-a456-426614174000",
+      trigger: "admin",
+      status: "querying",
+      attempts: 1,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+      glueJobRunId: "jr_1",
+      athenaQueryExecutionIds: {},
+    };
+    const runStore = {
+      findLatestRun: async () => persisted,
+      findActiveRun: async () => persisted.status === "querying" ? persisted : null,
+      get: async () => persisted,
+      save: async (run: RefreshRunRecord) => {
+        persisted = run;
+        return run;
+      },
+    };
+    const service = createService(
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      runStore,
+      undefined,
+      async () => {
+        stopped = true;
+      },
+    );
+
+    await expect(service.cancelLatestRefresh(admin)).resolves.toEqual({
+      cancelled: true,
+      message: "Analytics refresh was cancelled.",
+      runId: persisted.runId,
+      status: "cancelled",
+    });
+    expect(stopped).toBe(true);
+    expect(persisted.status).toBe("cancelled");
+  });
+
 
   it("returns no status when the refresh store has no runs", async () => {
     const service = createService(undefined, false, undefined, undefined, undefined, {
@@ -325,7 +385,7 @@ describe("AnalyticsService", () => {
     const service = createService(undefined, false, undefined, "scheduler-secret");
 
     await expect(service.scheduledRefresh("scheduler-secret")).resolves.toEqual({
-      accepted: true,
+      accepted: false,
       message: "Analytics refresh orchestration is not configured; nothing was started.",
     });
   });
@@ -384,8 +444,9 @@ function createService(
   onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined,
   schedulerSecret?: string | undefined,
   onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined,
-  runStore?: { findLatestRun: () => Promise<RefreshRunRecord | null> } | undefined,
+  runStore?: Pick<RefreshRunStore, "findLatestRun"> & Partial<Pick<RefreshRunStore, "findActiveRun" | "get" | "save">> | undefined,
   recordingStartedAt?: Date | undefined,
+  onRefreshCancelled?: ((run: RefreshRunRecord) => Promise<void>) | undefined,
 ): AnalyticsService {
   return new AnalyticsService({
     repository: repository ?? new FakeAnalyticsRepository(),
@@ -408,6 +469,7 @@ function createService(
             joinedAt: now,
             updatedAt: now,
             bannedBy: null,
+            bannedAt: null,
           };
         }
         return null;
@@ -416,6 +478,7 @@ function createService(
     clock,
     runStore,
     onRefreshRequested,
+    onRefreshCancelled,
     schedulerSecret,
     onScheduledRefresh,
   });

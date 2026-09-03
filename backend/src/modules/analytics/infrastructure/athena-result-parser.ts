@@ -93,9 +93,36 @@ export function parseActionAthenaResultRows(
       periodStart: parseDate(requiredValue(row, indexes.get("period_start")!, index, "period_start"), "period_start"),
       periodEnd: parseDate(requiredValue(row, indexes.get("period_end")!, index, "period_end"), "period_end"),
       snapshotAt: parseOptionalDate(row[indexes.get("snapshot_at")!], "snapshot_at"),
-      data: data as Record<string, unknown>,
+      data: normalizeActionMetricData(data),
     };
   });
+}
+
+/** Athena names ROW fields in snake_case; the domain contract uses camelCase. */
+function normalizeActionMetricData(data: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => {
+      const normalizedKey = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+      return [normalizedKey, ACTION_DATA_TIMESTAMP_FIELDS[normalizedKey] === true ? normalizeTimestamp(value) : value];
+    }),
+  );
+}
+
+const ACTION_DATA_TIMESTAMP_FIELDS: Record<string, true> = {
+  firstActivityAt: true,
+  lastActivityAt: true,
+  snapshotAt: true,
+  previousSnapshotAt: true,
+  currentSnapshotAt: true,
+};
+
+function normalizeTimestamp(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const naiveTimestamp = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?: UTC)?$/.exec(value);
+  const timestamp = new Date(
+    naiveTimestamp === null ? value : `${naiveTimestamp[1]}T${naiveTimestamp[2]}Z`,
+  );
+  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toISOString();
 }
 
 function parseOptionalUuid(value: string | null | undefined, column: string, rowIndex: number): string | null {

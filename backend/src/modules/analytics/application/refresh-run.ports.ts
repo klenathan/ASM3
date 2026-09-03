@@ -7,7 +7,8 @@ export type RefreshRunStatus =
   | "exporting"
   | "querying"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface RefreshRunRecord {
   readonly runId: string;

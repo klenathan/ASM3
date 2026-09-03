@@ -29,13 +29,19 @@ export interface QueryMetricsRequest {
 export interface RefreshStatusDto {
   readonly runId: string;
   readonly trigger: "admin" | "nightly";
-  readonly status: "requested" | "exporting" | "querying" | "completed" | "failed";
+  readonly status: "requested" | "exporting" | "querying" | "completed" | "failed" | "cancelled";
   readonly attempts: number;
   readonly lastError: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly periodStart?: string;
   readonly periodEnd?: string;
+}
+export interface RefreshCancellationResponse {
+  readonly cancelled: boolean;
+  readonly message: string;
+  readonly runId?: string;
+  readonly status?: RefreshStatusDto["status"];
 }
 
 export interface RefreshResponse {

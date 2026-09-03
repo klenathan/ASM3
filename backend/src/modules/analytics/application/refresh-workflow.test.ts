@@ -9,11 +9,13 @@ describe("AnalyticsRefreshWorkflow", () => {
   it("creates a durable run and starts one Step Functions execution", async () => {
     const store = new InMemoryRefreshRunStore();
     const starts: unknown[] = [];
+    let recordExistedBeforeStart = false;
     const workflow = new AnalyticsRefreshWorkflow({
       runStore: store,
       clock,
       starter: {
         start: async (input) => {
+          recordExistedBeforeStart = await store.get(input.runId) !== null;
           starts.push(input);
           return "arn:aws:states:us-east-1:123:execution:analytics-refresh:run";
         },
@@ -24,6 +26,7 @@ describe("AnalyticsRefreshWorkflow", () => {
 
     expect(result).toMatchObject({ status: "requested", coalesced: false });
     expect(starts).toHaveLength(1);
+    expect(recordExistedBeforeStart).toBe(true);
     expect(starts[0]).toMatchObject({
       trigger: "admin",
       snapshotAt: "20260828T020000Z",

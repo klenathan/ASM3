@@ -30,4 +30,21 @@ describe("StepFunctionsWorkflowStarter", () => {
       snapshotAt: "20260828T020000Z",
     });
   });
+  it("stops the execution named by the refresh run ID", async () => {
+    const commands: Record<string, unknown>[] = [];
+    const starter = new StepFunctionsWorkflowStarter(
+      { region: "us-east-1", stateMachineArn: "arn:aws:states:us-east-1:123:stateMachine:analytics-refresh" },
+      async (command) => {
+        commands.push(command.input as unknown as Record<string, unknown>);
+        return {};
+      },
+    );
+
+    await expect(starter.stop("123e4567-e89b-12d3-a456-426614174000")).resolves.toBeUndefined();
+
+    expect(commands[0]).toMatchObject({
+      executionArn: "arn:aws:states:us-east-1:123:execution:analytics-refresh:123e4567-e89b-12d3-a456-426614174000",
+      cause: "Cancelled by a system administrator",
+    });
+  });
 });

@@ -13,7 +13,7 @@ TARGET_PLATFORM ?= linux/amd64
 
 .DEFAULT_GOAL := help
 
-.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend migrate-seed remote
+.PHONY: help whoami bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output bootstrap-tofu init plan apply destroy output validate fmt tofu deploy-frontend push-backend push-content-analysis push-analytics-lambda migrate-seed remote
 
 define with_env
 	@set -a; \
@@ -36,6 +36,7 @@ help:
 		'  make plan|apply|destroy|output       Manage the root infrastructure stack.' \
 		'  make deploy-frontend                 Build and publish the React app to Amplify.' \
 		'  make push-backend                    Build/push x86 backend image (latest) to ECR and force-deploy ECS.' \
+		'  make push-analytics-lambda           Build/push the analytics workflow Lambda bundle.' \
 		'  make migrate-seed                    Run the one-shot ECS migration and seed task.' \
 		'  make validate|fmt                    Validate or format both stacks.' \
 		'  make tofu ARGS="<command>"           Run an authenticated root OpenTofu command.' \
@@ -92,6 +93,9 @@ deploy-frontend:
 
 push-content-analysis:
 	@./scripts/push-content-analysis-lambda.sh
+
+push-analytics-lambda:
+	@./scripts/push-analytics-lambda.sh
 
 validate:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) validate)

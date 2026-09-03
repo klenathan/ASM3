@@ -143,8 +143,8 @@ resource "aws_lambda_function" "analytics_workflow" {
 
   environment {
     variables = {
-      DATABASE_URL_SECRET_ARN             = aws_secretsmanager_secret.database_url.arn
-      RDS_CA_BUNDLE_PATH                  = "/var/task/rds-global-bundle.pem"
+      DATABASE_URL_SECRET_ARN            = aws_secretsmanager_secret.database_url.arn
+      RDS_CA_BUNDLE_PATH                 = "/var/task/rds-global-bundle.pem"
       ANALYTICS_RAW_EVENT_RETENTION_DAYS = tostring(var.analytics_raw_event_retention_days)
     }
   }
@@ -246,7 +246,7 @@ locals {
                 "queryExecutionId.$" = "$.QueryExecution.QueryExecutionId"
               }
               ResultPath = "$.athena"
-              Next      = "ShapeQueryResult"
+              Next       = "ShapeQueryResult"
             }
             ShapeQueryResult = {
               Type = "Pass"
@@ -327,4 +327,8 @@ resource "aws_lambda_permission" "analytics_workflow_step_functions" {
 
 output "analytics_refresh_state_machine_arn" {
   value = try(aws_sfn_state_machine.analytics_refresh[0].arn, null)
+}
+
+output "analytics_workflow_function_name" {
+  value = try(aws_lambda_function.analytics_workflow[0].function_name, null)
 }

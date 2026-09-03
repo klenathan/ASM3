@@ -93,23 +93,26 @@ export const createAthenaMetricSqlCatalog: MetricSqlCatalogFactory = (snapshotId
  WITH ${latestSnapshot}, latest_societies AS (
    SELECT s.* FROM analytics.societies s
    JOIN latest l ON s.snapshot_at = l.snapshot_at AND s.snapshot_id = l.snapshot_id
+ ), membership_counts AS (
+   SELECT m.society_id, sum(m.member_count) AS member_count
+   FROM analytics.memberships m
+   JOIN latest l ON m.snapshot_at = l.snapshot_at AND m.snapshot_id = l.snapshot_id
+   WHERE m.status = 'active'
+   GROUP BY m.society_id
+ ), thread_counts AS (
+   SELECT t.society_id, count(DISTINCT t.id) AS thread_count
+   FROM analytics.threads t
+   JOIN latest l ON t.snapshot_at = l.snapshot_at AND t.snapshot_id = l.snapshot_id
+   GROUP BY t.society_id
  ), society_stats AS (
    SELECT
      s.id AS society_id,
      s.name,
-     count(DISTINCT m.user_id) AS member_count,
-     count(DISTINCT t.id) AS thread_count
+     coalesce(m.member_count, CAST(0 AS bigint)) AS member_count,
+     coalesce(t.thread_count, CAST(0 AS bigint)) AS thread_count
    FROM latest_societies s
-   LEFT JOIN analytics.memberships m
-     ON m.society_id = s.id
-    AND m.status = 'active'
-    AND m.snapshot_at = (SELECT snapshot_at FROM latest)
-    AND m.snapshot_id = (SELECT snapshot_id FROM latest)
-   LEFT JOIN analytics.threads t
-     ON t.society_id = s.id
-    AND t.snapshot_at = (SELECT snapshot_at FROM latest)
-    AND t.snapshot_id = (SELECT snapshot_id FROM latest)
-   GROUP BY s.id, s.name
+   LEFT JOIN membership_counts m ON m.society_id = s.id
+   LEFT JOIN thread_counts t ON t.society_id = s.id
  ), top_members AS (
    SELECT * FROM society_stats ORDER BY member_count DESC, society_id LIMIT 10
  ), top_threads AS (

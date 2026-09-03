@@ -96,7 +96,7 @@ export const refreshResponseSchema = z
     accepted: z.boolean(),
     message: z.string(),
     runId: z.string().uuid().optional(),
-    status: z.enum(["requested", "exporting", "querying", "completed", "failed"]).optional(),
+    status: z.enum(["requested", "exporting", "querying", "completed", "failed", "cancelled"]).optional(),
     coalesced: z.boolean().optional(),
     periodStart: calendarDate.optional(),
     periodEnd: calendarDate.optional(),
@@ -108,7 +108,7 @@ export const refreshStatusSchema = z
   .object({
     runId: z.string().uuid(),
     trigger: z.enum(["admin", "nightly"]),
-    status: z.enum(["requested", "exporting", "querying", "completed", "failed"]),
+    status: z.enum(["requested", "exporting", "querying", "completed", "failed", "cancelled"]),
     attempts: z.number().int().nonnegative(),
     lastError: z.string().nullable(),
     createdAt: isoDate,
@@ -117,6 +117,15 @@ export const refreshStatusSchema = z
     periodEnd: calendarDate.optional(),
   })
   .openapi("AnalyticsRefreshStatus");
+
+export const refreshCancellationResponseSchema = z
+  .object({
+    cancelled: z.boolean(),
+    message: z.string(),
+    runId: z.string().uuid().optional(),
+    status: z.enum(["requested", "exporting", "querying", "completed", "failed", "cancelled"]).optional(),
+  })
+  .openapi("AnalyticsRefreshCancellationResponse");
 
 export const actionAnalyticsQuerySchema = z.object({
   grain: z.enum(["platform", "society", "content"]).optional(),

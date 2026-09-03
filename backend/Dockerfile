@@ -43,6 +43,7 @@ COPY --from=development-dependencies --chown=node:node /app/node_modules ./node_
 COPY --chown=node:node package.json drizzle.config.ts ./
 COPY --chown=node:node src ./src
 COPY --chown=node:node drizzle ./drizzle
+COPY --chown=node:node scripts/delete-analytics-refresh-runs.mjs ./scripts/delete-analytics-refresh-runs.mjs
 
 USER node
 

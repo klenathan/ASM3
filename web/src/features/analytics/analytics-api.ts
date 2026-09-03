@@ -53,7 +53,7 @@ export interface AnalyticsPage {
   };
 }
 
-export type RefreshStatus = "requested" | "exporting" | "querying" | "completed" | "failed";
+export type RefreshStatus = "requested" | "exporting" | "querying" | "completed" | "failed" | "cancelled";
 
 export interface RefreshRun {
   runId: string;
@@ -76,6 +76,12 @@ export interface RefreshResponse {
   periodStart?: string;
   periodEnd?: string;
   warnings?: string[];
+}
+export interface RefreshCancellationResponse {
+  cancelled: boolean;
+  message: string;
+  runId?: string;
+  status?: RefreshStatus;
 }
 
 export type ActionMetricKind = "activity" | "current_state" | "reconciliation";
@@ -130,6 +136,11 @@ export function refreshActionAnalytics(periodStart: string, periodEnd: string): 
     method: "POST",
     body: JSON.stringify({ periodStart, periodEnd }),
     headers: { "Content-Type": "application/json" },
+  });
+}
+export function cancelLatestActionAnalyticsRefresh(): Promise<RefreshCancellationResponse> {
+  return request<RefreshCancellationResponse>("/api/v2/admin/analytics/refresh/cancel", {
+    method: "POST",
   });
 }
 

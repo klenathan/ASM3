@@ -100,7 +100,7 @@ function toRow(run: RefreshRunRecord) {
 function toRecord(row: typeof analyticsRefreshRuns.$inferSelect): RefreshRunRecord {
   const status = row.status as RefreshRunStatus;
   const trigger = row.trigger as RefreshRunTrigger;
-  if (!UNFINISHED_STATUSES.includes(status) && status !== "completed" && status !== "failed") {
+  if (!UNFINISHED_STATUSES.includes(status) && !["completed", "failed", "cancelled"].includes(status)) {
     throw new Error(`invalid persisted refresh run status: ${row.status}`);
   }
   if (trigger !== "admin" && trigger !== "nightly") {
