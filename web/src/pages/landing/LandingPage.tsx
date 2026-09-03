@@ -4,11 +4,24 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { LogoMark } from "../../components/site/LogoMark";
 import { useAuth } from "../../features/auth/auth-context";
+import { AnalysisBadge } from "@/features/discussions/analysis-badge";
 
 const indexItems = [
-  "Find a society",
-  "Join the thread",
-  "Keep it accountable",
+  {
+    label: "Find a society",
+    detail: "Create your account to browse student communities.",
+    to: "/register",
+  },
+  {
+    label: "Join a thread",
+    detail: "Sign in to read and post in active discussions.",
+    to: "/sign-in",
+  },
+  {
+    label: "Keep it accountable",
+    detail: "Sign in to report content and support healthy discussion.",
+    to: "/sign-in",
+  },
 ];
 
 export function LandingPage() {
@@ -33,12 +46,12 @@ export function LandingPage() {
             id="landing-title"
             className="max-w-4xl font-heading text-[clamp(3rem,7.5vw,5.75rem)] leading-[0.95] font-semibold tracking-[-0.01em] text-balance uppercase"
           >
-            Make room for better conversations.
+            Find and join RMIT societies and campus threads.
           </h1>
           <p className="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
-            RMIT Society is a community forum organized around societies —
-            shared reading tables where students find their people and keep
-            campus conversation moving.
+            RMIT Society is the unofficial forum for approved RMIT students.
+            Societies are shared student communities; threads are the
+            conversations inside them. Find one to follow, then join in.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
             <Button
@@ -57,13 +70,11 @@ export function LandingPage() {
               size="lg"
               className="h-12 rounded-none px-5 text-base font-semibold shadow-none"
             >
-              <Link to="/sign-in">
-                Sign in
-              </Link>
+              <Link to="/sign-in">Sign in</Link>
             </Button>
             <p className="max-w-xs text-sm leading-6 text-muted-foreground">
-              Open to approved RMIT identities only. An unofficial student
-              community space.
+              New here? Create an account with your approved RMIT email. Already
+              a member? Sign in.
             </p>
           </div>
           {status === "loading" && (
@@ -78,7 +89,7 @@ export function LandingPage() {
         </section>
 
         <aside
-          aria-label="What RMIT Society is for"
+          aria-label="Ways to enter RMIT Society"
           className="bg-card ring-1 ring-foreground/15"
         >
           <div className="flex items-center justify-between border-b border-foreground/15 px-5 py-4 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
@@ -87,25 +98,32 @@ export function LandingPage() {
           </div>
           <div className="divide-y divide-foreground/15">
             {indexItems.map((item, index) => (
-              <div
-                className="group flex items-center gap-4 px-5 py-5 transition-colors hover:bg-primary/5"
-                key={item}
+              <Link
+                className="group flex items-start gap-4 px-5 py-5 transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                key={item.label}
+                to={item.to}
               >
-                <span className="w-6 text-sm font-semibold text-primary tabular-nums">
+                <span className="w-6 pt-0.5 text-sm font-semibold text-primary tabular-nums">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <strong className="flex-1 font-heading text-lg font-medium tracking-[0.01em] uppercase">
-                  {item}
-                </strong>
+                <span className="flex-1">
+                  <strong className="block font-heading text-lg font-medium tracking-[0.01em] uppercase">
+                    {item.label}
+                  </strong>
+                  <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                    {item.detail}
+                  </span>
+                </span>
                 <ArrowRight
                   aria-hidden="true"
-                  className="size-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary"
+                  className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary"
                 />
-              </div>
+              </Link>
             ))}
           </div>
           <p className="border-t border-foreground/15 px-5 py-5 text-sm leading-6 text-muted-foreground">
-            For approved RMIT identities across the AU, VN, and EU community.
+            Access is limited to approved RMIT identities across the AU, VN, and
+            EU community.
           </p>
         </aside>
       </main>

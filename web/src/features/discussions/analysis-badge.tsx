@@ -46,19 +46,20 @@ export function AnalysisBadge({
   readonly override?: "accept" | "reject" | null;
   readonly className?: string;
 }) {
-  const status = override === "accept"
-    ? "approved"
-    : override === "reject"
-      ? "rejected"
-      : autoRemoved
-        ? "autoRemoved"
-        : hidden
-          ? "hidden"
-          : failed
-            ? "failed"
-            : decision === "allow" || decision === "review"
-            ? decision
-            : "pending";
+  const status =
+    override === "accept"
+      ? "approved"
+      : override === "reject"
+        ? "rejected"
+        : autoRemoved
+          ? "autoRemoved"
+          : hidden
+            ? "hidden"
+            : failed
+              ? "failed"
+              : decision === "allow" || decision === "review"
+                ? decision
+                : "pending";
 
   return (
     <Badge
@@ -66,16 +67,14 @@ export function AnalysisBadge({
       title={TITLES[status]}
       className={cn(
         status === "allow" &&
-          "border-primary/35 bg-accent text-foreground",
-        status === "review" &&
-          "border-signal/60 bg-signal/20 text-signal-foreground",
+          "border-green-200/35 bg-green-200/20 text-foreground",
+        status === "review" && "border-signal/60 bg-signal/20 text-foreground",
         (status === "autoRemoved" ||
           status === "hidden" ||
           status === "failed" ||
           status === "rejected") &&
           "border-primary/45 bg-accent text-primary",
-        status === "approved" &&
-          "border-primary/35 bg-accent text-foreground",
+        status === "approved" && "border-green/35 bg-accent text-foreground",
         status === "pending" && "border-foreground/20 text-muted-foreground",
         className,
       )}
