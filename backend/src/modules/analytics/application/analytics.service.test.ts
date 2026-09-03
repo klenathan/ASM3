@@ -15,6 +15,7 @@ import type {
   AnalyticsRepository,
   UpsertAnalyticsMetricInput,
 } from "./analytics.repository";
+import type { RefreshRange } from "./refresh-range";
 import type { RefreshRunRecord } from "./refresh-run.ports";
 import type { RequestRefreshResult } from "./refresh-workflow";
 
@@ -206,6 +207,68 @@ describe("AnalyticsService", () => {
     expect(response.accepted).toBe(true);
     expect(refreshCalled).toBe(true);
   });
+  it("clamps ranges before the recording boundary and warns about skipped dates", async () => {
+    let requestedRange: RefreshRange | undefined;
+    const service = createService(
+      undefined,
+      false,
+      async (range) => {
+        requestedRange = range;
+        return {
+          runId: "123e4567-e89b-12d3-a456-426614174000",
+          status: "requested",
+          coalesced: false,
+          periodStart: range?.periodStart,
+          periodEnd: range?.periodEnd,
+        };
+      },
+      undefined,
+      undefined,
+      undefined,
+      new Date("2026-09-03T14:00:00.000Z"),
+    );
+
+    const response = await service.refresh(admin, {
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-08",
+    });
+
+    expect(requestedRange).toEqual({ periodStart: "2026-09-03", periodEnd: "2026-09-08" });
+    expect(response).toMatchObject({
+      accepted: true,
+      periodStart: "2026-09-03",
+      periodEnd: "2026-09-08",
+      warnings: ["Requested range starts before retained action events; skipped dates before 2026-09-03."],
+    });
+  });
+
+
+  it("skips a range that ends before retained events and warns without starting a run", async () => {
+    let refreshCalled = false;
+    const service = createService(
+      undefined,
+      false,
+      async () => {
+        refreshCalled = true;
+      },
+      undefined,
+      undefined,
+      undefined,
+      new Date("2026-09-03T14:00:00.000Z"),
+    );
+
+    const response = await service.refresh(admin, {
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-03",
+    });
+
+    expect(response).toEqual({
+      accepted: true,
+      message: "No retained action events exist in the requested range; nothing was refreshed.",
+      warnings: ["Requested range starts before retained action events; skipped dates before 2026-09-03."],
+    });
+    expect(refreshCalled).toBe(false);
+  });
 
   it("returns the latest durable refresh status to system admins", async () => {
     const latestRun: RefreshRunRecord = {
@@ -318,13 +381,21 @@ describe("AnalyticsService", () => {
 function createService(
   repository?: AnalyticsRepository | undefined,
   isModeratorOfSociety = false,
-  onRefreshRequested?: (() => Promise<void>) | undefined,
+  onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined,
   schedulerSecret?: string | undefined,
   onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined,
   runStore?: { findLatestRun: () => Promise<RefreshRunRecord | null> } | undefined,
+  recordingStartedAt?: Date | undefined,
 ): AnalyticsService {
   return new AnalyticsService({
     repository: repository ?? new FakeAnalyticsRepository(),
+    ...(recordingStartedAt === undefined ? {} : {
+      actionMetricsRepository: {
+        findActionMetrics: async () => ({ metrics: [], nextCursor: null, hasMore: false }),
+        upsertActionMetrics: async () => undefined,
+        getRecordingStartedAt: async () => recordingStartedAt,
+      },
+    }),
     accountReader: { findAccountByUserId: findAccount },
     membershipRepository: {
       findMembership: async (socId: string, _userId: string) => {
@@ -337,7 +408,6 @@ function createService(
             joinedAt: now,
             updatedAt: now,
             bannedBy: null,
-            bannedAt: null,
           };
         }
         return null;

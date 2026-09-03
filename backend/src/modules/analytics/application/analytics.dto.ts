@@ -44,6 +44,7 @@ export interface RefreshResponse {
   readonly coalesced?: boolean;
   readonly periodStart?: string;
   readonly periodEnd?: string;
+  readonly warnings?: readonly string[];
 }
 export interface ActionMetricDto {
   readonly id: string;

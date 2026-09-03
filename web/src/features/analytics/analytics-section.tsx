@@ -384,6 +384,7 @@ function ActionAnalyticsPanel() {
   const [periodStart, setPeriodStart] = useState(dateDaysAgo(6));
   const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
   const [runId, setRunId] = useState<string | null>(null);
+  const [refreshWarnings, setRefreshWarnings] = useState<readonly string[]>([]);
   const actionQuery = useQuery({
     queryKey: ["analytics", "action-events", grain, periodStart, periodEnd],
     queryFn: () => queryActionMetrics({ grain, periodStart, periodEnd, limit: 100 }),
@@ -400,6 +401,7 @@ function ActionAnalyticsPanel() {
   const refreshMutation = useMutation({
     mutationFn: () => refreshActionAnalytics(periodStart, periodEnd),
     onSuccess: (result) => {
+      setRefreshWarnings(result.warnings ?? []);
       if (result.runId) setRunId(result.runId);
       void queryClient.invalidateQueries({ queryKey: ["analytics", "action-events"] });
     },
@@ -415,7 +417,7 @@ function ActionAnalyticsPanel() {
           <p className="text-sm text-muted-foreground">Durable product actions, aggregated by UTC day.</p>
           <h2 id="action-analytics-heading" className="text-xl font-semibold">Action analytics</h2>
         </div>
-        <Button type="button" onClick={() => refreshMutation.mutate()} disabled={active || refreshMutation.isPending}>
+        <Button type="button" onClick={() => { setRefreshWarnings([]); refreshMutation.mutate(); }} disabled={active || refreshMutation.isPending}>
           <RefreshCw className={refreshMutation.isPending ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
           {active ? "Refresh in progress" : statusQuery.data?.status === "failed" ? "Retry refresh" : "Refresh analytics"}
         </Button>
@@ -426,6 +428,7 @@ function ActionAnalyticsPanel() {
         <label className="grid gap-1 text-sm">Grain<select aria-label="Analytics grain" value={grain} onChange={(event) => setGrain(event.target.value as typeof grain)} className="rounded border bg-background px-2 py-1"><option value="platform">Platform</option><option value="society">Society</option><option value="content">Content</option></select></label>
       </div>
       {refreshMutation.isError ? <p role="alert" className="text-sm text-destructive">{refreshMutation.error instanceof Error ? refreshMutation.error.message : "Unable to refresh analytics."}</p> : null}
+      {refreshWarnings.map((warning) => <p key={warning} role="status" className="text-sm text-amber-700 dark:text-amber-300">Warning: {warning}</p>)}
       {statusQuery.data?.status === "failed" && statusQuery.data.lastError ? <p role="alert" className="text-sm text-destructive">Refresh failed: {statusQuery.data.lastError}</p> : null}
       {actionQuery.isLoading ? <Skeleton className="h-40" /> : actionQuery.isError ? <p role="alert" className="text-sm text-destructive">Unable to load action analytics.</p> : metrics.length === 0 ? <MetricCardEmpty title="Action analytics" /> : <ActionActivitySummary metrics={metrics} />}
       {metrics.length > 0 ? <div className="grid gap-4 md:grid-cols-2">

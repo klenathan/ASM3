@@ -19,7 +19,10 @@ state changes. The event table stores HMAC pseudonyms rather than actor user
 IDs; production requires `ANALYTICS_PSEUDONYM_KEY` and a key version.
 
 `POST /api/v2/admin/analytics/refresh` accepts an optional UTC half-open date
-range (`periodStart`, `periodEnd`, maximum 31 days). One active run is allowed
+range (`periodStart`, `periodEnd`, maximum 31 days). If the requested start
+predates the retained recording window, the API clamps the effective start to
+the first retained UTC date and returns a warning; a range ending before that
+date is accepted as a no-op with the same warning. One active run is allowed
 per range; a same-range request coalesces and a different-range request returns
 `409 ANALYTICS_REFRESH_BUSY`. The v2 status endpoint is scoped to the returned
 run ID. `GET /api/v2/admin/analytics` serves activity, current-state, and

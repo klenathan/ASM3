@@ -8,7 +8,6 @@ import type { MembershipRepository } from "../../societies/application/membershi
 import { isActiveModerator } from "../../societies/domain/membership";
 import {
   AnalyticsForbiddenError,
-  AnalyticsRangeUnavailableError,
   AnalyticsSocietyNotModeratedError,
 } from "../domain/analytics.errors";
 import {
@@ -20,7 +19,7 @@ import type {
   ActionMetricsRepository,
   ActionMetricsQuery,
 } from "./action-metrics.repository";
-import type { RefreshRange } from "./refresh-range";
+import { normalizeRefreshRange, type RefreshRange } from "./refresh-range";
 import {
   type ActionAnalyticsPageDto,
   type ActionMetricDto,
@@ -139,16 +138,37 @@ export class AnalyticsService {
     const account = await this.accountReader.findAccountByUserId(principal.userId);
     assertTargetExists(account);
     assertSystemAdmin(account);
-    if (range !== undefined && this.actionMetricsRepository?.getRecordingStartedAt !== undefined) {
+
+    const requestedRange = range === undefined
+      ? undefined
+      : normalizeRefreshRange(range, this.clock.now());
+    let effectiveRange = requestedRange;
+    let warnings: readonly string[] | undefined;
+
+    if (requestedRange !== undefined && this.actionMetricsRepository?.getRecordingStartedAt !== undefined) {
       const recordingStartedAt = await this.actionMetricsRepository.getRecordingStartedAt(2);
-      if (new Date(`${range.periodStart}T00:00:00.000Z`) < recordingStartedAt) {
-        throw new AnalyticsRangeUnavailableError();
+      const firstAvailableDate = recordingStartedAt.toISOString().slice(0, 10);
+      if (requestedRange.periodStart < firstAvailableDate) {
+        warnings = [
+          `Requested range starts before retained action events; skipped dates before ${firstAvailableDate}.`,
+        ];
+        if (firstAvailableDate >= requestedRange.periodEnd) {
+          return {
+            accepted: true,
+            message: "No retained action events exist in the requested range; nothing was refreshed.",
+            warnings,
+          };
+        }
+        effectiveRange = {
+          periodStart: firstAvailableDate,
+          periodEnd: requestedRange.periodEnd,
+        };
       }
     }
 
     const result = this.onRefreshRequested === undefined
       ? undefined
-      : await this.onRefreshRequested(range);
+      : await this.onRefreshRequested(effectiveRange);
 
     return {
       accepted: true,
@@ -157,6 +177,7 @@ export class AnalyticsService {
         : result.coalesced
           ? "An analytics refresh run is already in progress."
           : "Analytics refresh has been queued.",
+      ...(warnings === undefined ? {} : { warnings }),
       ...(result === undefined ? {} : {
         runId: result.runId,
         status: result.status,

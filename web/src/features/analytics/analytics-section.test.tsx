@@ -173,4 +173,28 @@ describe("AnalyticsSection", () => {
 
     expect(await screen.findByText("Running metrics")).toBeInTheDocument();
   });
+  it("shows a warning when refresh skips dates before retained events", async () => {
+    mockFetch((url, init) => {
+      if (url.endsWith("/api/v2/admin/analytics/refresh") && init?.method === "POST") {
+        return jsonResponse({
+          accepted: true,
+          message: "Analytics refresh has been queued.",
+          warnings: ["Requested range starts before retained action events; skipped dates before 2026-09-03."],
+          runId: "22222222-2222-4222-8222-222222222222",
+          status: "requested",
+        });
+      }
+      return jsonResponse(emptyPage());
+    });
+    const { user } = setup();
+
+    await user.click(screen.getByRole("button", { name: "Refresh analytics" }));
+
+    expect(
+      await screen.findByText(
+        "Warning: Requested range starts before retained action events; skipped dates before 2026-09-03.",
+        { selector: '[role="status"]' },
+      ),
+    ).toBeInTheDocument();
+  });
 });

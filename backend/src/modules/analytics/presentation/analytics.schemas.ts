@@ -100,6 +100,7 @@ export const refreshResponseSchema = z
     coalesced: z.boolean().optional(),
     periodStart: calendarDate.optional(),
     periodEnd: calendarDate.optional(),
+    warnings: z.array(z.string()).optional(),
   })
   .openapi("AnalyticsRefreshResponse");
 

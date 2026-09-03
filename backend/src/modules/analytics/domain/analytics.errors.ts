@@ -30,9 +30,3 @@ export class AnalyticsRefreshBusyError extends ApplicationError {
     );
   }
 }
-
-export class AnalyticsRangeUnavailableError extends ApplicationError {
-  constructor() {
-    super("ANALYTICS_RANGE_UNAVAILABLE", "The requested range predates retained action events");
-  }
-}

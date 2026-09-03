@@ -73,6 +73,7 @@ export interface RefreshResponse {
   coalesced?: boolean;
   periodStart?: string;
   periodEnd?: string;
+  warnings?: string[];
 }
 
 export type ActionMetricKind = "activity" | "current_state" | "reconciliation";
