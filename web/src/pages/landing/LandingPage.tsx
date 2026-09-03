@@ -1,10 +1,9 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Button } from "../../components/ui/button";
 import { LogoMark } from "../../components/site/LogoMark";
+import { Button } from "../../components/ui/button";
 import { useAuth } from "../../features/auth/auth-context";
-import { AnalysisBadge } from "@/features/discussions/analysis-badge";
 
 const indexItems = [
   {
