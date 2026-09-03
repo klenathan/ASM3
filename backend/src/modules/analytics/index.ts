@@ -1,6 +1,5 @@
 import type { Database } from "../../db/client";
 import type { IdentityRepository } from "../identity/application/identity.repository";
-import type { MembershipRepository } from "../societies/application/membership.repository";
 import { AnalyticsService } from "./application/analytics.service";
 import { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
 import { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
@@ -11,7 +10,6 @@ import type { RefreshRunRecord } from "./application/refresh-run.ports";
 export interface AnalyticsModuleDependencies {
   readonly database: Database;
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
-  readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
   readonly onRefreshCancelled?: ((run: RefreshRunRecord) => Promise<void>) | undefined;
   readonly schedulerSecret?: string | undefined;
@@ -22,10 +20,8 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
   const repository = new DrizzleAnalyticsRepository(dependencies.database);
   const refreshRunStore = new DrizzleRefreshRunStore(dependencies.database);
   const analyticsService = new AnalyticsService({
-    repository,
     actionMetricsRepository: repository,
     accountReader: dependencies.accountReader,
-    membershipRepository: dependencies.membershipRepository,
     runStore: refreshRunStore,
     onRefreshRequested: dependencies.onRefreshRequested,
     onRefreshCancelled: dependencies.onRefreshCancelled,
@@ -50,23 +46,14 @@ export { InMemoryRefreshRunStore } from "./application/refresh-run.store";
 export { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
 export { StepFunctionsWorkflowStarter } from "./infrastructure/step-functions-workflow-starter";
 export type { StepFunctionsWorkflowStarterConfig } from "./infrastructure/step-functions-workflow-starter";
-export {
-  createAthenaMetricSqlCatalog,
-  METRIC_SQL_TYPES,
-} from "./infrastructure/athena-sql-catalog";
 export { createActionAthenaSqlCatalog } from "./infrastructure/action-athena-sql-catalog";
 export type { ActionMetricSqlCatalog } from "./infrastructure/action-athena-sql-catalog";
 export type {
-  AthenaMetricRow,
-  MetricSqlCatalog,
-  MetricSqlCatalogFactory,
   RefreshRunRecord,
   RefreshRunStatus,
   RefreshRunStore,
   RefreshRunTrigger,
 } from "./application/refresh-run.ports";
-export { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
-export type { AnalyticsRepository } from "./application/analytics.repository";
 export {
   registerAnalyticsRoutes,
   SCHEDULER_SECRET_HEADER,

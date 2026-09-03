@@ -14,38 +14,6 @@ variable "analytics_glue_script_path" {
 locals {
   analytics_catalog_database = "analytics"
   analytics_catalog_tables = {
-    users = {
-      columns = [
-        { name = "created_at", type = "timestamp" },
-        { name = "status", type = "string" },
-      ]
-    }
-    societies = {
-      columns = [
-        { name = "id", type = "string" },
-        { name = "name", type = "string" },
-        { name = "slug", type = "string" },
-        { name = "status", type = "string" },
-        { name = "created_at", type = "timestamp" },
-      ]
-    }
-    threads = {
-      columns = [
-        { name = "id", type = "string" },
-        { name = "society_id", type = "string" },
-        { name = "status", type = "string" },
-        { name = "created_at", type = "timestamp" },
-      ]
-    }
-    comments = {
-      columns = [
-        { name = "id", type = "string" },
-        { name = "thread_id", type = "string" },
-        { name = "status", type = "string" },
-        { name = "created_at", type = "timestamp" },
-        { name = "society_id", type = "string" },
-      ]
-    }
     memberships = {
       columns = [
         { name = "society_id", type = "string" },
@@ -60,15 +28,6 @@ locals {
         { name = "value", type = "bigint" },
         { name = "society_id", type = "string" },
         { name = "vote_count", type = "bigint" },
-      ]
-    }
-    reports = {
-      columns = [
-        { name = "id", type = "string" },
-        { name = "society_id", type = "string" },
-        { name = "status", type = "string" },
-        { name = "created_at", type = "timestamp" },
-        { name = "resolved_at", type = "timestamp" },
       ]
     }
   }

@@ -1,31 +1,3 @@
-import type { MetricType, MetricPayload } from "../domain/analytics";
-
-export interface AnalyticsMetricDto {
-  readonly id: string;
-  readonly metricType: MetricType;
-  readonly societyId: string | null;
-  readonly periodStart: string;
-  readonly periodEnd: string;
-  readonly data: MetricPayload;
-}
-
-export interface AnalyticsPageDto {
-  readonly metrics: readonly AnalyticsMetricDto[];
-  readonly page: {
-    readonly cursor: string | null;
-    readonly hasMore: boolean;
-  };
-}
-
-export interface QueryMetricsRequest {
-  readonly metricType?: MetricType | undefined;
-  readonly societyId?: string | undefined;
-  readonly periodStart?: string | undefined;
-  readonly periodEnd?: string | undefined;
-  readonly cursor?: string | undefined;
-  readonly limit?: number | undefined;
-}
-
 export interface RefreshStatusDto {
   readonly runId: string;
   readonly trigger: "admin" | "nightly";
@@ -37,6 +9,7 @@ export interface RefreshStatusDto {
   readonly periodStart?: string;
   readonly periodEnd?: string;
 }
+
 export interface RefreshCancellationResponse {
   readonly cancelled: boolean;
   readonly message: string;
@@ -54,6 +27,7 @@ export interface RefreshResponse {
   readonly periodEnd?: string;
   readonly warnings?: readonly string[];
 }
+
 export interface ActionMetricDto {
   readonly id: string;
   readonly source: "action_events";
@@ -73,12 +47,5 @@ export interface ActionAnalyticsPageDto {
   readonly contractVersion: 2;
   readonly recordingStartedAt: string;
   readonly metrics: readonly ActionMetricDto[];
-  readonly page: { readonly cursor: string | null; readonly hasMore: boolean };
-}
-
-export interface HistoricalBaselineDto {
-  readonly source: "historical_baseline";
-  readonly label: "Historical snapshot baseline — not reconstructed action history";
-  readonly metrics: readonly AnalyticsMetricDto[];
   readonly page: { readonly cursor: string | null; readonly hasMore: boolean };
 }

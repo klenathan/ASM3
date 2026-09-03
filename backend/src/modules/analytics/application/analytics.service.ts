@@ -1,46 +1,25 @@
 import type { Clock } from "../../../shared/application/clock";
-import { normalizePageSize } from "../../../shared/application/pagination";
 import type { RequestPrincipal } from "../../../shared/presentation/request-principal";
-import { assertSystemAdmin, assertTargetExists } from "../../identity/domain/access.policy";
 import { ApplicationError } from "../../../shared/domain/errors";
 import type { IdentityRepository } from "../../identity/application/identity.repository";
-import type { MembershipRepository } from "../../societies/application/membership.repository";
-import { isActiveModerator } from "../../societies/domain/membership";
-import {
-  AnalyticsForbiddenError,
-  AnalyticsSocietyNotModeratedError,
-} from "../domain/analytics.errors";
-import {
-  normalizeMetricPayload,
-  type AnalyticsMetricRecord,
-} from "../domain/analytics";
-import type { AnalyticsRepository, AnalyticsQuery } from "./analytics.repository";
-import type {
-  ActionMetricsRepository,
-  ActionMetricsQuery,
-} from "./action-metrics.repository";
+import { assertSystemAdmin, assertTargetExists } from "../../identity/domain/access.policy";
 import { normalizeRefreshRange, type RefreshRange } from "./refresh-range";
-import {
-  type ActionAnalyticsPageDto,
-  type ActionMetricDto,
-  type HistoricalBaselineDto,
-  type AnalyticsMetricDto,
-  type AnalyticsPageDto,
-  type QueryMetricsRequest,
-  type RefreshCancellationResponse,
-  type RefreshResponse,
-  type RefreshStatusDto,
+import type { ActionMetricsRepository, ActionMetricsQuery } from "./action-metrics.repository";
+import type {
+  ActionAnalyticsPageDto,
+  ActionMetricDto,
+  RefreshCancellationResponse,
+  RefreshResponse,
+  RefreshStatusDto,
 } from "./analytics.dto";
 import type { RefreshRunRecord, RefreshRunStore } from "./refresh-run.ports";
 import type { RequestRefreshResult } from "./refresh-workflow";
 
 export interface AnalyticsServiceDependencies {
-  readonly repository: AnalyticsRepository;
   readonly actionMetricsRepository?: Pick<ActionMetricsRepository, "findActionMetrics" | "upsertActionMetrics"> & {
     getRecordingStartedAt?(contractVersion: 2): Promise<Date>;
   };
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
-  readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly clock?: Clock | undefined;
   readonly onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
   readonly runStore?: Pick<RefreshRunStore, "findLatestRun">
@@ -52,12 +31,10 @@ export interface AnalyticsServiceDependencies {
 }
 
 export class AnalyticsService {
-  private readonly repository: AnalyticsRepository;
   private readonly actionMetricsRepository:
     | AnalyticsServiceDependencies["actionMetricsRepository"]
     | undefined;
   private readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
-  private readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   private readonly runStore: AnalyticsServiceDependencies["runStore"];
   private readonly clock: Clock;
   private readonly onRefreshRequested: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
@@ -66,10 +43,8 @@ export class AnalyticsService {
   private readonly onScheduledRefresh: (() => Promise<RequestRefreshResult>) | undefined;
 
   constructor(dependencies: AnalyticsServiceDependencies) {
-    this.repository = dependencies.repository;
     this.actionMetricsRepository = dependencies.actionMetricsRepository;
     this.accountReader = dependencies.accountReader;
-    this.membershipRepository = dependencies.membershipRepository;
     this.runStore = dependencies.runStore;
     this.onRefreshRequested = dependencies.onRefreshRequested;
     this.onRefreshCancelled = dependencies.onRefreshCancelled;
@@ -78,67 +53,6 @@ export class AnalyticsService {
     this.onScheduledRefresh = dependencies.onScheduledRefresh;
   }
 
-  async queryMetrics(
-    principal: RequestPrincipal,
-    request: QueryMetricsRequest,
-  ): Promise<AnalyticsPageDto> {
-    const account = await this.accountReader.findAccountByUserId(principal.userId);
-    assertTargetExists(account);
-
-    if (principal.platformRole === "system_admin") {
-      // Admin: access all metrics, optional society filter
-      const query: AnalyticsQuery = {
-        metricType: request.metricType,
-        societyId: request.societyId,
-        limit: normalizePageSize(request.limit),
-        cursor: request.cursor,
-        periodStart: request.periodStart !== undefined ? new Date(request.periodStart) : undefined,
-        periodEnd: request.periodEnd !== undefined ? new Date(request.periodEnd) : undefined,
-      };
-
-      const result = await this.repository.findMetrics(query);
-
-      return {
-        metrics: result.metrics.map(toDto),
-        page: {
-          cursor: result.nextCursor,
-          hasMore: result.hasMore,
-        },
-      };
-    }
-
-    // Non-admin: must be a moderator of the requested society
-    if (request.societyId === undefined) {
-      throw new AnalyticsForbiddenError();
-    }
-
-    const membership = await this.membershipRepository.findMembership(
-      request.societyId,
-      principal.userId,
-    );
-    if (!isActiveModerator(membership)) {
-      throw new AnalyticsSocietyNotModeratedError();
-    }
-
-    const query: AnalyticsQuery = {
-      metricType: request.metricType,
-      societyId: request.societyId,
-      limit: normalizePageSize(request.limit),
-      cursor: request.cursor,
-      periodStart: request.periodStart !== undefined ? new Date(request.periodStart) : undefined,
-      periodEnd: request.periodEnd !== undefined ? new Date(request.periodEnd) : undefined,
-    };
-
-    const result = await this.repository.findMetrics(query);
-
-    return {
-      metrics: result.metrics.map(toDto),
-      page: {
-        cursor: result.nextCursor,
-        hasMore: result.hasMore,
-      },
-    };
-  }
 
   async refresh(principal: RequestPrincipal, range?: RefreshRange): Promise<RefreshResponse> {
     const account = await this.accountReader.findAccountByUserId(principal.userId);
@@ -319,16 +233,6 @@ export class AnalyticsService {
     return run === null || run === undefined ? null : toRefreshStatusDto(run);
   }
 
-  async historicalBaseline(principal: RequestPrincipal, query: QueryMetricsRequest): Promise<HistoricalBaselineDto> {
-    await this.requireSystemAdmin(principal);
-    const page = await this.queryMetrics(principal, query);
-    return {
-      source: "historical_baseline",
-      label: "Historical snapshot baseline — not reconstructed action history",
-      metrics: page.metrics,
-      page: page.page,
-    };
-  }
 
   private async requireSystemAdmin(principal: RequestPrincipal): Promise<void> {
     const account = await this.accountReader.findAccountByUserId(principal.userId);
@@ -367,16 +271,5 @@ function toRefreshStatusDto(run: {
     updatedAt: run.updatedAt.toISOString(),
     ...(run.periodStart === undefined ? {} : { periodStart: run.periodStart }),
     ...(run.periodEnd === undefined ? {} : { periodEnd: run.periodEnd }),
-  };
-}
-
-function toDto(record: AnalyticsMetricRecord): AnalyticsMetricDto {
-  return {
-    id: record.id,
-    metricType: record.metricType,
-    societyId: record.societyId,
-    periodStart: record.periodStart.toISOString(),
-    periodEnd: record.periodEnd.toISOString(),
-    data: normalizeMetricPayload(record.data),
   };
 }

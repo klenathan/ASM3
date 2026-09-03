@@ -6,11 +6,9 @@ import {
 import type {
   AthenaActionMetricRow,
   AthenaGateway,
-  AthenaMetricRow,
 } from "../application/refresh-run.ports";
 import {
   parseActionAthenaResultRows,
-  parseAthenaResultRows,
   type AthenaResultRow,
 } from "./athena-result-parser";
 
@@ -28,10 +26,6 @@ export class AthenaGatewayAdapter implements AthenaGateway {
     this.send = send ?? ((command) => client.send(command as never));
   }
 
-  async getResults(queryExecutionId: string): Promise<readonly AthenaMetricRow[]> {
-    const { columnNames, rows } = await this.readRows(queryExecutionId);
-    return parseAthenaResultRows(columnNames, rows);
-  }
 
   async getActionResults(queryExecutionId: string): Promise<readonly AthenaActionMetricRow[]> {
     const { columnNames, rows } = await this.readRows(queryExecutionId);

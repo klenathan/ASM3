@@ -19,21 +19,6 @@ describe("validateQueryIds", () => {
     });
   });
 
-  it("accepts legacy v1 metric types", () => {
-    const queryIds = {
-      user_growth: "query-1",
-      content_volume: "query-2",
-      top_societies: "query-3",
-      moderation: "query-4",
-    };
-
-    expect(validateQueryIds(queryIds, runId)).toEqual({
-      user_growth: "query-1",
-      content_volume: "query-2",
-      top_societies: "query-3",
-      moderation: "query-4",
-    });
-  });
 
   it("accepts an empty query map", () => {
     expect(validateQueryIds({}, runId)).toEqual({});

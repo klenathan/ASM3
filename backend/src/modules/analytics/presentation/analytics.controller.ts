@@ -7,10 +7,8 @@ import { analyticsErrorResponse, requireInjectedPrincipal, validated } from "./h
 import type { z } from "@hono/zod-openapi";
 import type {
   actionAnalyticsQuerySchema,
-  queryAnalyticsQuerySchema,
   refreshRangeSchema,
 } from "./analytics.schemas";
-import type { MetricType } from "../domain/analytics";
 
 export const SCHEDULER_SECRET_HEADER = "x-analytics-scheduler-secret";
 
@@ -18,82 +16,11 @@ export interface AnalyticsControllerDependencies {
   readonly analyticsService: AnalyticsService;
 }
 
-type QueryAnalyticsQuery = z.infer<typeof queryAnalyticsQuerySchema>;
 type ActionAnalyticsQuery = z.infer<typeof actionAnalyticsQuerySchema>;
 type RefreshRangeInput = z.infer<typeof refreshRangeSchema>;
 
 export function createAnalyticsController(dependencies: AnalyticsControllerDependencies) {
   return {
-    async queryMetrics(context: Context<AppEnvironment>): Promise<Response> {
-      try {
-        const principal = requireInjectedPrincipal(context);
-        const query = validated<QueryAnalyticsQuery>(context, "query");
-        const logger = context.get("logger");
-        const requestId = context.get("requestId");
-        logger.debug({ requestId, userId: principal.userId, query }, "analytics query started");
-
-        const result = await dependencies.analyticsService.queryMetrics(principal, {
-          metricType: query.metric_type as MetricType | undefined,
-          societyId: query.society_id,
-          periodStart: query.period_start,
-          periodEnd: query.period_end,
-          cursor: query.cursor,
-          limit: query.limit,
-        });
-
-        logger.info({
-          requestId,
-          userId: principal.userId,
-          requestedMetricType: query.metric_type,
-          returnedMetricCount: result.metrics.length,
-          returnedMetricTypes: [...new Set(result.metrics.map((metric) => metric.metricType))],
-          hasMore: result.page.hasMore,
-        }, "analytics query completed");
-        return context.json(result, 200);
-      } catch (error) {
-        context.get("logger").warn({
-          requestId: context.get("requestId"),
-          error: error instanceof Error ? error.message : String(error),
-        }, "analytics query failed");
-        return analyticsErrorResponse(context, error);
-      }
-    },
-
-    async refresh(context: Context<AppEnvironment>): Promise<Response> {
-      try {
-        const principal = requireInjectedPrincipal(context);
-        context.get("logger").info({
-          requestId: context.get("requestId"),
-          userId: principal.userId,
-        }, "analytics refresh requested");
-        const result = await dependencies.analyticsService.refresh(principal);
-        context.get("logger").info({
-          requestId: context.get("requestId"),
-          accepted: result.accepted,
-        }, "analytics refresh response");
-        return context.json(result, result.accepted ? 202 : 200);
-      } catch (error) {
-        context.get("logger").warn({
-          requestId: context.get("requestId"),
-          error: error instanceof Error ? error.message : String(error),
-        }, "analytics refresh failed");
-        return analyticsErrorResponse(context, error);
-      }
-    },
-    async refreshStatus(context: Context<AppEnvironment>): Promise<Response> {
-      try {
-        const principal = requireInjectedPrincipal(context);
-        const result = await dependencies.analyticsService.refreshStatus(principal);
-        return context.json(result, 200);
-      } catch (error) {
-        context.get("logger").warn({
-          requestId: context.get("requestId"),
-          error: error instanceof Error ? error.message : String(error),
-        }, "analytics refresh status failed");
-        return analyticsErrorResponse(context, error);
-      }
-    },
-
     async scheduledRefresh(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const presented = context.req.header(SCHEDULER_SECRET_HEADER);
@@ -111,6 +38,7 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         return analyticsErrorResponse(context, error);
       }
     },
+
     async queryActionMetrics(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
@@ -141,6 +69,17 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         return analyticsErrorResponse(context, error);
       }
     },
+
+    async refreshStatus(context: Context<AppEnvironment>): Promise<Response> {
+      try {
+        const principal = requireInjectedPrincipal(context);
+        const result = await dependencies.analyticsService.refreshStatus(principal);
+        return context.json(result, 200);
+      } catch (error) {
+        return analyticsErrorResponse(context, error);
+      }
+    },
+
     async cancelLatestRefresh(context: Context<AppEnvironment>): Promise<Response> {
       try {
         const principal = requireInjectedPrincipal(context);
@@ -157,24 +96,6 @@ export function createAnalyticsController(dependencies: AnalyticsControllerDepen
         const { runId } = context.req.param();
         if (runId === undefined) throw new ApplicationError("VALIDATION_ERROR", "runId is required");
         const result = await dependencies.analyticsService.actionRefreshStatus(principal, runId);
-        return context.json(result, 200);
-      } catch (error) {
-        return analyticsErrorResponse(context, error);
-      }
-    },
-
-    async historicalBaseline(context: Context<AppEnvironment>): Promise<Response> {
-      try {
-        const principal = requireInjectedPrincipal(context);
-        const query = validated<QueryAnalyticsQuery>(context, "query");
-        const result = await dependencies.analyticsService.historicalBaseline(principal, {
-          metricType: query.metric_type,
-          societyId: query.society_id,
-          periodStart: query.period_start,
-          periodEnd: query.period_end,
-          cursor: query.cursor,
-          limit: query.limit,
-        });
         return context.json(result, 200);
       } catch (error) {
         return analyticsErrorResponse(context, error);

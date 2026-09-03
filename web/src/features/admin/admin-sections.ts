@@ -85,7 +85,7 @@ export const adminSections: AdminSection[] = [
     label: "Analytics",
     heading: "Analytics",
     icon: BarChart3,
-    blurb: "Usage metrics computed nightly via the EMR pipeline.",
+    blurb: "Action metrics computed from the Glue and Athena pipeline.",
     pending: false,
   },
 ];

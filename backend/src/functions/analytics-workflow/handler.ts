@@ -4,12 +4,10 @@ import { AthenaGatewayAdapter } from "../../modules/analytics/infrastructure/ath
 import { DrizzleAnalyticsRepository } from "../../modules/analytics/infrastructure/drizzle-analytics.repository";
 import { DrizzleRefreshRunStore } from "../../modules/analytics/infrastructure/drizzle-refresh-run.store";
 import type {
-  AthenaMetricRow,
   RefreshRunStatus,
   RefreshRunStore,
 } from "../../modules/analytics/application/refresh-run.ports";
 import { createActionAthenaSqlCatalog } from "../../modules/analytics/infrastructure/action-athena-sql-catalog";
-import { createAthenaMetricSqlCatalog } from "../../modules/analytics/infrastructure/athena-sql-catalog";
 import { actionMetricDataSchema } from "../../modules/analytics/domain/action-metrics";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { createWorkflowPool } from "./workflow-database";
@@ -29,9 +27,9 @@ export interface WorkflowDependencies {
   readonly runStore: Pick<RefreshRunStore, "get" | "save">;
   readonly repository: Pick<
     DrizzleAnalyticsRepository,
-    "upsertActionMetrics" | "upsertMetrics" | "deleteIngestedBefore"
+    "upsertActionMetrics" | "deleteIngestedBefore"
   >;
-  readonly athena: Pick<AthenaGatewayAdapter, "getActionResults" | "getResults">;
+  readonly athena: Pick<AthenaGatewayAdapter, "getActionResults">;
 }
 
 
@@ -69,13 +67,11 @@ export async function processWorkflowEvent(
       glueJobRunId: event.glueJobRunId ?? run.glueJobRunId,
       updatedAt: new Date(),
     });
-    const catalog = saved.contractVersion === 2
-      ? createActionAthenaSqlCatalog(saved.runId, saved.periodStart!, saved.periodEnd!)
-      : createAthenaMetricSqlCatalog(saved.runId);
+    const catalog = createActionAthenaSqlCatalog(saved.runId, saved.periodStart!, saved.periodEnd!);
     return {
       runId: saved.runId,
       status: saved.status,
-      queries: Object.entries(catalog).map(([metricType, sql]) => ({ metricType, sql: sql as string })),
+      queries: Object.entries(catalog).map(([metricType, sql]) => ({ metricType, sql })),
     };
   }
   if (event.action === "mark") {
@@ -93,59 +89,42 @@ export async function processWorkflowEvent(
 
   const queryIds = event.queryExecutionIds ?? [];
   if (queryIds.length === 0) throw new Error("workflow persist event is missing Athena query IDs");
-  if (run.contractVersion === 2) {
-    const actionRows = [];
-    for (const query of queryIds) {
-      actionRows.push(...await dependencies.athena.getActionResults(query.queryExecutionId));
-    }
-    const now = new Date();
-    await dependencies.repository.upsertActionMetrics(actionRows.map((row) => {
-      const data = actionMetricDataSchema.parse({ metricKind: row.metricKind, data: row.data });
-      return {
-        id: randomUUID(),
-        contractVersion: 2 as const,
-        metricKind: row.metricKind,
-        grain: row.grain,
-        societyId: row.societyId,
-        targetType: row.targetType,
-        targetId: row.targetId,
-        threadId: row.threadId,
-        periodStart: row.periodStart,
-        periodEnd: row.periodEnd,
-        snapshotAt: row.snapshotAt,
-        data,
-        refreshRunId: run.runId,
-        createdAt: now,
-        updatedAt: now,
-      };
-    }));
-    const rawRetentionDays = process.env.ANALYTICS_RAW_EVENT_RETENTION_DAYS
-      ?? process.env.ANALYTICS_RAW_RETENTION_DAYS
-      ?? "30";
-    const retentionDays = Number(rawRetentionDays);
-    if (!Number.isFinite(retentionDays) || retentionDays < 0) {
-      throw new Error("ANALYTICS_RAW_EVENT_RETENTION_DAYS must be a non-negative number");
-    }
-    await dependencies.repository.deleteIngestedBefore(
-      new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000),
-    );
-  } else {
-    const rows: AthenaMetricRow[] = [];
-    for (const query of queryIds) {
-      rows.push(...await dependencies.athena.getResults(query.queryExecutionId));
-    }
-    await dependencies.repository.upsertMetrics(rows.map((row) => ({
+
+  const actionRows = [];
+  for (const query of queryIds) {
+    actionRows.push(...await dependencies.athena.getActionResults(query.queryExecutionId));
+  }
+  const now = new Date();
+  await dependencies.repository.upsertActionMetrics(actionRows.map((row) => {
+    const data = actionMetricDataSchema.parse({ metricKind: row.metricKind, data: row.data });
+    return {
       id: randomUUID(),
-      metricType: row.metricType,
+      contractVersion: 2 as const,
+      metricKind: row.metricKind,
+      grain: row.grain,
       societyId: row.societyId,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      threadId: row.threadId,
       periodStart: row.periodStart,
       periodEnd: row.periodEnd,
-      data: row.data,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })));
+      snapshotAt: row.snapshotAt,
+      data,
+      refreshRunId: run.runId,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }));
+  const rawRetentionDays = process.env.ANALYTICS_RAW_EVENT_RETENTION_DAYS
+    ?? process.env.ANALYTICS_RAW_RETENTION_DAYS
+    ?? "30";
+  const retentionDays = Number(rawRetentionDays);
+  if (!Number.isFinite(retentionDays) || retentionDays < 0) {
+    throw new Error("ANALYTICS_RAW_EVENT_RETENTION_DAYS must be a non-negative number");
   }
-
+  await dependencies.repository.deleteIngestedBefore(
+    new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000),
+  );
   const saved = await dependencies.runStore.save({
     ...run,
     status: "completed",

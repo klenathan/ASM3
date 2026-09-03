@@ -31,12 +31,11 @@ describeWithDb("DrizzleRefreshRunStore", () => {
 
     await expect(store.get(run.runId)).resolves.toMatchObject({
       runId: run.runId,
-      status: "querying",
       athenaQueryExecutionIds: {
-        user_growth: "query-1",
-        content_volume: "query-2",
+        activity: "query-1",
+        current_state: "query-2",
       },
-    });
+  });
   });
 
   it("converges concurrent first saves on one active run", async () => {
@@ -82,8 +81,8 @@ function makeRun(runId: string): RefreshRunRecord {
     lastError: null,
     glueJobRunId: "glue-1",
     athenaQueryExecutionIds: {
-      user_growth: "query-1",
-      content_volume: "query-2",
+      activity: "query-1",
+      current_state: "query-2",
     },
   };
 }

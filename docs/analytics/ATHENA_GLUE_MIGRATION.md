@@ -1,136 +1,61 @@
 # Analytics Pipeline: Glue + Athena
 
-Spec: [klenathan/ASM3#6](https://github.com/klenathan/ASM3/issues/6).
-Implementation decisions are recorded in tickets #9 and #11. This document is
-the final data, orchestration, verification, and rollback contract.
+This document defines the action-event analytics data, orchestration, verification, and rollback contract.
 
-## Runtime Ownership
+## Runtime ownership
 
-The ECS backend owns the API boundary and durable refresh request; a managed
-Step Functions workflow owns the long-running AWS lifecycle:
+The ECS backend owns the API boundary and durable refresh request. The managed Step Functions workflow owns the long-running AWS lifecycle:
 
-1. `POST /api/v1/admin/analytics/refresh` authorizes a `system_admin`, creates
-   a durable run, starts Step Functions, and returns `202 Accepted`.
-2. The scheduled EventBridge rule calls
-   `POST /api/v1/admin/analytics/scheduled-refresh` through an API destination
-   authenticated by `x-analytics-scheduler-secret`.
-3. `AnalyticsRefreshWorkflow` coalesces concurrent requests into one durable
-   PostgreSQL run. Step Functions invokes the workflow Lambda to mark phases,
-   waits for one Glue export, runs four Athena queries in parallel, and invokes
-   the Lambda to retrieve and persist their rows.
+1. `POST /api/v2/admin/analytics/refresh` authorizes a `system_admin`, creates a durable run, starts Step Functions, and returns `202 Accepted`.
+2. EventBridge invokes `POST /api/v2/admin/analytics/scheduled-refresh` through an API destination authenticated with `x-analytics-scheduler-secret`.
+3. Step Functions marks phases, waits for one Glue export, runs three Athena queries in parallel, and invokes the Lambda to retrieve and persist rows.
 
-The run lifecycle is `requested -> exporting -> querying -> completed`, with
-`failed` as the terminal error state. Step Functions owns retry and timeout
-handling. Athena receives `<run-id>:<metric-type>` client request tokens, and
-the workflow Lambda's metric upserts are safe to replay.
+The lifecycle is `requested -> exporting -> querying -> completed`, with `failed` and `cancelled` as terminal states. Step Functions owns retry and timeout handling. Athena receives `<run-id>:<metric-kind>` request tokens, and metric upserts are safe to replay.
 
-The ECS process does not poll Glue or Athena. The Admin Center reads the
-durable latest-run status endpoint while an execution is active.
+The ECS process does not poll Glue or Athena. The Admin Center reads the durable latest-run status endpoint while an execution is active.
 
-## S3 And Glue Contract
+## S3 and Glue contract
 
-The gated private bucket is named `${project}-analytics-${accountId}` and uses
-SSE-S3. Glue reads `users`, `societies`, `threads`, `comments`, `memberships`,
-`votes`, and `reports` from PostgreSQL through separate JDBC reads. It writes:
+The private analytics bucket is named `${project}-analytics-${accountId}` and uses SSE-S3. Glue reads `action_events`, `memberships`, and `votes` from PostgreSQL through separate JDBC reads. It writes Parquet under:
 
 ```text
-s3://<analytics-bucket>/analytics/source/table=users/
-  snapshot_at=20260827T120000Z/snapshot_id=<run-id>/part-*.parquet
-s3://<analytics-bucket>/analytics/source/table=<name>/...
+s3://<analytics-bucket>/analytics/source/table=<name>/
+  [event_date=YYYY-MM-DD/]snapshot_at=<utc>/snapshot_id=<run-id>/part-*.parquet
 s3://<analytics-bucket>/analytics/manifest/snapshot_id=<run-id>/part-*.parquet
 s3://<analytics-bucket>/analytics/query-results/<athena-files>
 s3://<analytics-bucket>/analytics/glue-temp/<temporary-files>
 ```
 
-The source dataset contains `users`, `societies`, `threads`, `comments`,
-`memberships`, `votes`, and `reports`. The votes export includes the resolved
-`society_id` for both thread and comment votes. The manifest is written only
-after all seven tables succeed. Athena is passed the current run ID and uses
-only its matching `snapshot_at`/`snapshot_id` partitions for every join.
-Retries reuse the run creation timestamp as `snapshot_at`, clean that run's
-source and manifest prefixes, and rewrite the run-scoped manifest. The
-`completed_at` ordering is deterministic if old manifest objects remain.
+Action events are exported only for the requested UTC half-open range. Exports omit direct user identifiers. A manifest is written only after all three source exports succeed. Athena receives the immutable run ID and selects only its matching partitions, so a failed or partial run is never queryable.
 
-The Glue Catalog database is `analytics`. It contains one external Parquet
-table per source table and an unpartitioned `snapshot_manifest` table. Source
-tables expose their source columns plus `snapshot_at string` and
-`snapshot_id string` partition keys. Glue updates partitions while writing;
-no crawler is required.
+The Glue Catalog database is `analytics`. It contains external Parquet tables for `action_events`, `memberships`, and `votes`. Source tables expose run partition keys; action events additionally expose `event_date`. No crawler is required because Glue updates partitions while writing.
 
-S3 retention is 30 days for source snapshots and manifests, 7 days for Athena
-query results, and 1 day for Glue temporary files. `analytics_metrics` in RDS
-is durable dashboard history and is not covered by those lifecycle rules.
+S3 retention is 30 days for source snapshots and manifests, 7 days for Athena results, and 1 day for Glue temporary files. Durable action metrics remain in the RDS `analytics_action_metrics` table.
 
-## Athena Contract
+## Athena contract
 
-The SQL catalog factory at
-`backend/src/modules/analytics/infrastructure/athena-sql-catalog.ts` contains
-one query for each existing metric group and binds the current UUID snapshot
-ID. Each query returns zero or more rows
-with exactly:
+`backend/src/modules/analytics/infrastructure/action-athena-sql-catalog.ts` contains one query for each action metric kind:
 
-| Column | Athena type | Meaning |
-| --- | --- | --- |
-| `metric_type` | `varchar` | One of the four metric group names |
-| `society_id` | `varchar` nullable | Empty/null for platform-wide rows |
-| `period_start` | `timestamp` | UTC start of the daily period |
-| `period_end` | `timestamp` | UTC inclusive end of the daily period |
-| `data` | `varchar` | JSON object containing the group payload |
+- `activity`: event counts, distinct pseudonymous actors, reaction deltas, and membership deltas.
+- `current_state`: authoritative reaction and active-membership balances from the RDS snapshot.
+- `reconciliation`: an explicit status for comparisons that are not computable from the retained event boundary.
 
-The gateway consumes every result page and the parser rejects malformed metric
-types, dates, IDs, or JSON. Rows are mapped to
-`{metricType, societyId, periodStart, periodEnd, data}` and persisted through
-the existing repository. The administrator API and dashboard response shape
-remain unchanged.
+Every query returns metric dimensions, UTC period boundaries, an optional snapshot timestamp, and JSON-object `data`. The result parser rejects missing columns, invalid dimensions, invalid dates, and malformed JSON before persistence.
 
-## Infrastructure Contract
+## Database and deployment
 
-`infras/analytics-storage.tf` owns the gated shared S3 bucket and its policy.
-`infras/glue-athena.tf` owns the Glue connection, export script object, Glue
-Catalog, Glue job, Athena workgroup, VPC access, and retention rules.
-`infras/scheduling.tf` owns the gated EventBridge scheduled rule, API
-destination, generated shared secret, retry policy, and SQS DLQ.
-`infras/analytics-workflow.tf` owns the workflow Lambda, Step Functions state
-machine, Lambda security groups, and private interface endpoints. The
-pre-created `LabRole` is reused; no IAM roles or users are created. OpenTofu
-fails closed unless the active LabRole trust and required permissions have
-been verified explicitly.
+Migrations are forward-only and generated from the Drizzle schema. The legacy snapshot metric table is removed by the current cutover migration; the action-event tables and refresh-run table remain. Do not edit applied migration files or generated metadata.
 
-The complete analytics deployment is disabled by default. Setting
-`enable_analytics_pipeline = true` enables these resources. Build
-`backend/dist-function/analytics-workflow.zip` before `tofu plan`; OpenTofu
-uploads the workflow bundle and the Glue script from
-`backend/src/functions/analytics/glue/export_rds.py`.
+The Lambda runs in private database subnets with the existing `LabRole`, RDS CA validation, and interface endpoints for Athena, Secrets Manager, and CloudWatch Logs. The workflow is deployed only when `enable_analytics_pipeline` is enabled.
 
-## Acceptance Evidence
+## Verification and rollback
 
-Against one RDS fixture and UTC date, the cutover is accepted when:
+Verify the complete path with deterministic product activity:
 
-1. All seven source tables and the manifest point to one snapshot identity.
-2. Platform rows exist for all four groups with the expected daily periods.
-3. Society-scoped content and moderation rows preserve platform totals.
-4. Top-society ordering, names, and IDs match the existing dashboard.
-5. Repeating a run ID updates the same metric persistence keys.
-6. Paginated Athena results equal unpaginated results.
-7. An invalid result row prevents partial persistence.
-8. Admin API and dashboard metric groups are unchanged.
+1. Seed product activity.
+2. Request a bounded refresh from the Admin Center or invoke the scheduled route.
+3. Confirm the durable refresh lifecycle and Glue manifest.
+4. Confirm three Athena executions and Lambda persistence into `analytics_action_metrics`.
+5. Confirm API rows for platform, society, and content grains.
 
-## Cutover And Rollback
-
-The acceptance evidence above is the prerequisite for applying the cutover.
-After it is applied, the runtime contains only the ECS -> Glue -> Athena ->
-RDS path. There is no automatic analytics fallback. If rollback is required,
-restore the pre-cutover Git revision, rebuild that revision's artifacts, and
-reapply its OpenTofu configuration. The shared analytics S3 bucket is retained
-as the data handoff boundary, while normal teardown remains `tofu destroy`.
-
-### Database Migration Boundary
-
-Run `pnpm db:migrate`, not raw `drizzle-kit migrate`, so the preflight runs
-before migration 0013. It deterministically deletes older duplicate
-platform-wide rows for `(metric_type, period_start)`, retaining the newest by
-`updated_at`, `created_at`, and `id`, then applies generated migrations 0013,
-0014, and 0015 in order. Migrations are forward-only: do not edit or remove an
-applied SQL file or snapshot metadata. Roll back application code only to a
-revision compatible with the applied schema, and use database backup restore
-for data rollback.
+Rollback application code by restoring the prior Git revision and reapplying infrastructure. Treat the database cutover as forward-only; preserve the drop migration and restore data only from an explicitly retained backup.

@@ -15,7 +15,7 @@ describe("analytics scheduled-refresh route", () => {
     const app = createTestApp();
     const headers = secret === undefined ? {} : { [SCHEDULER_SECRET_HEADER]: secret };
     const response = await app.request(
-      new Request("http://localhost/api/v1/admin/analytics/scheduled-refresh", {
+      new Request("http://localhost/api/v2/admin/analytics/scheduled-refresh", {
         method: "POST",
         headers,
       }),
@@ -34,7 +34,7 @@ describe("analytics scheduled-refresh route", () => {
       return { accepted: true, message: "queued" };
     });
     const response = await app.request(
-      new Request("http://localhost/api/v1/admin/analytics/scheduled-refresh", {
+      new Request("http://localhost/api/v2/admin/analytics/scheduled-refresh", {
         method: "POST",
         headers: { [SCHEDULER_SECRET_HEADER]: "scheduler-secret" },
       }),
@@ -50,7 +50,7 @@ describe("analytics scheduled-refresh route", () => {
       message: "Analytics refresh orchestration is not configured; nothing was started.",
     }));
     const response = await app.request(
-      new Request("http://localhost/api/v1/admin/analytics/scheduled-refresh", {
+      new Request("http://localhost/api/v2/admin/analytics/scheduled-refresh", {
         method: "POST",
         headers: { [SCHEDULER_SECRET_HEADER]: "scheduler-secret" },
       }),

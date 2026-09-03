@@ -126,7 +126,6 @@ describe("analytics workflow handler - processWorkflowEvent", () => {
         upsertActionMetrics: vi.fn(async (metrics) => {
           upsertedActionMetrics.push(...metrics);
         }),
-        upsertMetrics: vi.fn(async () => []),
         deleteIngestedBefore: vi.fn(async (before) => {
           deletedBefore.push(before);
           return 0;
@@ -139,7 +138,6 @@ describe("analytics workflow handler - processWorkflowEvent", () => {
           if (queryId === "query-reconciliation") return [];
           return [];
         }),
-        getResults: vi.fn(async () => []),
       },
     };
 

@@ -97,7 +97,7 @@ resource "aws_cloudwatch_event_api_destination" "analytics_scheduled_refresh" {
 
   name                = "${local.name}-analytics-scheduled-refresh"
   description         = "Points the nightly scheduler at the backend internal scheduled-refresh route"
-  invocation_endpoint = "${local.api_origin}/api/v1/admin/analytics/scheduled-refresh"
+  invocation_endpoint = "${local.api_origin}/api/v2/admin/analytics/scheduled-refresh"
   http_method         = "POST"
   connection_arn      = aws_cloudwatch_event_connection.analytics_scheduler[0].arn
 

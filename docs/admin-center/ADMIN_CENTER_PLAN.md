@@ -13,7 +13,7 @@ Five sections are in scope:
 2. Moderation & reports (buildable now via existing `/api/v1/mod/*`)
 3. System health & status (needs new backend endpoint)
 4. Platform config (needs new backend endpoint)
-5. Analytics (flagged deferred until the AWS analytics milestone)
+5. Analytics (implemented as the action-event v2 dashboard; see `../analytics/README.md`)
 
 ## TODO
 
@@ -55,7 +55,7 @@ Five sections are in scope:
 
 ### Analytics
 
-- [ ] Deferred — revisit with the AWS analytics milestone before final submission.
+- [x] Action-event analytics dashboard, bounded refresh, and durable run status.
 
 ### Shared states & constraints
 
@@ -67,4 +67,4 @@ Five sections are in scope:
 
 - [ ] Backend user-directory list/search endpoint (required for Users & roles).
 - [ ] Exact platform-config keys to ship.
-- [ ] Scope of analytics section tied to the AWS analytics milestone.
+- [x] Scope resolved: action-event metrics at platform, society, and content grain.

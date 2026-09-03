@@ -1,7 +1,6 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../../../db/client";
-import { METRIC_TYPES } from "../domain/analytics";
 import { ACTION_METRIC_KINDS } from "../domain/action-metrics";
 import type {
   RefreshRunRecord,
@@ -16,10 +15,7 @@ const UNFINISHED_STATUSES: readonly RefreshRunStatus[] = [
   "exporting",
   "querying",
 ];
-export const VALID_QUERY_METRIC_KEYS: readonly string[] = [
-  ...METRIC_TYPES,
-  ...ACTION_METRIC_KINDS,
-];
+export const VALID_QUERY_METRIC_KEYS: readonly string[] = [...ACTION_METRIC_KINDS];
 
 
 export class DrizzleRefreshRunStore implements RefreshRunStore {

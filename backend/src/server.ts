@@ -309,7 +309,6 @@ async function main(): Promise<void> {
   const analytics = createAnalyticsModule({
     database: database.db,
     accountReader: identity.repository,
-    membershipRepository: societies.membershipRepository,
     onRefreshRequested: async (range) =>
       analyticsRefreshWorkflow?.requestRefresh("admin", range),
     ...(analyticsWorkflowStarter === undefined ? {} : {

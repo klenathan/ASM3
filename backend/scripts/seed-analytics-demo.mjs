@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
  * Seeds deterministic, realistic source data for the Glue + Athena dashboard demo.
- *
- * This intentionally writes the PostgreSQL source tables, not analytics_metrics.
- * The normal refresh workflow still snapshots PostgreSQL through Glue and computes
- * metrics in Athena, so the demo exercises the real analytics path.
+ * This intentionally writes the PostgreSQL product source tables.
+ * The normal refresh workflow snapshots them through Glue and computes
+ * action metrics in Athena, so the demo exercises the real analytics path.
  *
  * Prerequisite: run `pnpm db:migrate` and `pnpm db:seed` first.
  * Usage: pnpm analytics:demo [--refresh]
@@ -428,7 +427,7 @@ async function requestRefresh() {
       "--refresh requires ANALYTICS_SCHEDULER_SECRET; alternatively trigger refresh from Admin Center",
     );
   }
-  const response = await fetch(`${apiUrl.replace(/\/$/, "")}/api/v1/admin/analytics/scheduled-refresh`, {
+  const response = await fetch(`${apiUrl.replace(/\/$/, "")}/api/v2/admin/analytics/scheduled-refresh`, {
     method: "POST",
     headers: { "x-analytics-scheduler-secret": secret },
   });

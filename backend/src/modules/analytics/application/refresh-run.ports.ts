@@ -1,5 +1,3 @@
-import type { MetricPayload, MetricType } from "../domain/analytics";
-
 export type RefreshRunTrigger = "admin" | "nightly";
 
 export type RefreshRunStatus =
@@ -33,13 +31,6 @@ export interface RefreshRunStore {
   save(run: RefreshRunRecord): Promise<RefreshRunRecord>;
 }
 
-export interface AthenaMetricRow {
-  readonly metricType: MetricType;
-  readonly societyId: string | null;
-  readonly periodStart: Date;
-  readonly periodEnd: Date;
-  readonly data: MetricPayload;
-}
 export interface AthenaActionMetricRow {
   readonly metricKind: "activity" | "current_state" | "reconciliation";
   readonly grain: "platform" | "society" | "content";
@@ -54,9 +45,5 @@ export interface AthenaActionMetricRow {
 }
 
 export interface AthenaGateway {
-  getResults(queryExecutionId: string): Promise<readonly AthenaMetricRow[]>;
   getActionResults(queryExecutionId: string): Promise<readonly AthenaActionMetricRow[]>;
 }
-
-export type MetricSqlCatalog = Readonly<Partial<Record<MetricType, string>>>;
-export type MetricSqlCatalogFactory = (snapshotId: string) => MetricSqlCatalog;

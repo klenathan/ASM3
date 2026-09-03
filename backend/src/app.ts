@@ -194,8 +194,6 @@ export function createApp(dependencies: AppDependencies) {
       const principalMiddleware = sessionPrincipalMiddleware({
         authService: dependencies.identity.authService,
       });
-      app.use("/api/v1/admin/analytics", principalMiddleware);
-      app.use("/api/v1/admin/analytics/*", principalMiddleware);
       app.use("/api/v2/admin/analytics", principalMiddleware);
       app.use("/api/v2/admin/analytics/*", principalMiddleware);
     }

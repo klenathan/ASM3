@@ -153,21 +153,21 @@ The analytics pipeline is the **Analytics-category AWS service** required by
 Assessment 3. It is fully gated by `enable_analytics_pipeline` (default
 `false`, costs nothing when disabled).
 
-The final path preserves the administrator API and dashboard metrics:
+The final path serves the action-event administrator dashboard:
 
 ```text
-POST /api/v1/admin/analytics/refresh (system_admin, 202 Accepted)
+POST /api/v2/admin/analytics/refresh (system_admin, 202 Accepted)
   -> ECS creates durable refresh run
   -> Standard Step Functions workflow
-  -> AWS Glue export job
+  -> AWS Glue exports action_events, memberships, and votes
   -> private analytics S3 bucket (partitioned Parquet + manifest)
-  -> Athena queries (four metric groups in parallel)
-  -> analytics workflow Lambda retrieves results and updates RDS
-  -> GET /api/v1/admin/analytics
+  -> three Athena metric queries in parallel
+  -> analytics workflow Lambda validates and persists action metrics
+  -> GET /api/v2/admin/analytics
 ```
 
-EventBridge invokes the same backend request path through the authenticated
-`/api/v1/admin/analytics/scheduled-refresh` API destination at
+EventBridge invokes the authenticated
+`/api/v2/admin/analytics/scheduled-refresh` API destination at
 `cron(0 2 * * ? *)` UTC. The ECS backend does not poll Glue or Athena.
 Step Functions owns waiting, retries, timeout handling, and fan-in. The
 workflow Lambda runs in the database subnets and uses VPC interface endpoints
@@ -224,16 +224,13 @@ cd ..
 make push-analytics-lambda
 ```
 
-Use `GET /api/v1/admin/analytics` and the Admin Center Analytics tab to verify
-fresh metrics, Glue job completion, and Athena query history. Cutover requires
-the Glue snapshot and four Athena queries to pass the parity checks in
-`docs/analytics/ATHENA_GLUE_MIGRATION.md` before applying infrastructure
-changes that remove the previous deployment state. After cutover, rollback is
-explicit and manual: restore the pre-cutover revision and reapply it from Git;
-there is no deployed analytics fallback path. The shared S3 bucket is retained
-across the cutover so existing analytics data can be inspected or removed by
-the normal teardown process.
-
+Use `GET /api/v2/admin/analytics` and the Admin Center Analytics tab to verify
+action metrics, Glue job completion, and Athena query history. Confirm the
+three action metric queries pass the checks in
+`docs/analytics/ATHENA_GLUE_MIGRATION.md` before enabling infrastructure.
+After cutover, rollback is explicit and manual: restore the prior Git revision
+and reapply it. The shared S3 bucket is retained across the cutover so action
+analytics data can be inspected or removed by the normal teardown process.
 ### Troubleshoot `voc-cancel-cred` upload failures
 
 An S3 error naming `assumed-role/voclabs/user...` and the

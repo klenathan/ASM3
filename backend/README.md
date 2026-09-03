@@ -24,7 +24,6 @@ Deferred:
 
 - product database tables and migrations
 - Better Auth and email verification
-- analytics
 
 ## Requirements
 
@@ -85,9 +84,10 @@ share the dev password `SeedPass123!` (change logins via the existing auth flow
 in a real deployment). Re-running the seed restores the admin's email, password,
 role, and active status.
 
-Committed migrations include the analytics metric and refresh-run tables. The
-bootstrap migration command also normalizes legacy nullable platform metric
-duplicates before applying the generated platform uniqueness migration.
+Committed migrations include the action-event analytics tables,
+`analytics_action_metrics`, and durable refresh-run state. Migration `0022`
+drops the retired snapshot metric table; applied migration history remains
+immutable.
 
 ## Configuration
 

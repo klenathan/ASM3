@@ -73,17 +73,6 @@ def main() -> None:
         raise ValueError("Glue JDBC connection did not provide a URL")
 
     queries = {
-        "users": """
-          SELECT u.created_at, p.status
-          FROM auth_users u INNER JOIN user_profiles p ON p.user_id = u.id
-        """,
-        "societies": "SELECT id::text AS id, name, slug, status, created_at FROM societies",
-        "threads": "SELECT id::text AS id, society_id::text AS society_id, status, created_at FROM threads",
-        "comments": """
-          SELECT c.id::text AS id, c.thread_id::text AS thread_id,
-                 c.status, c.created_at, t.society_id::text AS society_id
-          FROM comments c INNER JOIN threads t ON t.id = c.thread_id
-        """,
         "memberships": """
           SELECT society_id::text AS society_id, role, status, count(*) AS member_count
           FROM society_memberships
@@ -104,11 +93,6 @@ def main() -> None:
             INNER JOIN threads t ON t.id = c.thread_id
           ) vote_rows
           GROUP BY vote_rows.target_id, vote_rows.value, vote_rows.society_id
-        """,
-        "reports": """
-          SELECT id::text AS id, society_id::text AS society_id, status,
-                 created_at, resolved_at
-          FROM reports
         """,
         "action_events": f"""
           SELECT e.event_id::text AS event_id, e.event_type, e.schema_version,
@@ -188,13 +172,8 @@ def cleanup_run_output(bucket: str, run_id: str, snapshot_at: str) -> None:
     prefixes = [
         f"analytics/source/table={table}/snapshot_at={snapshot_at}/snapshot_id={run_id}/"
         for table in (
-            "users",
-            "societies",
-            "threads",
-            "comments",
             "memberships",
             "votes",
-            "reports",
         )
     ]
     action_events_prefix = "analytics/source/table=action_events/"
