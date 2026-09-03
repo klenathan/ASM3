@@ -15,6 +15,7 @@ import type { MembershipRepository, SocietyRepository } from "../societies/index
 import type { AnalysisDecisionReader } from "./application/analysis-decision.reader";
 import type { ThreadAnalysisDetailsReader } from "./application/analysis-details.reader";
 import type { AnalysisModerationPort } from "./application/thread.service";
+import type { ActionEventWriter } from "../analytics/application/action-event.ports";
 
 export interface DiscussionsModuleDependencies {
   readonly database: Database;
@@ -28,12 +29,16 @@ export interface DiscussionsModuleDependencies {
   readonly analysisDecisionReader?: AnalysisDecisionReader;
   readonly threadAnalysisReader?: ThreadAnalysisDetailsReader;
   readonly analysisModeration?: AnalysisModerationPort;
+  readonly actionEventWriterFactory?: (executor: unknown) => ActionEventWriter;
   readonly placesPort?: import("../places/application/places.port").PlacesPort;
 }
 
 export function createDiscussionsModule(dependencies: DiscussionsModuleDependencies) {
   const repository = new DrizzleDiscussionRepository(dependencies.database);
-  const transactions = new DrizzleDiscussionTransactionManager(dependencies.database);
+  const transactions = new DrizzleDiscussionTransactionManager(
+    dependencies.database,
+    dependencies.actionEventWriterFactory,
+  );
   const clock = dependencies.clock ?? systemClock;
   const events = dependencies.events ?? new NoopThreadEventPublisher();
   const authorization = {

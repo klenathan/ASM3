@@ -127,6 +127,27 @@
       "when": 1788422730717,
       "tag": "0017_fancy_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788422979092,
+      "tag": "0018_brave_queen_noir",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788423236130,
+      "tag": "0019_milky_scream",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788425230310,
+      "tag": "0020_warm_lily_hollister",
+      "breakpoints": true
     }
   ]
 }

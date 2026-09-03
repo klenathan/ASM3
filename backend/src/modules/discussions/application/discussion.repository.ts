@@ -5,6 +5,7 @@ import type {
   ThreadRecord,
   ThreadVoteRecord,
 } from "../domain/discussion";
+import type { ActionEventWriter } from "../../analytics/application/action-event.ports";
 
 export interface ThreadMediaRecord {
   readonly threadId: string;
@@ -63,6 +64,7 @@ export interface UpdateCommentInput {
 }
 
 export interface DiscussionRepository {
+  readonly actionEvents?: ActionEventWriter;
   listThreads(
     societyId: string,
     page: PageRequest,

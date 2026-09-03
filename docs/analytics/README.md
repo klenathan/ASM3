@@ -10,6 +10,31 @@ triggers create a durable refresh run and start a Standard Step Functions
 workflow. The existing admin API, dashboard, four metric groups, and persisted
 `analytics_metrics` rows remain unchanged.
 
+## Action analytics v2
+
+The action contract is versioned independently from the legacy snapshot
+dashboard. Product writes append validated `action_events` rows in the same
+transaction as thread, comment, reaction, membership, report, and moderation
+state changes. The event table stores HMAC pseudonyms rather than actor user
+IDs; production requires `ANALYTICS_PSEUDONYM_KEY` and a key version.
+
+`POST /api/v2/admin/analytics/refresh` accepts an optional UTC half-open date
+range (`periodStart`, `periodEnd`, maximum 31 days). One active run is allowed
+per range; a same-range request coalesces and a different-range request returns
+`409 ANALYTICS_REFRESH_BUSY`. The v2 status endpoint is scoped to the returned
+run ID. `GET /api/v2/admin/analytics` serves activity, current-state, and
+reconciliation rows with platform, society, and content grains. Activity
+metrics are additive event counts; current-state metrics are authoritative RDS
+balances; reconciliation metrics expose mismatches instead of silently
+blending the two models.
+
+Glue exports event rows using inclusive-start/exclusive-end UTC boundaries and
+run-scoped `event_date`, `snapshot_at`, and `snapshot_id` partitions. Exports
+omit `actor_user_id`. Raw event and manifest retention is configurable through
+`analytics_raw_event_retention_days` and defaults to 30 days. A contract-state
+row records the v2 recording start time; the API exposes it as the historical
+baseline boundary.
+
 ## Final Architecture
 
 Admin refresh or scheduled EventBridge rule
@@ -113,7 +138,16 @@ and manifests, 7 days for Athena result files, and 1 day for Glue temporary
 files. RDS `analytics_metrics` is the durable dashboard history and is not
 subject to those S3 lifecycle rules.
 
-Glue uses two `G.1X` workers with concurrency one and Athena uses one
+Database migrations are forward-only and applied in order through
+`pnpm db:migrate`. The legacy analytics boundary is migrations 0013
+(`analytics_metrics` nullable platform-key normalization), 0014 (durable
+refresh runs), and 0015 (refresh-run leases). The action analytics boundary is
+migrations 0017 (`action_events` and contract state), 0018
+(`analytics_action_metrics`), and 0019 (range-aware refresh runs). Migration
+0017 initializes contract version 2 and its recording-start timestamp. The
+migration preflight retains the newest row per legacy `(metric_type,
+period_start)` platform key before 0013 creates its unique index; it does not
+edit generated migration files.
 configured workgroup. The deployment reuses `LabRole`, avoids additional IAM
 resources, and does not provision duplicate compute. The workflow Lambda is
 reserved to one concurrent invocation. Destroy the demo stack with
@@ -133,12 +167,6 @@ date that:
 6. Pagination produces the same result and an invalid row persists nothing.
 7. The admin API response shape and dashboard groups are unchanged.
 
-Database migrations are forward-only and applied in order through
-`pnpm db:migrate`. The current analytics boundary is migrations 0013
-(`analytics_metrics` nullable platform-key normalization), 0014 (durable
-refresh runs), and 0015 (refresh-run leases). The migration preflight retains
-the newest row per legacy `(metric_type, period_start)` platform key before
-0013 creates its unique index; it does not edit generated migration files.
 For rollback, deploy code compatible with the already-applied schema and
 restore data from the database backup if required. Do not delete or rewrite an
 applied Drizzle migration; roll forward with a new generated migration.

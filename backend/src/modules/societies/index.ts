@@ -10,17 +10,22 @@ import {
   DrizzleSocietyRepository,
   DrizzleSocietyTransactionManager,
 } from "./infrastructure/drizzle-society.repository";
+import type { ActionEventWriter } from "../analytics/application/action-event.ports";
 
 export interface SocietyModuleDependencies {
   readonly database: Database;
   readonly clock?: Clock;
+  readonly actionEventWriterFactory?: (executor: unknown) => ActionEventWriter;
 }
 
 export function createSocietyModule(dependencies: SocietyModuleDependencies) {
   const societyRepository = new DrizzleSocietyRepository(dependencies.database);
   const membershipRepository = new DrizzleMembershipRepository(dependencies.database);
   const societyTransactions = new DrizzleSocietyTransactionManager(dependencies.database);
-  const membershipTransactions = new DrizzleMembershipTransactionManager(dependencies.database);
+  const membershipTransactions = new DrizzleMembershipTransactionManager(
+    dependencies.database,
+    dependencies.actionEventWriterFactory,
+  );
   const clock = dependencies.clock ?? systemClock;
 
   return {

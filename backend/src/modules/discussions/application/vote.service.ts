@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Clock } from "../../../shared/application/clock";
 import type { TransactionManager } from "../../../shared/application/transaction";
 import { ApplicationError } from "../../../shared/domain/errors";
@@ -38,7 +39,7 @@ export class VoteService {
     const thread = await this.threadOrThrow(threadId);
     await requireActiveMember(this.authorization, principal, thread.societyId);
     if (thread.status !== "published") throw new ApplicationError("NOT_FOUND", "Thread was not found");
-    return this.setThreadVote(principal.userId, thread, assertVoteValue(value));
+    return this.setThreadVote(principal, thread, assertVoteValue(value));
   }
 
   async voteComment(
@@ -52,14 +53,15 @@ export class VoteService {
     if (thread.status !== "published" || comment.status !== "published") {
       throw new ApplicationError("NOT_FOUND", "Comment was not found");
     }
-    return this.setCommentVote(principal.userId, comment, assertVoteValue(value));
+    return this.setCommentVote(principal, thread.societyId, comment, assertVoteValue(value));
   }
 
   private async setThreadVote(
-    userId: string,
+    principal: RequestPrincipal,
     thread: ThreadRecord,
     value: -1 | 0 | 1,
   ): Promise<VoteDto> {
+    const userId = principal.userId;
     const now = this.clock.now();
     const result = await this.transactions.withTransaction(async (repository) => {
       const lockedThread = await repository.findThreadForUpdate(thread.id);
@@ -88,6 +90,25 @@ export class VoteService {
 
       const updated = await repository.incrementThreadScore(thread.id, value - oldValue);
       if (updated === null) throw new ApplicationError("NOT_FOUND", "Thread was not found");
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "thread_reaction_changed",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "thread",
+        targetId: thread.id,
+        societyId: thread.societyId,
+        threadId: thread.id,
+        commentId: null,
+        reportId: null,
+        correlationId: thread.id,
+        fromReaction: oldValue as -1 | 0 | 1,
+        toReaction: value,
+        metadata: {},
+      });
       return { score: updated.score, value };
     });
 
@@ -95,10 +116,12 @@ export class VoteService {
   }
 
   private async setCommentVote(
-    userId: string,
+    principal: RequestPrincipal,
+    societyId: string,
     comment: CommentRecord,
     value: -1 | 0 | 1,
   ): Promise<VoteDto> {
+    const userId = principal.userId;
     const now = this.clock.now();
     const result = await this.transactions.withTransaction(async (repository) => {
       const lockedComment = await repository.findCommentForUpdate(comment.id);
@@ -127,6 +150,25 @@ export class VoteService {
 
       const updated = await repository.incrementCommentScore(comment.id, value - oldValue);
       if (updated === null) throw new ApplicationError("NOT_FOUND", "Comment was not found");
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "comment_reaction_changed",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "comment",
+        targetId: comment.id,
+        societyId,
+        threadId: comment.threadId,
+        commentId: comment.id,
+        reportId: null,
+        correlationId: comment.id,
+        fromReaction: oldValue as -1 | 0 | 1,
+        toReaction: value,
+        metadata: {},
+      });
       return { score: updated.score, value };
     });
 

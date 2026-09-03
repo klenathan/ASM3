@@ -8,15 +8,20 @@ import {
   DrizzleModerationTransactionManager,
 } from "./infrastructure/drizzle-moderation.repository";
 
+import type { ActionEventWriter } from "../analytics/application/action-event.ports";
 export interface ModerationModuleDependencies {
   readonly database: Database;
   readonly societyRepository: SocietyRepository;
   readonly clock?: Clock;
+  readonly actionEventWriterFactory?: (executor: unknown) => ActionEventWriter;
 }
 
 export function createModerationModule(dependencies: ModerationModuleDependencies) {
   const repository = new DrizzleModerationRepository(dependencies.database);
-  const transactions = new DrizzleModerationTransactionManager(dependencies.database);
+  const transactions = new DrizzleModerationTransactionManager(
+    dependencies.database,
+    dependencies.actionEventWriterFactory,
+  );
   const clock = dependencies.clock ?? systemClock;
 
   return {

@@ -1,4 +1,4 @@
-import { check, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, integer, jsonb, pgTable, smallint, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const analyticsRefreshRuns = pgTable(
@@ -6,6 +6,9 @@ export const analyticsRefreshRuns = pgTable(
   {
     runId: uuid("run_id").primaryKey(),
     trigger: text("trigger", { enum: ["admin", "nightly"] }).notNull(),
+    contractVersion: smallint("contract_version").notNull().default(2),
+    periodStart: timestamp("period_start", { withTimezone: true, mode: "date" }),
+    periodEnd: timestamp("period_end", { withTimezone: true, mode: "date" }),
     status: text("status", {
       enum: ["requested", "exporting", "querying", "completed", "failed"],
     }).notNull(),

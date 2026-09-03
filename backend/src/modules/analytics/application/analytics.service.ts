@@ -10,48 +10,65 @@ import {
   AnalyticsForbiddenError,
   AnalyticsSocietyNotModeratedError,
 } from "../domain/analytics.errors";
-import type { AnalyticsRepository, AnalyticsQuery } from "./analytics.repository";
 import {
   normalizeMetricPayload,
   type AnalyticsMetricRecord,
 } from "../domain/analytics";
+import type { AnalyticsRepository, AnalyticsQuery } from "./analytics.repository";
 import type {
-  AnalyticsMetricDto,
-  AnalyticsPageDto,
-  QueryMetricsRequest,
-  RefreshResponse,
-  RefreshStatusDto,
+  ActionMetricsRepository,
+  ActionMetricsQuery,
+} from "./action-metrics.repository";
+import type { RefreshRange } from "./refresh-range";
+import {
+  type ActionAnalyticsPageDto,
+  type ActionMetricDto,
+  type HistoricalBaselineDto,
+  type AnalyticsMetricDto,
+  type AnalyticsPageDto,
+  type QueryMetricsRequest,
+  type RefreshResponse,
+  type RefreshStatusDto,
 } from "./analytics.dto";
 import type { RefreshRunStore } from "./refresh-run.ports";
 import type { RequestRefreshResult } from "./refresh-workflow";
 
 export interface AnalyticsServiceDependencies {
   readonly repository: AnalyticsRepository;
+  readonly actionMetricsRepository?: Pick<ActionMetricsRepository, "findActionMetrics" | "upsertActionMetrics"> & {
+    getRecordingStartedAt?(contractVersion: 2): Promise<Date>;
+  };
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
   readonly clock?: Clock | undefined;
-  readonly runStore?: Pick<RefreshRunStore, "findLatestRun"> | undefined;
-  readonly onRefreshRequested?: (() => Promise<RequestRefreshResult | void>) | undefined;
-  readonly schedulerSecret?: string | undefined;
+  readonly onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
+  readonly runStore?: Pick<RefreshRunStore, "findLatestRun"> & Partial<Pick<RefreshRunStore, "get">> | undefined;
   readonly onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined;
+  readonly schedulerSecret?: string | undefined;
 }
 
 export class AnalyticsService {
   private readonly repository: AnalyticsRepository;
+  private readonly actionMetricsRepository:
+    | AnalyticsServiceDependencies["actionMetricsRepository"]
+    | undefined;
   private readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   private readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
-  private readonly runStore: Pick<RefreshRunStore, "findLatestRun"> | undefined;
-  private readonly onRefreshRequested: (() => Promise<RequestRefreshResult | void>) | undefined;
+  private readonly runStore: AnalyticsServiceDependencies["runStore"];
+  private readonly clock: Clock;
+  private readonly onRefreshRequested: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
   private readonly schedulerSecret: string | undefined;
   private readonly onScheduledRefresh: (() => Promise<RequestRefreshResult>) | undefined;
 
   constructor(dependencies: AnalyticsServiceDependencies) {
     this.repository = dependencies.repository;
+    this.actionMetricsRepository = dependencies.actionMetricsRepository;
     this.accountReader = dependencies.accountReader;
     this.membershipRepository = dependencies.membershipRepository;
     this.runStore = dependencies.runStore;
     this.onRefreshRequested = dependencies.onRefreshRequested;
     this.schedulerSecret = dependencies.schedulerSecret;
+    this.clock = dependencies.clock ?? { now: () => new Date() };
     this.onScheduledRefresh = dependencies.onScheduledRefresh;
   }
 
@@ -117,14 +134,14 @@ export class AnalyticsService {
     };
   }
 
-  async refresh(principal: RequestPrincipal): Promise<RefreshResponse> {
+  async refresh(principal: RequestPrincipal, range?: RefreshRange): Promise<RefreshResponse> {
     const account = await this.accountReader.findAccountByUserId(principal.userId);
     assertTargetExists(account);
     assertSystemAdmin(account);
 
     const result = this.onRefreshRequested === undefined
       ? undefined
-      : await this.onRefreshRequested();
+      : await this.onRefreshRequested(range);
 
     return {
       accepted: true,
@@ -133,7 +150,13 @@ export class AnalyticsService {
         : result.coalesced
           ? "An analytics refresh run is already in progress."
           : "Analytics refresh has been queued.",
-      ...(result === undefined ? {} : { runId: result.runId, status: result.status }),
+      ...(result === undefined ? {} : {
+        runId: result.runId,
+        status: result.status,
+        coalesced: result.coalesced,
+        ...(result.periodStart === undefined ? {} : { periodStart: result.periodStart }),
+        ...(result.periodEnd === undefined ? {} : { periodEnd: result.periodEnd }),
+      }),
     };
   }
 
@@ -170,6 +193,69 @@ export class AnalyticsService {
       status: result.status,
     };
   }
+  async queryActionMetrics(
+    principal: RequestPrincipal,
+    query: ActionMetricsQuery,
+  ): Promise<ActionAnalyticsPageDto> {
+    await this.requireSystemAdmin(principal);
+    const repository = this.actionMetricsRepository;
+    if (repository === undefined) {
+      return {
+        contractVersion: 2,
+        recordingStartedAt: this.clock.now().toISOString(),
+        metrics: [],
+        page: { cursor: null, hasMore: false },
+      };
+    }
+    const result = await repository.findActionMetrics(query);
+    const recordingStartedAt = repository.getRecordingStartedAt === undefined
+      ? this.clock.now()
+      : await repository.getRecordingStartedAt(2);
+    const metrics = result.metrics.map((metric): ActionMetricDto => ({
+      id: metric.id,
+      source: "action_events",
+      metricKind: metric.metricKind,
+      grain: metric.grain,
+      societyId: metric.societyId,
+      targetType: metric.targetType,
+      targetId: metric.targetId,
+      threadId: metric.threadId,
+      periodStart: metric.periodStart.toISOString(),
+      periodEnd: metric.periodEnd.toISOString(),
+      snapshotAt: metric.snapshotAt?.toISOString() ?? null,
+      data: metric.data.data,
+    }));
+    return {
+      contractVersion: 2,
+      recordingStartedAt: recordingStartedAt.toISOString(),
+      metrics,
+      page: { cursor: result.nextCursor, hasMore: result.hasMore },
+    };
+  }
+
+  async actionRefreshStatus(principal: RequestPrincipal, runId: string): Promise<RefreshStatusDto | null> {
+    await this.requireSystemAdmin(principal);
+    const run = this.runStore?.get === undefined ? null : await this.runStore.get(runId);
+    return run === null || run === undefined ? null : toRefreshStatusDto(run);
+  }
+
+  async historicalBaseline(principal: RequestPrincipal, query: QueryMetricsRequest): Promise<HistoricalBaselineDto> {
+    await this.requireSystemAdmin(principal);
+    const page = await this.queryMetrics(principal, query);
+    return {
+      source: "historical_baseline",
+      label: "Historical snapshot baseline — not reconstructed action history",
+      metrics: page.metrics,
+      page: page.page,
+    };
+  }
+
+  private async requireSystemAdmin(principal: RequestPrincipal): Promise<void> {
+    const account = await this.accountReader.findAccountByUserId(principal.userId);
+    assertTargetExists(account);
+    assertSystemAdmin(account);
+  }
+
 }
 
 function timingSafeEqualStrings(presented: string, expected: string): boolean {

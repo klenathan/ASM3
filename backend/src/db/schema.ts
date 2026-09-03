@@ -27,3 +27,4 @@ export {
   actionEvents,
   analyticsContractState,
 } from "../modules/analytics/infrastructure/action-event.tables";
+export { analyticsActionMetrics } from "../modules/analytics/infrastructure/action-metrics.tables";

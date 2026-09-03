@@ -76,7 +76,27 @@ export class ReportService {
       const input: CreateReportInput = targetType === "thread"
         ? { ...inputBase, threadId: targetId }
         : { ...inputBase, commentId: targetId };
-      return repository.createReport(input);
+      const created = await repository.createReport(input);
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "report_created",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "report",
+        targetId: created.id,
+        societyId: created.societyId,
+        threadId: created.threadId ?? null,
+        commentId: created.commentId ?? null,
+        reportId: created.id,
+        correlationId: created.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: { reportedTargetType: targetType },
+      });
+      return created;
     });
 
     return toReportDto(report);

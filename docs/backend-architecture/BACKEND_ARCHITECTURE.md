@@ -431,6 +431,13 @@ Initial route groups:
 
 Use IDs for writes and stable resource identity. Society slug may be accepted for human-facing reads, then resolved once in repository/service.
 
+Analytics action reads use `/api/v2/admin/analytics` and are restricted to
+system administrators. The contract exposes additive activity, authoritative
+current-state, and reconciliation metric kinds at platform, society, and
+content grains. Refresh requests are durable, range-scoped, and coalesced by
+the workflow service; controllers do not contain metric or authorization
+rules.
+
 ## 10. Testing strategy
 
 - **Domain tests:** pure invariant/policy tests; no database or Hono.
@@ -451,7 +458,8 @@ Do not mock Drizzle to prove SQL correctness. Unit-test services through reposit
 6. Implement Reports and Moderation audit workflow.
 7. Implement S3 media lifecycle and thread attachments.
 8. Add admin operations, demo seed data, and architecture evidence.
-9. Add analytics only after user-visible purpose and AWS service are approved.
+9. Implement analytics action events, Glue export, Athena aggregates, and the
+   versioned admin API after the user-visible workflow is approved.
 
 Each slice should include schema migration, repository integration tests, service tests, controller/OpenAPI tests, and documentation update.
 
@@ -462,4 +470,6 @@ Each slice should include schema migration, repository integration tests, servic
 - Maximum comment nesting depth.
 - Allowed media MIME types and size limits.
 - Whether students may request/create societies; MVP assumes system-admin creation.
-- Analytics service and user-visible workflow; intentionally deferred.
+- Analytics is implemented through the v2 action-event contract and the
+  existing Glue/Athena workflow; contract retention and recording-start
+  boundaries remain deployment configuration.

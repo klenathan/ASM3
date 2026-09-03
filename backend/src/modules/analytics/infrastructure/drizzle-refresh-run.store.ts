@@ -84,6 +84,9 @@ function toRow(run: RefreshRunRecord) {
   return {
     runId: run.runId,
     trigger: run.trigger,
+    contractVersion: run.contractVersion ?? 2,
+    periodStart: run.periodStart === undefined ? null : new Date(`${run.periodStart}T00:00:00.000Z`),
+    periodEnd: run.periodEnd === undefined ? null : new Date(`${run.periodEnd}T00:00:00.000Z`),
     status: run.status,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
@@ -106,10 +109,12 @@ function toRecord(row: typeof analyticsRefreshRuns.$inferSelect): RefreshRunReco
 
   const queryIds = row.athenaQueryExecutionIds;
   const safeQueryIds = validateQueryIds(queryIds, row.runId);
-
   return {
     runId: row.runId,
     trigger,
+    ...(row.contractVersion === 2 ? { contractVersion: 2 as const } : {}),
+    ...(row.periodStart === null ? {} : { periodStart: row.periodStart.toISOString().slice(0, 10) }),
+    ...(row.periodEnd === null ? {} : { periodEnd: row.periodEnd.toISOString().slice(0, 10) }),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     status,

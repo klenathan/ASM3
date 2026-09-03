@@ -54,9 +54,8 @@ export const actionEvents = pgTable(
       OR (${table.eventType} IN ('comment_created', 'comment_edited', 'comment_deleted', 'comment_reaction_changed') AND ${table.targetType} = 'comment' AND ${table.societyId} IS NOT NULL AND ${table.threadId} IS NOT NULL AND ${table.commentId} IS NOT NULL)
       OR (${table.eventType} IN ('society_membership_joined', 'society_membership_left', 'society_membership_activated') AND ${table.targetType} = 'society' AND ${table.societyId} IS NOT NULL)
       OR (${table.eventType} = 'society_membership_banned' AND ${table.targetType} = 'society' AND ${table.societyId} IS NOT NULL AND ${table.reportId} IS NOT NULL)
-      OR (${table.eventType} = 'report_created' AND ${table.targetType} = 'report' AND ${table.societyId} IS NOT NULL AND ${table.reportId} IS NOT NULL AND ${table.threadId} IS NOT NULL)
-      OR (${table.eventType} = 'moderation_report_decided' AND ${table.targetType} = 'report' AND ${table.societyId} IS NOT NULL AND ${table.reportId} IS NOT NULL AND ${table.threadId} IS NOT NULL)
-      OR (${table.eventType} = 'moderation_content_removed' AND ${table.targetType} IN ('thread', 'comment') AND ${table.societyId} IS NOT NULL AND ${table.threadId} IS NOT NULL AND ${table.reportId} IS NOT NULL)
+      OR (${table.eventType} = 'report_created' AND ${table.targetType} = 'report' AND ${table.societyId} IS NOT NULL AND ${table.reportId} IS NOT NULL AND (${table.threadId} IS NOT NULL OR ${table.commentId} IS NOT NULL))
+      OR (${table.eventType} = 'moderation_report_decided' AND ${table.targetType} = 'report' AND ${table.societyId} IS NOT NULL AND ${table.reportId} IS NOT NULL AND (${table.threadId} IS NOT NULL OR ${table.commentId} IS NOT NULL))
     )`),
   ],
 );

@@ -26,6 +26,9 @@ export class StepFunctionsWorkflowStarter implements RefreshWorkflowStarter {
   async start(input: {
     readonly runId: string;
     readonly trigger: RefreshRunTrigger;
+    readonly contractVersion?: 2;
+    readonly periodStart?: string;
+    readonly periodEnd?: string;
     readonly snapshotAt: string;
   }): Promise<string> {
     const response = await this.send(new StartExecutionCommand({

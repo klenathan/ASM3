@@ -12,6 +12,9 @@ export type RefreshRunStatus =
 export interface RefreshRunRecord {
   readonly runId: string;
   readonly trigger: RefreshRunTrigger;
+  readonly contractVersion?: 2;
+  readonly periodStart?: string;
+  readonly periodEnd?: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly status: RefreshRunStatus;

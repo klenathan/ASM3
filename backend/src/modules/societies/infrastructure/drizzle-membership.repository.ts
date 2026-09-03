@@ -8,6 +8,7 @@ import type {
   MembershipRepository,
   UpdateMembershipInput,
 } from "../application/membership.repository";
+import type { ActionEventWriter } from "../../analytics/application/action-event.ports";
 import {
   assertMembershipRole,
   assertMembershipState,
@@ -102,15 +103,21 @@ export class DrizzleMembershipRepository implements MembershipRepository {
 
 export class DrizzleMembershipTransactionManager implements TransactionManager<MembershipRepository> {
   private readonly database: Database;
+  private readonly actionEventWriterFactory: ((executor: unknown) => ActionEventWriter) | undefined;
 
-  constructor(database: Database) {
+  constructor(database: Database, actionEventWriterFactory?: (executor: unknown) => ActionEventWriter) {
     this.database = database;
+    this.actionEventWriterFactory = actionEventWriterFactory;
   }
 
   withTransaction<TResult>(work: (transaction: MembershipRepository) => Promise<TResult>): Promise<TResult> {
-    return this.database.transaction(async (transaction) =>
-      work(new DrizzleMembershipRepository(transaction)),
-    );
+    return this.database.transaction(async (transaction) => {
+      const repository = new DrizzleMembershipRepository(transaction);
+      if (this.actionEventWriterFactory !== undefined) {
+        Object.assign(repository, { actionEvents: this.actionEventWriterFactory(transaction) });
+      }
+      return work(repository);
+    });
   }
 }
 

@@ -4,13 +4,14 @@ import type { MembershipRepository } from "../societies/application/membership.r
 import { AnalyticsService } from "./application/analytics.service";
 import { DrizzleAnalyticsRepository } from "./infrastructure/drizzle-analytics.repository";
 import { DrizzleRefreshRunStore } from "./infrastructure/drizzle-refresh-run.store";
+import type { RefreshRange } from "./application/refresh-range";
 import type { RequestRefreshResult } from "./application/refresh-workflow";
 
 export interface AnalyticsModuleDependencies {
   readonly database: Database;
   readonly accountReader: Pick<IdentityRepository, "findAccountByUserId">;
   readonly membershipRepository: Pick<MembershipRepository, "findMembership">;
-  readonly onRefreshRequested?: (() => Promise<RequestRefreshResult | void>) | undefined;
+  readonly onRefreshRequested?: ((range?: RefreshRange) => Promise<RequestRefreshResult | void>) | undefined;
   readonly schedulerSecret?: string | undefined;
   readonly onScheduledRefresh?: (() => Promise<RequestRefreshResult>) | undefined;
 }
@@ -21,6 +22,7 @@ export function createAnalyticsModule(dependencies: AnalyticsModuleDependencies)
 
   const analyticsService = new AnalyticsService({
     repository,
+    actionMetricsRepository: repository,
     accountReader: dependencies.accountReader,
     membershipRepository: dependencies.membershipRepository,
     runStore: refreshRunStore,
@@ -83,3 +85,14 @@ export {
   type ActionEventPseudonymizer,
 } from "./domain/pseudonymizer";
 export { DrizzleActionEventWriter } from "./infrastructure/drizzle-action-event.writer";
+export {
+  actionMetricDataSchema,
+  activityMetricDataSchema,
+  currentStateMetricDataSchema,
+  reconciliationMetricDataSchema,
+} from "./domain/action-metrics";
+export type {
+  ActionMetricRecord,
+  ActionMetricData,
+} from "./domain/action-metrics";
+export type { ActionMetricsRepository, ActionMetricsQuery, ActionMetricsPage } from "./application/action-metrics.repository";

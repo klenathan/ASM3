@@ -17,3 +17,16 @@ export class AnalyticsSocietyNotModeratedError extends ApplicationError {
     super("ANALYTICS_SOCIETY_NOT_MODERATED", "You are not a moderator of the requested society");
   }
 }
+export class AnalyticsRefreshBusyError extends ApplicationError {
+  constructor(activeRun: { runId: string; periodStart?: string; periodEnd?: string }) {
+    super(
+      "ANALYTICS_REFRESH_BUSY",
+      "Another analytics refresh is already in progress",
+      {
+        activeRunId: activeRun.runId,
+        periodStart: activeRun.periodStart ?? null,
+        periodEnd: activeRun.periodEnd ?? null,
+      },
+    );
+  }
+}
