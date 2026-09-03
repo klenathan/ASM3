@@ -137,6 +137,25 @@ export class ThreadService {
     const thread = await this.transactions.withTransaction(async (repository) => {
       const created = await repository.createThread(input);
       await repository.replaceThreadMedia(created.id, mediaIds);
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "thread_created",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "thread",
+        targetId: created.id,
+        societyId: created.societyId,
+        threadId: created.id,
+        commentId: null,
+        reportId: null,
+        correlationId: created.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: {},
+      });
       return created;
     });
 
@@ -215,12 +234,35 @@ export class ThreadService {
       if (locked === null || locked.status === "deleted") {
         throw new ApplicationError("NOT_FOUND", "Thread was not found");
       }
+      const titleChanged = input.title !== undefined && input.title !== locked.title;
+      const bodyChanged = input.body !== undefined && input.body !== locked.body;
       const result = await repository.updateThread(threadId, input);
       if (result === null) {
         throw new ApplicationError("NOT_FOUND", "Thread was not found");
       }
       if (mediaIds !== undefined) {
         await repository.replaceThreadMedia(threadId, mediaIds);
+      }
+      if (titleChanged || bodyChanged) {
+        await repository.actionEvents?.append({
+          eventId: randomUUID(),
+          eventType: "thread_edited",
+          schemaVersion: 1,
+          actorUserId: principal.userId,
+          actorPlatformRole: principal.platformRole,
+          actorSocietyRole: null,
+          occurredAt: now,
+          targetType: "thread",
+          targetId: result.id,
+          societyId: result.societyId,
+          threadId: result.id,
+          commentId: null,
+          reportId: null,
+          correlationId: result.id,
+          fromReaction: null,
+          toReaction: null,
+          metadata: {},
+        });
       }
       return result;
     });
@@ -250,6 +292,25 @@ export class ThreadService {
       if (result === null) {
         throw new ApplicationError("NOT_FOUND", "Thread was not found");
       }
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "thread_deleted",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "thread",
+        targetId: result.id,
+        societyId: result.societyId,
+        threadId: result.id,
+        commentId: null,
+        reportId: null,
+        correlationId: result.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: {},
+      });
       return result;
     });
 

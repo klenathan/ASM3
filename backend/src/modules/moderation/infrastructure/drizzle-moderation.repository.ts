@@ -17,6 +17,7 @@ import type {
   UserProfileRecord,
   UserStatus,
 } from "../../identity/domain/identity.types";
+import type { ActionEventWriter } from "../../analytics/application/action-event.ports";
 import { authUsers } from "../../identity/infrastructure/auth.tables";
 import { userProfiles } from "../../identity/infrastructure/user-profile.tables";
 import {
@@ -350,13 +351,21 @@ export class DrizzleModerationRepository implements ModerationRepository {
 
 export class DrizzleModerationTransactionManager implements TransactionManager<ModerationRepository> {
   private readonly database: Database;
+  private readonly actionEventWriterFactory: ((executor: unknown) => ActionEventWriter) | undefined;
 
-  constructor(database: Database) {
+  constructor(database: Database, actionEventWriterFactory?: (executor: unknown) => ActionEventWriter) {
     this.database = database;
+    this.actionEventWriterFactory = actionEventWriterFactory;
   }
 
   withTransaction<TResult>(work: (transaction: ModerationRepository) => Promise<TResult>): Promise<TResult> {
-    return this.database.transaction(async (transaction) => work(new DrizzleModerationRepository(transaction)));
+    return this.database.transaction(async (transaction) => {
+      const repository = new DrizzleModerationRepository(transaction);
+      if (this.actionEventWriterFactory !== undefined) {
+        Object.assign(repository, { actionEvents: this.actionEventWriterFactory(transaction) });
+      }
+      return work(repository);
+    });
   }
 }
 

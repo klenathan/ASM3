@@ -61,7 +61,7 @@ export function TopBar() {
 
         <form
           role="search"
-          className="relative mx-auto w-full max-w-xl flex-1"
+          className="relative mx-auto min-w-0 w-full max-w-xl flex-1"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);

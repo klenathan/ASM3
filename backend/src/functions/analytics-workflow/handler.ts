@@ -7,7 +7,9 @@ import type {
   AthenaMetricRow,
   RefreshRunStatus,
 } from "../../modules/analytics/application/refresh-run.ports";
+import { createActionAthenaSqlCatalog } from "../../modules/analytics/infrastructure/action-athena-sql-catalog";
 import { createAthenaMetricSqlCatalog } from "../../modules/analytics/infrastructure/athena-sql-catalog";
+import { actionMetricDataSchema } from "../../modules/analytics/domain/action-metrics";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { createWorkflowPool } from "./workflow-database";
 import type { Pool } from "pg";
@@ -45,11 +47,13 @@ export async function handler(event: WorkflowEvent): Promise<{
       glueJobRunId: event.glueJobRunId ?? run.glueJobRunId,
       updatedAt: new Date(),
     });
-    const catalog = createAthenaMetricSqlCatalog(saved.runId);
+    const catalog = saved.contractVersion === 2
+      ? createActionAthenaSqlCatalog(saved.runId, saved.periodStart!, saved.periodEnd!)
+      : createAthenaMetricSqlCatalog(saved.runId);
     return {
       runId: saved.runId,
       status: saved.status,
-      queries: Object.entries(catalog).map(([metricType, sql]) => ({ metricType, sql })),
+      queries: Object.entries(catalog).map(([metricType, sql]) => ({ metricType, sql: sql as string })),
     };
   }
   if (event.action === "mark") {
@@ -67,20 +71,55 @@ export async function handler(event: WorkflowEvent): Promise<{
 
   const queryIds = event.queryExecutionIds ?? [];
   if (queryIds.length === 0) throw new Error("workflow persist event is missing Athena query IDs");
-  const rows: AthenaMetricRow[] = [];
-  for (const query of queryIds) {
-    rows.push(...await dependencies.athena.getResults(query.queryExecutionId));
+  if (run.contractVersion === 2) {
+    const actionRows = [];
+    for (const query of queryIds) {
+      actionRows.push(...await dependencies.athena.getActionResults(query.queryExecutionId));
+    }
+    const now = new Date();
+    await dependencies.repository.upsertActionMetrics(actionRows.map((row) => {
+      const data = actionMetricDataSchema.parse({ metricKind: row.metricKind, data: row.data });
+      return {
+        id: randomUUID(),
+        contractVersion: 2 as const,
+        metricKind: row.metricKind,
+        grain: row.grain,
+        societyId: row.societyId,
+        targetType: row.targetType,
+        targetId: row.targetId,
+        threadId: row.threadId,
+        periodStart: row.periodStart,
+        periodEnd: row.periodEnd,
+        snapshotAt: row.snapshotAt,
+        data,
+        refreshRunId: run.runId,
+        createdAt: now,
+        updatedAt: now,
+      };
+    }));
+    const retentionDays = Number(process.env.ANALYTICS_RAW_RETENTION_DAYS ?? "30");
+    if (!Number.isFinite(retentionDays) || retentionDays < 0) {
+      throw new Error("ANALYTICS_RAW_RETENTION_DAYS must be a non-negative number");
+    }
+    await dependencies.repository.deleteIngestedBefore(
+      new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000),
+    );
+  } else {
+    const rows: AthenaMetricRow[] = [];
+    for (const query of queryIds) {
+      rows.push(...await dependencies.athena.getResults(query.queryExecutionId));
+    }
+    await dependencies.repository.upsertMetrics(rows.map((row) => ({
+      id: randomUUID(),
+      metricType: row.metricType,
+      societyId: row.societyId,
+      periodStart: row.periodStart,
+      periodEnd: row.periodEnd,
+      data: row.data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })));
   }
-  await dependencies.repository.upsertMetrics(rows.map((row) => ({
-    id: randomUUID(),
-    metricType: row.metricType,
-    societyId: row.societyId,
-    periodStart: row.periodStart,
-    periodEnd: row.periodEnd,
-    data: row.data,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })));
 
   const saved = await dependencies.runStore.save({
     ...run,

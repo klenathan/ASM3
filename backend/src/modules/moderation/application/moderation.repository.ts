@@ -1,3 +1,4 @@
+import type { ActionEventWriter } from "../../analytics/application/action-event.ports";
 import type { PageRequest, PageResult } from "../../../shared/application/pagination";
 import type {
   IdentityAccountRecord,
@@ -72,6 +73,7 @@ export interface UpdateModerationUserInput {
  * needed to resolve a report. The Drizzle adapter supplies the transaction instance.
  */
 export interface ModerationRepository {
+  readonly actionEvents?: ActionEventWriter;
   listReporterReports(
     reporterId: string,
     page: PageRequest,

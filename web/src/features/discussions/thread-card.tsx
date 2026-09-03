@@ -1,4 +1,4 @@
-import { ArrowBigUp, MessageCircle, Share2 } from "lucide-react";
+import { ArrowBigUp, Check, MessageCircle, Share2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -21,11 +21,24 @@ export function DiscussionCard({
 }) {
   const navigate = useNavigate();
   const [locationOpen, setLocationOpen] = useState(false);
+  const [shared, setShared] = useState(false);
   const liked = item.myVote === 1;
   const threadUrl =
     item.societySlug === null ? null : `/s/${item.societySlug}/t/${item.id}`;
   const openThread = () => {
     if (threadUrl !== null) navigate(threadUrl);
+  };
+  const handleShare = async () => {
+    if (threadUrl === null) return;
+    try {
+      await navigator.clipboard.writeText(
+        new URL(threadUrl, window.location.origin).toString(),
+      );
+      setShared(true);
+      window.setTimeout(() => setShared(false), 1800);
+    } catch {
+      setShared(false);
+    }
   };
   const author =
     item.authorDisplayName === null ? null : (
@@ -39,7 +52,7 @@ export function DiscussionCard({
     );
 
   return (
-    <div className="flex flex-col gap-3 border-b border-foreground/15 py-5">
+    <article className="flex flex-col gap-3 border-b border-foreground/15 py-6">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {showSociety && item.societySlug !== null && (
           <>
@@ -99,7 +112,7 @@ export function DiscussionCard({
         )}
       </div>
 
-      <div className="flex items-center gap-5 text-xs font-medium text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-5 text-xs font-medium text-muted-foreground">
         {onToggleLike === undefined ? (
           <span className="inline-flex items-center min-h-11 gap-1.5 px-2 -mx-2">
             <ArrowBigUp aria-hidden="true" className="size-4" strokeWidth={2} />
@@ -135,7 +148,7 @@ export function DiscussionCard({
             openThread();
           }}
           disabled={threadUrl === null}
-          className="inline-flex min-h-11 items-center gap-1.5 px-2 -mx-2 transition-colors hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground"
+          className="inline-flex min-h-11 items-center gap-1.5 px-2 -mx-2 transition-colors hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <MessageCircle
             aria-hidden="true"
@@ -144,13 +157,34 @@ export function DiscussionCard({
           />
           {item.commentCount} comment{item.commentCount === 1 ? "" : "s"}
         </button>
-        <span className="inline-flex items-center min-h-11 gap-1.5 px-2 -mx-2">
-          <Share2 aria-hidden="true" className="size-4" strokeWidth={2} />
-        </span>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleShare();
+          }}
+          disabled={threadUrl === null}
+          aria-label={shared ? "Thread link copied" : "Copy thread link"}
+          title={shared ? "Thread link copied" : "Copy thread link"}
+          className="inline-flex min-h-11 items-center gap-1.5 px-2 -mx-2 transition-colors hover:text-primary disabled:cursor-default disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {shared ? (
+            <Check aria-hidden="true" className="size-4" strokeWidth={2} />
+          ) : (
+            <Share2 aria-hidden="true" className="size-4" strokeWidth={2} />
+          )}
+          <span className="sr-only">
+            {shared ? "Thread link copied" : "Copy thread link"}
+          </span>
+        </button>
       </div>
       {item.location && (
-        <LocationModal location={item.location} open={locationOpen} onOpenChange={setLocationOpen} />
+        <LocationModal
+          location={item.location}
+          open={locationOpen}
+          onOpenChange={setLocationOpen}
+        />
       )}
-    </div>
+    </article>
   );
 }

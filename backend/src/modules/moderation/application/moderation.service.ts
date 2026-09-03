@@ -154,6 +154,25 @@ export class ModerationService {
         metadata: { reportId: locked.id, resolution: action },
         createdAt: now,
       });
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "moderation_report_decided",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "report",
+        targetId: locked.id,
+        societyId: locked.societyId,
+        threadId: locked.threadId,
+        commentId: locked.commentId,
+        reportId: locked.id,
+        correlationId: locked.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: { decision: action },
+      });
       return updated;
     });
 
@@ -195,6 +214,25 @@ export class ModerationService {
         reason: note ?? "Dismissed report",
         metadata: {},
         createdAt: now,
+      });
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "moderation_report_decided",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "report",
+        targetId: locked.id,
+        societyId: locked.societyId,
+        threadId: locked.threadId,
+        commentId: locked.commentId,
+        reportId: locked.id,
+        correlationId: locked.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: { decision: "dismissed" },
       });
       return updated;
     });
@@ -287,9 +325,27 @@ export class ModerationService {
         ? await repository.softRemoveThread(target.targetId, now)
         : await repository.softRemoveComment(target.targetId, now);
       if (removed === null) throw new ApplicationError("NOT_FOUND", "The reported content was not found");
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "moderation_content_removed",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: target.targetType,
+        targetId: target.targetId,
+        societyId: report.societyId,
+        threadId: target.targetType === "thread" ? target.targetId : report.threadId,
+        commentId: target.targetType === "comment" ? target.targetId : null,
+        reportId: report.id,
+        correlationId: report.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: {},
+      });
       return { action: "content_removed", targetType: target.targetType, targetId: target.targetId };
     }
-
     if (action === "ban_member") {
       const membership = await repository.findMembership(report.societyId, target.authorId);
       if (membership === null) {
@@ -305,6 +361,25 @@ export class ModerationService {
         bannedAt: now,
       });
       if (updated === null) throw new ApplicationError("NOT_FOUND", "The society membership was not found");
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "society_membership_banned",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "society",
+        targetId: report.societyId,
+        societyId: report.societyId,
+        threadId: report.threadId,
+        commentId: report.commentId,
+        reportId: report.id,
+        correlationId: report.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: {},
+      });
       return { action: "member_banned", targetType: "membership", targetId: target.authorId };
     }
 

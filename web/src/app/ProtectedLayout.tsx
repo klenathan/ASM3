@@ -6,7 +6,13 @@ import { useAuth } from "../features/auth/auth-context";
 import { SocietyIndex } from "../features/societies/society-index";
 import { ForbiddenPage, LoadingPage } from "../pages/status";
 
-export function ProtectedLayout({ children }: { children?: ReactNode }) {
+export function ProtectedLayout({
+  children,
+  withLayout = true,
+}: {
+  children?: ReactNode;
+  withLayout?: boolean;
+}) {
   const { status, error } = useAuth();
   const location = useLocation();
 
@@ -26,15 +32,23 @@ export function ProtectedLayout({ children }: { children?: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <TopBar />
-      <div className="mx-auto grid w-full  flex-1 px-6 py-10 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] lg:px-10 lg:py-14">
-        <aside
-          aria-label="Society index"
-          className="lg:sticky lg:top-24 lg:self-start"
-        >
-          <SocietyIndex />
-        </aside>
-        <div className="min-w-0">{children ?? <Outlet />}</div>
-      </div>
+      {!withLayout ? (
+        <div className="mx-auto w-full max-w-360 flex-1 px-5 py-8 sm:px-8 lg:px-10">
+          {children ?? <Outlet />}
+        </div>
+      ) : (
+        <div className="mx-auto grid w-full max-w-360 flex-1 grid-cols-1 gap-10 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)] lg:gap-14 lg:px-10 lg:py-12">
+          <aside
+            aria-label="Society index"
+            className="order-2 lg:order-1 lg:sticky lg:top-24 lg:self-start"
+          >
+            <SocietyIndex />
+          </aside>
+          <div className="order-1 min-w-0 lg:order-2">
+            {children ?? <Outlet />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

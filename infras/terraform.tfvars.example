@@ -35,3 +35,5 @@ force_destroy_buckets = false
 # The nightly trigger uses EventBridge + API destination and the same backend
 # scheduler secret. See infras/scheduling.tf.
 #   analytics_glue_job_name = "asm3-prod-analytics-metrics-export"
+# Raw action-event Parquet and manifest retention (days).
+#   analytics_raw_event_retention_days = 30

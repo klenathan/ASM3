@@ -92,6 +92,25 @@ export class CommentService {
       if (updatedThread === null) {
         throw new ApplicationError("NOT_FOUND", "Thread was not found");
       }
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "comment_created",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "comment",
+        targetId: created.id,
+        societyId: updatedThread.societyId,
+        threadId: created.threadId,
+        commentId: created.id,
+        reportId: null,
+        correlationId: created.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: {},
+      });
       return created;
     });
 
@@ -138,6 +157,27 @@ export class CommentService {
       if (result === null) {
         throw new ApplicationError("NOT_FOUND", "Comment was not found");
       }
+      if (result.body !== locked.body) {
+        await repository.actionEvents?.append({
+          eventId: randomUUID(),
+          eventType: "comment_edited",
+          schemaVersion: 1,
+          actorUserId: principal.userId,
+          actorPlatformRole: principal.platformRole,
+          actorSocietyRole: null,
+          occurredAt: input.updatedAt,
+          targetType: "comment",
+          targetId: result.id,
+          societyId: thread.societyId,
+          threadId: result.threadId,
+          commentId: result.id,
+          reportId: null,
+          correlationId: result.id,
+          fromReaction: null,
+          toReaction: null,
+          metadata: {},
+        });
+      }
       return result;
     });
 
@@ -167,6 +207,25 @@ export class CommentService {
           throw new ApplicationError("NOT_FOUND", "Thread was not found");
         }
       }
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "comment_deleted",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "comment",
+        targetId: result.id,
+        societyId: thread.societyId,
+        threadId: result.threadId,
+        commentId: result.id,
+        reportId: null,
+        correlationId: result.id,
+        fromReaction: null,
+        toReaction: null,
+        metadata: {},
+      });
       return result;
     });
 

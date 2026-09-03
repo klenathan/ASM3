@@ -1,4 +1,4 @@
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 
 import type { AppEnvironment } from "../../../app-types";
 import type { AnalyticsService } from "../application/analytics.service";
@@ -6,9 +6,13 @@ import {
   createAnalyticsController,
 } from "./analytics.controller";
 import {
+  actionAnalyticsPageSchema,
+  actionAnalyticsQuerySchema,
   analyticsPageSchema,
   errorSchema,
+  historicalBaselineSchema,
   queryAnalyticsQuerySchema,
+  refreshRangeSchema,
   refreshResponseSchema,
   refreshStatusSchema,
 } from "./analytics.schemas";
@@ -79,6 +83,59 @@ const scheduledRefreshRoute = createRoute({
   },
 });
 
+const v2QueryMetricsRoute = createRoute({
+  method: "get",
+  path: "/api/v2/admin/analytics",
+  tags: ["Analytics"],
+  summary: "Query action-event analytics metrics",
+  request: { query: actionAnalyticsQuerySchema },
+  responses: {
+    200: { description: "Action metrics", content: { "application/json": { schema: actionAnalyticsPageSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const v2RefreshRoute = createRoute({
+  method: "post",
+  path: "/api/v2/admin/analytics/refresh",
+  tags: ["Analytics"],
+  summary: "Refresh action-event analytics",
+  request: { body: { content: { "application/json": { schema: refreshRangeSchema } } } },
+  responses: {
+    202: { description: "Refresh accepted", content: { "application/json": { schema: refreshResponseSchema } } },
+    409: { description: "Another range is active", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const v2RefreshStatusRoute = createRoute({
+  method: "get",
+  path: "/api/v2/admin/analytics/refresh/:runId",
+  tags: ["Analytics"],
+  summary: "Get an analytics refresh run",
+  request: { params: z.object({ runId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Refresh run", content: { "application/json": { schema: refreshStatusSchema } } },
+    404: { description: "Refresh run not found", content: { "application/json": { schema: errorSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
+
+const v2BaselineRoute = createRoute({
+  method: "get",
+  path: "/api/v2/admin/analytics/historical-baseline",
+  tags: ["Analytics"],
+  summary: "Read labelled legacy snapshot baseline",
+  request: { query: queryAnalyticsQuerySchema },
+  responses: {
+    200: { description: "Historical baseline", content: { "application/json": { schema: historicalBaselineSchema } } },
+    401: { description: "Authentication is required", content: { "application/json": { schema: errorSchema } } },
+    403: { description: "System-admin access is required", content: { "application/json": { schema: errorSchema } } },
+  },
+});
 export interface AnalyticsRouteDependencies {
   readonly analyticsService: AnalyticsService;
 }
@@ -96,6 +153,10 @@ export function registerAnalyticsRoutes(
   app.openapi(scheduledRefreshRoute, (context) =>
     controller.scheduledRefresh(context) as never,
   );
+  app.openapi(v2QueryMetricsRoute, (context) => controller.queryActionMetrics(context) as never);
+  app.openapi(v2RefreshRoute, (context) => controller.refreshV2(context) as never);
+  app.openapi(v2RefreshStatusRoute, (context) => controller.refreshStatusById(context) as never);
+  app.openapi(v2BaselineRoute, (context) => controller.historicalBaseline(context) as never);
 }
 
 export { SCHEDULER_SECRET_HEADER } from "./analytics.controller";

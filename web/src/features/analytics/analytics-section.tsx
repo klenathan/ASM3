@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { BarChart3, RefreshCw } from "lucide-react";
 import {
   Bar,
@@ -28,8 +29,16 @@ import {
 } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 
-import { getAnalyticsRefreshStatus, queryMetrics, refreshAnalytics } from "./analytics-api";
+import {
+  getActionAnalyticsRefreshStatus,
+  getAnalyticsRefreshStatus,
+  queryActionMetrics,
+  refreshActionAnalytics,
+  queryMetrics,
+  refreshAnalytics,
+} from "./analytics-api";
 import type {
+  ActionMetric,
   AnalyticsPage,
   ContentVolumeData,
   MetricPayload,
@@ -327,6 +336,109 @@ function ModerationChart({ data }: { data: ModerationData }) {
 }
 
 
+function dateDaysAgo(days: number): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function numberValue(data: Record<string, unknown>, key: string): number {
+  const value = data[key];
+  return typeof value === "number" ? value : 0;
+}
+
+function ActionActivitySummary({ metrics }: { metrics: ActionMetric[] }) {
+  const activity = metrics.filter((metric) => metric.metricKind === "activity");
+  const totals = activity.reduce<Record<string, number>>((result, metric) => {
+    for (const key of [
+      "likesAdded", "likesRemoved", "dislikesAdded", "dislikesRemoved",
+      "reactionScoreDelta", "joins", "leaves", "activations", "bans", "distinctActors",
+    ]) result[key] = (result[key] ?? 0) + numberValue(metric.data, key);
+    return result;
+  }, {});
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Action totals">
+      {[
+        ["Distinct actors", "distinctActors"],
+        ["Likes added", "likesAdded"],
+        ["Likes removed", "likesRemoved"],
+        ["Dislikes added", "dislikesAdded"],
+        ["Dislikes removed", "dislikesRemoved"],
+        ["Reaction score delta", "reactionScoreDelta"],
+        ["Joins", "joins"],
+        ["Leaves", "leaves"],
+        ["Activations", "activations"],
+        ["Bans", "bans"],
+      ].map(([label, key]) => (
+        <Card key={key}>
+          <CardHeader className="p-4"><CardDescription>{label}</CardDescription><CardTitle>{totals[key] ?? 0}</CardTitle></CardHeader>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ActionAnalyticsPanel() {
+  const queryClient = useQueryClient();
+  const [grain, setGrain] = useState<"platform" | "society" | "content">("platform");
+  const [periodStart, setPeriodStart] = useState(dateDaysAgo(6));
+  const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
+  const [runId, setRunId] = useState<string | null>(null);
+  const actionQuery = useQuery({
+    queryKey: ["analytics", "action-events", grain, periodStart, periodEnd],
+    queryFn: () => queryActionMetrics({ grain, periodStart, periodEnd, limit: 100 }),
+  });
+  const statusQuery = useQuery({
+    queryKey: ["analytics", "action-refresh-status", runId],
+    queryFn: () => getActionAnalyticsRefreshStatus(runId as string),
+    enabled: runId !== null,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "requested" || status === "exporting" || status === "querying" ? 5_000 : false;
+    },
+  });
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshActionAnalytics(periodStart, periodEnd),
+    onSuccess: (result) => {
+      if (result.runId) setRunId(result.runId);
+      void queryClient.invalidateQueries({ queryKey: ["analytics", "action-events"] });
+    },
+  });
+  const active = statusQuery.data?.status === "requested" || statusQuery.data?.status === "exporting" || statusQuery.data?.status === "querying";
+  const metrics = actionQuery.data?.metrics ?? [];
+  const currentState = metrics.filter((metric) => metric.metricKind === "current_state");
+  const reconciliation = metrics.filter((metric) => metric.metricKind === "reconciliation" && metric.data.status === "mismatch");
+  return (
+    <section aria-labelledby="action-analytics-heading" className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-muted-foreground">Durable product actions, aggregated by UTC day.</p>
+          <h2 id="action-analytics-heading" className="text-xl font-semibold">Action analytics</h2>
+        </div>
+        <Button type="button" onClick={() => refreshMutation.mutate()} disabled={active || refreshMutation.isPending}>
+          <RefreshCw className={refreshMutation.isPending ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+          {active ? "Refresh in progress" : statusQuery.data?.status === "failed" ? "Retry refresh" : "Refresh analytics"}
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="grid gap-1 text-sm">Period start<input aria-label="Period start" type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
+        <label className="grid gap-1 text-sm">Period end<input aria-label="Period end" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="rounded border bg-background px-2 py-1" /></label>
+        <label className="grid gap-1 text-sm">Grain<select aria-label="Analytics grain" value={grain} onChange={(event) => setGrain(event.target.value as typeof grain)} className="rounded border bg-background px-2 py-1"><option value="platform">Platform</option><option value="society">Society</option><option value="content">Content</option></select></label>
+      </div>
+      {refreshMutation.isError ? <p role="alert" className="text-sm text-destructive">{refreshMutation.error instanceof Error ? refreshMutation.error.message : "Unable to refresh analytics."}</p> : null}
+      {statusQuery.data?.status === "failed" && statusQuery.data.lastError ? <p role="alert" className="text-sm text-destructive">Refresh failed: {statusQuery.data.lastError}</p> : null}
+      {actionQuery.isLoading ? <Skeleton className="h-40" /> : actionQuery.isError ? <p role="alert" className="text-sm text-destructive">Unable to load action analytics.</p> : metrics.length === 0 ? <MetricCardEmpty title="Action analytics" /> : <ActionActivitySummary metrics={metrics} />}
+      {metrics.length > 0 ? <div className="grid gap-4 md:grid-cols-2">
+        <Card><CardHeader><CardTitle className="text-sm">Thread reactions</CardTitle><CardDescription>Likes/dislikes added, removed, and score delta</CardDescription></CardHeader><CardContent className="text-sm">Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "thread" ? numberValue(metric.data, "likesRemoved") : 0), 0)}</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm">Comment reactions</CardTitle><CardDescription>Likes/dislikes added, removed, and score delta</CardDescription></CardHeader><CardContent className="text-sm">Likes added {metrics.reduce((sum, metric) => sum + (metric.targetType === "comment" ? numberValue(metric.data, "likesAdded") : 0), 0)} · Likes removed {metrics.reduce((sum, metric) => sum + (metric.targetType === "comment" ? numberValue(metric.data, "likesRemoved") : 0), 0)}</CardContent></Card>
+      </div> : null}
+      {currentState.length > 0 ? <Card><CardHeader><CardTitle className="text-sm">Current-state balances</CardTitle><CardDescription>Authoritative RDS snapshot, separate from activity</CardDescription></CardHeader><CardContent className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">{currentState.map((metric) => <div key={metric.id}><span className="text-muted-foreground">{metric.targetType ?? metric.grain} reactions</span><strong className="block">{numberValue(metric.data, "reactionScore")}</strong></div>)}</CardContent></Card> : null}
+      {reconciliation.length > 0 ? <div role="alert" className="rounded border border-destructive/50 p-4 text-sm text-destructive">Reconciliation mismatch detected in {reconciliation.length} snapshot row(s).</div> : null}
+      <details><summary className="cursor-pointer font-medium">Historical snapshot baseline</summary><p className="mt-2 text-sm text-muted-foreground">Historical snapshot baseline — not reconstructed action history</p></details>
+    </section>
+  );
+}
+
 export function AnalyticsSection() {
   const queryClient = useQueryClient();
 
@@ -380,6 +492,9 @@ export function AnalyticsSection() {
 
   return (
     <div>
+      <ActionAnalyticsPanel />
+      <details className="mt-8">
+        <summary className="cursor-pointer text-sm font-medium">Historical snapshot baseline</summary>
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -480,6 +595,7 @@ export function AnalyticsSection() {
           <MetricCardEmpty title="Moderation" />
         )}
       </div>
+</details>
     </div>
   );
 }

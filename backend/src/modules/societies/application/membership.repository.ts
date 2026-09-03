@@ -1,3 +1,4 @@
+import type { ActionEventWriter } from "../../analytics/application/action-event.ports";
 import type { MembershipRecord } from "../domain/membership";
 
 export interface CreateMembershipInput {
@@ -19,6 +20,7 @@ export interface UpdateMembershipInput {
 }
 
 export interface MembershipRepository {
+  readonly actionEvents?: ActionEventWriter;
   findMembership(societyId: string, userId: string): Promise<MembershipRecord | null>;
   findActiveMembershipsByUser(userId: string): Promise<readonly MembershipRecord[]>;
   countActiveModerators(societyId: string): Promise<number>;

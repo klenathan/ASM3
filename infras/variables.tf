@@ -49,6 +49,17 @@ variable "analytics_learner_lab_permissions_confirmed" {
   default     = false
 }
 
+variable "analytics_raw_event_retention_days" {
+  description = "Number of days to retain raw action-event Parquet and manifests."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.analytics_raw_event_retention_days >= 1
+    error_message = "analytics_raw_event_retention_days must be at least one day."
+  }
+}
+
 variable "api_custom_domain_name" {
   description = "Optional DNS name for the HTTPS API Gateway endpoint, such as community.example.com."
   type        = string

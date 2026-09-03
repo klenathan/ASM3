@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 
@@ -45,19 +46,20 @@ export function AnalysisBadge({
   readonly override?: "accept" | "reject" | null;
   readonly className?: string;
 }) {
-  const status = override === "accept"
-    ? "approved"
-    : override === "reject"
-      ? "rejected"
-      : autoRemoved
-        ? "autoRemoved"
-        : hidden
-          ? "hidden"
-          : failed
-            ? "failed"
-            : decision === "allow" || decision === "review"
-            ? decision
-            : "pending";
+  const status =
+    override === "accept"
+      ? "approved"
+      : override === "reject"
+        ? "rejected"
+        : autoRemoved
+          ? "autoRemoved"
+          : hidden
+            ? "hidden"
+            : failed
+              ? "failed"
+              : decision === "allow" || decision === "review"
+                ? decision
+                : "pending";
 
   return (
     <Badge
@@ -65,19 +67,21 @@ export function AnalysisBadge({
       title={TITLES[status]}
       className={cn(
         status === "allow" &&
-          "border-emerald-600/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-        status === "review" &&
-          "border-amber-600/40 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-        (status === "autoRemoved" || status === "hidden" || status === "failed" || status === "rejected") &&
-          "border-red-600/40 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+          "border-green-200/35 bg-green-200/20 text-foreground",
+        status === "review" && "border-signal/60 bg-signal/20 text-foreground",
+        (status === "autoRemoved" ||
+          status === "hidden" ||
+          status === "failed" ||
+          status === "rejected") &&
+          "border-primary/45 bg-accent text-primary",
         status === "approved" &&
-          "border-emerald-600/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-        status === "pending" && "text-muted-foreground",
+          "border-green-200/35 bg-green-200/20 text-foreground",
+        status === "pending" && "border-foreground/20 text-muted-foreground",
         className,
       )}
     >
       {(status === "allow" || status === "approved") && (
-        <span aria-hidden="true">✓</span>
+        <Check aria-hidden="true" className="size-3" strokeWidth={2.5} />
       )}
       {TITLES[status]}
     </Badge>

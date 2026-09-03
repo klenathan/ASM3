@@ -8,6 +8,7 @@ import { createApp } from "./app";
 import { loadConfig } from "./config/env";
 import { SERVICE_NAME } from "./constants";
 import { createDatabase } from "./db/client";
+import type { Database } from "./db/client";
 import { createLogger } from "./lib/logger";
 import { createIdentityModule } from "./modules/identity/index";
 import { createSocietyModule } from "./modules/societies/index";
@@ -17,6 +18,9 @@ import { createAuditModule } from "./modules/audit/index";
 import {
   AnalyticsRefreshWorkflow,
   createAnalyticsModule,
+  createHmacPseudonymizer,
+  decodePseudonymKey,
+  DrizzleActionEventWriter,
   StepFunctionsWorkflowStarter,
 } from "./modules/analytics/index";
 import { createPlatformModule, createPlatformConfigReader } from "./modules/platform/index";
@@ -48,7 +52,21 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const database = createDatabase(config, logger);
-  const societies = createSocietyModule({ database: database.db });
+  const actionEventWriterFactory =
+    config.analyticsPseudonymKey === null
+      ? undefined
+      : (() => {
+          const pseudonymizer = createHmacPseudonymizer(
+            decodePseudonymKey(config.analyticsPseudonymKey),
+            config.analyticsPseudonymKeyVersion,
+          );
+          return (executor: unknown) =>
+            new DrizzleActionEventWriter(executor as Database, pseudonymizer);
+        })();
+  const societies = createSocietyModule({
+    database: database.db,
+    ...(actionEventWriterFactory === undefined ? {} : { actionEventWriterFactory }),
+  });
   const placesPort = config.mapboxSecretToken ? new MapboxPlacesAdapter(config.mapboxSecretToken) : undefined;
   // ECS resolves its LabRole through the AWS SDK credential provider chain.
   // Never inject temporary Learner Lab user credentials into the task.
@@ -96,6 +114,7 @@ async function main(): Promise<void> {
     societyRepository: societies.societyRepository,
     media: media.mediaService,
     events: threadEventPublisher,
+    ...(actionEventWriterFactory === undefined ? {} : { actionEventWriterFactory }),
     analysisDecisionReader: contentAnalysisRepository,
     threadAnalysisReader: contentAnalysisRepository,
     ...(placesPort !== undefined ? { placesPort } : {}),
@@ -264,6 +283,7 @@ async function main(): Promise<void> {
   const moderation = createModerationModule({
     database: database.db,
     societyRepository: societies.societyRepository,
+    ...(actionEventWriterFactory === undefined ? {} : { actionEventWriterFactory }),
   });
   const platform = createPlatformModule({
     database: database.db,
@@ -284,8 +304,8 @@ async function main(): Promise<void> {
     database: database.db,
     accountReader: identity.repository,
     membershipRepository: societies.membershipRepository,
-    onRefreshRequested: async () =>
-      analyticsRefreshWorkflow?.requestRefresh("admin"),
+    onRefreshRequested: async (range) =>
+      analyticsRefreshWorkflow?.requestRefresh("admin", range),
     ...(config.analyticsSchedulerSecret === null
       ? {}
       : {

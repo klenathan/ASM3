@@ -62,7 +62,19 @@
 - Registration requires an approved RMIT email from an AU, VN, or EU domain. Keep exact domain allow-list configurable; do not hard-code unconfirmed domains.
 - Core capabilities: authentication, societies, threads, comments, voting, reporting, moderation, user/role management, and system operations.
 - Deploy application on AWS and keep AWS use directly connected to user-visible workflows.
-- Follow `ASSESSMENT_3_S2-1.pdf`, including automated service invocation and solution-architecture documentation requirements.
+- Follow [`docs/assessment/ASSESSMENT_3.md`](docs/assessment/ASSESSMENT_3.md) and the latest Canvas brief for Assessment 3. The assessment requires an AWS-deployed end-to-end application, a solution architecture document, and a live demonstration; the PDF states a due date of 23:59 on 12 September 2026, but Canvas is authoritative for updates.
+
+## Assessment 3 delivery requirements
+
+- Use AWS services from every required category: Compute, Containers, Storage, Networking and Content Delivery, Database, and Analytics.
+- Fully implement and automate every selected AWS service/API. A client operation, application code path, or another service must invoke it; manual AWS Console/CLI use is not sufficient for full credit.
+- Choose services that are appropriate to the product and document each service's purpose and interactions.
+- The architecture document must include project links, summary, introduction (motivation, high-level view, beneficiaries), related work, comprehensive operation-level architecture diagrams, system descriptions, dataset/data-structure/API descriptions, and IEEE references.
+- In the architecture diagrams, trace every client-interface operation through all invoked components and show each component's function.
+- Package the submission with the document, `doc_images/`, `code/`, `deploy/`, and `data/`; use `code.txt` or `data.txt` for items larger than 5 MB when required. Exclude credentials and secrets.
+- Keep the client interface user-friendly, present analysis in tables or graphs, deploy the application in AWS, and prepare a roughly 30-minute introduction/demo/Q&A/document walkthrough.
+- The PDF lists 6 marks for each of Elastic Beanstalk, Lambda, API Gateway, ECS, and EMR; 3 for other qualifying AWS service types; and 2 for each qualifying third-party API type, with bundled service marks not counted repeatedly. Only two third-party APIs are graded.
+- The PDF says not to reuse the Assessment 2 application and requires IEEE attribution for external code, data, diagrams, models, frameworks, ideas, and websites. The brief's stated 40-mark weighting conflicts with rubric maxima totalling 50; confirm the effective marking scheme in Canvas or with the tutor.
 
 ## Current AWS decisions
 

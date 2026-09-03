@@ -19,6 +19,17 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomeRoute />}>
+        <Route
+          path="admin"
+          element={
+            <ProtectedLayout withLayout={false}>
+              <AdminGuard>
+                <AdminPage />
+              </AdminGuard>
+            </ProtectedLayout>
+          }
+        />
+
         <Route element={<ProtectedLayout />}>
           <Route index element={<ForumPage />} />
           <Route path="societies" element={<BrowseSocietiesPage />} />
@@ -26,7 +37,7 @@ export function AppRoutes() {
           <Route path="s/:slug/t/:id" element={<ThreadPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
+
           <Route path="u/:sid" element={<UserProfilePage />} />
         </Route>
       </Route>
@@ -41,6 +52,6 @@ export function AppRoutes() {
 }
 
 function ThreadRedirect() {
-  const { slug, id } = useParams()
-  return <Navigate to={`/s/${slug ?? ""}/t/${id ?? ""}`} replace />
+  const { slug, id } = useParams();
+  return <Navigate to={`/s/${slug ?? ""}/t/${id ?? ""}`} replace />;
 }

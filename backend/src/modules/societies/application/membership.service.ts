@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Clock } from "../../../shared/application/clock";
 import type { TransactionManager } from "../../../shared/application/transaction";
 import { ApplicationError } from "../../../shared/domain/errors";
@@ -93,6 +94,25 @@ export class MembershipService {
           throw new ApplicationError("NOT_FOUND", "Membership was not found");
         }
 
+        await repository.actionEvents?.append({
+          eventId: randomUUID(),
+          eventType: "society_membership_activated",
+          schemaVersion: 1,
+          actorUserId: principal.userId,
+          actorPlatformRole: principal.platformRole,
+          actorSocietyRole: null,
+          occurredAt: now,
+          targetType: "society",
+          targetId: societyId,
+          societyId,
+          threadId: null,
+          commentId: null,
+          reportId: null,
+          correlationId: societyId,
+          fromReaction: null,
+          toReaction: null,
+          metadata: { subjectRole: "member" },
+        });
         return updated;
       }
 
@@ -104,7 +124,27 @@ export class MembershipService {
         joinedAt: now,
         updatedAt: now,
       };
-      return repository.createMembership(input);
+      const created = await repository.createMembership(input);
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "society_membership_joined",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: null,
+        occurredAt: now,
+        targetType: "society",
+        targetId: societyId,
+        societyId,
+        threadId: null,
+        commentId: null,
+        reportId: null,
+        correlationId: societyId,
+        fromReaction: null,
+        toReaction: null,
+        metadata: { subjectRole: "member" },
+      });
+      return created;
     });
 
     return toMembershipDto(membership);
@@ -137,6 +177,25 @@ export class MembershipService {
       if (updated === null) {
         throw new ApplicationError("NOT_FOUND", "Active membership was not found");
       }
+      await repository.actionEvents?.append({
+        eventId: randomUUID(),
+        eventType: "society_membership_left",
+        schemaVersion: 1,
+        actorUserId: principal.userId,
+        actorPlatformRole: principal.platformRole,
+        actorSocietyRole: current.role,
+        occurredAt: now,
+        targetType: "society",
+        targetId: societyId,
+        societyId,
+        threadId: null,
+        commentId: null,
+        reportId: null,
+        correlationId: societyId,
+        fromReaction: null,
+        toReaction: null,
+        metadata: { subjectRole: current.role },
+      });
     });
   }
 
