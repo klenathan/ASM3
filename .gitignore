@@ -83,3 +83,7 @@ override.tf.json
 
 .env
 .ralph
+
+submission.zip
+*s3891890_*.zip
+s3891890_cloud_computing.zip

@@ -171,6 +171,36 @@ Requirements for each path:
 - `deploy/`: Runnable or deployable files, if any, such as `.war`, `.zip`, or `.jar` files.
 - `data/`: Data files and SQL scripts, if any. If data is larger than 5 MB, provide a download link in `data.txt`.
 
+## Submission packaging
+
+Create the `code/` payload without credentials or state files:
+
+```sh
+./scripts/create-submission-archive.sh
+```
+
+The command creates `submission.zip` containing `code/` only. It collects
+tracked and non-ignored source files, excludes common credential/key,
+environment, state, plan, and private-certificate paths, rejects common
+credential signatures, then validates the archive. It is not the final Canvas
+submission archive.
+
+Build the final ZIP using the required layout:
+
+```text
+submission.zip
+├── solution-architecture-document.(docx|pdf)
+├── doc_images/
+├── code/                         ← contents from the generated source archive
+├── deploy/
+└── data/
+```
+
+Add the architecture document and its image assets, deployment artifacts, and
+data/SQL files yourself. If code or data is larger than 5 MB, use the required
+`code.txt` or `data.txt` download/share link instead. Inspect the final archive
+before upload; neither the script nor the brief permits security credentials.
+
 ## 9. Demonstration
 
 Demonstrate the live application to the tutor. The brief describes each demonstration as approximately 30 minutes, including:

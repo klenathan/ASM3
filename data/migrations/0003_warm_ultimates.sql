@@ -1,0 +1,2 @@
+ALTER TABLE "societies" DROP CONSTRAINT "societies_slug_normalized_check";--> statement-breakpoint
+ALTER TABLE "societies" ADD CONSTRAINT "societies_slug_normalized_check" CHECK ("societies"."slug" = lower(btrim("societies"."slug")) and length("societies"."slug") > 0 and "societies"."slug" ~ '^[a-z0-9][a-z0-9_-]*$');

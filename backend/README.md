@@ -1,124 +1,100 @@
 # RMIT Society API
 
-Node.js 22 backend for RMIT Society. Built with Hono, TypeScript 7, Drizzle ORM, and PostgreSQL 17.
+The API is a Node.js 22 modular monolith built with Hono, TypeScript, Drizzle ORM, and PostgreSQL. It owns authentication, societies, threads, comments, voting, reports, moderation, media metadata, content-analysis orchestration, and administrator analytics APIs.
 
-Accepted modular-monolith structure, DDD layer boundaries, logical data model, and implementation order are documented in [`../docs/backend-architecture/BACKEND_ARCHITECTURE.md`](../docs/backend-architecture/BACKEND_ARCHITECTURE.md). Product schema migrations are generated from the Drizzle schema and applied by the database bootstrap task.
-
-## Phase-one scope
-
-Included:
-
-- Node.js Hono server
-- PostgreSQL connection pool and Drizzle client
-- validated runtime configuration
-- liveness and database-readiness endpoints
-- OpenAPI 3.1 generation
-- structured Pino request logging
-- request IDs, secure headers, restricted CORS, and 1 MiB API body limit
-- graceful shutdown
-- unit tests, linting, type checking, and production build
-- local PostgreSQL Compose service
-- non-root production Docker image
-
-Deferred:
-
-- product database tables and migrations
-- Better Auth and email verification
+Its enforced dependency direction is route → controller → service → repository port → infrastructure adapter. See [the backend architecture](../docs/backend-architecture/BACKEND_ARCHITECTURE.md) before changing a module.
 
 ## Requirements
 
-- Node.js 22
-- pnpm 10.13.1 through Corepack
-- Docker with Compose for local PostgreSQL
+- Node.js 22 (`>=22 <23`)
+- Corepack and pnpm 10.13+
+- Docker Desktop with Docker Compose for local PostgreSQL
 
-## Local setup
+## Run locally
 
-```bash
+```sh
 corepack enable
-pnpm install
+pnpm install --frozen-lockfile
 cp .env.example .env
 docker compose up -d
+pnpm db:migrate
+pnpm db:seed
 pnpm dev
 ```
 
-API listens on `http://localhost:3000` by default. If host port `5432` is occupied, set `POSTGRES_PORT` to another port and use the same port in `DATABASE_URL` before starting Compose.
+The API listens on `http://localhost:3000`. The local web client defaults to that origin; start it from `../web` with `pnpm dev`.
 
-| Endpoint | Purpose |
+Verify the process and database separately:
+
+| Endpoint | Meaning |
 | --- | --- |
-| `GET /api/v1/health/live` | Process liveness; does not access PostgreSQL |
-| `GET /api/v1/health/ready` | Readiness; runs a lightweight PostgreSQL query |
-| `GET /docs` | Swagger UI for interactive API exploration |
-| `GET /api/v1/openapi.json` | Generated OpenAPI 3.1 document |
+| `GET /api/v1/health/live` | The API process is running; it does not query PostgreSQL. |
+| `GET /api/v1/health/ready` | The API can complete a lightweight PostgreSQL query. |
+| `GET /docs` | Swagger UI. |
+| `GET /api/v1/openapi.json` | Generated OpenAPI 3.1 document. |
+
+Stop the local database when finished:
+
+```sh
+docker compose down
+```
 
 ## Commands
 
-```bash
-pnpm dev          # watch mode
-pnpm check        # typecheck, lint, test, build
-pnpm test:watch   # interactive tests
-pnpm db:generate  # generate migrations from Drizzle schema
-pnpm db:migrate   # apply committed migrations
-pnpm db:studio    # inspect local database
-pnpm db:seed      # seed demo data (idempotent)
+```sh
+pnpm dev                     # watch-mode API
+pnpm start                   # compiled API
+pnpm typecheck               # TypeScript validation
+pnpm lint                    # Oxlint
+pnpm test                    # Vitest
+pnpm check                   # typecheck, lint, test, production build
+pnpm build                   # production API build
+pnpm db:generate             # generate a Drizzle migration from schema changes
+pnpm db:migrate              # apply committed migrations
+pnpm db:seed                 # idempotent deterministic demo seed
+pnpm db:studio               # Drizzle local database UI
+pnpm build:content-analysis  # package the optional content-analysis Lambda
+pnpm build:analytics-workflow # package the optional analytics workflow Lambda
 ```
-
-## Seed data
-
-`pnpm db:seed` is idempotent and inserts deterministic demo data:
-
-- a `system_admin` owner, plus 8 login-capable student users
-- 10 societies with rules, and society-scoped memberships (`member`/`moderator`)
-- 26 threads, some with attached images, plus nested comments
-- random-but-deterministic upvotes on threads and comments
-
-Seeded avatars and thread images resolve through the public **picsum.photos** API.
-Their remote URLs remain readable through `RemoteMediaStorage`. When
-`AWS_REGION` and `MEDIA_BUCKET` are configured, new images use the remote bucket:
-`request signed PUT → browser uploads directly to S3 → API verifies metadata →
-thread stores the ready media id`. Production uses the ECS task's `LabRole`.
-Local development uses the standard AWS SDK credential chain and therefore
-requires an active AWS session with `s3:PutObject` permission.
-
-The seeded system admin (`seed.admin@rmit.edu.au`) and every seeded student
-share the dev password `SeedPass123!` (change logins via the existing auth flow
-in a real deployment). Re-running the seed restores the admin's email, password,
-role, and active status.
-
-Committed migrations include the action-event analytics tables,
-`analytics_action_metrics`, and durable refresh-run state. Migration `0022`
-drops the retired snapshot metric table; applied migration history remains
-immutable.
 
 ## Configuration
 
-Copy `.env.example` to `.env` for local development. Never commit `.env`.
+Copy `.env.example` to `.env`; it documents all local variables. Do not commit the copy.
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `NODE_ENV` | No | `development` | Runtime environment |
-| `HOST` | No | `0.0.0.0` | Listen address |
-| `PORT` | No | `3000` | Listen port |
-| `WEB_ORIGIN` | No | `http://localhost:5173` | Only browser origin allowed by CORS |
-| `LOG_LEVEL` | No | `info` | Pino log level |
-| `POSTGRES_PORT` | No | `5432` | Local Compose host port; ignored by API runtime |
-| `DATABASE_URL` | Yes | — | PostgreSQL connection URL |
-| `DATABASE_SSL` | No | `false` | Enable verified TLS for PostgreSQL |
-| `DATABASE_POOL_MAX` | No | `10` | Maximum PostgreSQL pool clients |
-| `AWS_REGION` | Production | — | Region containing the media bucket; configure with `MEDIA_BUCKET` |
-| `MEDIA_BUCKET` | Production | — | S3 bucket receiving direct browser uploads |
+| Setting | Local default | Use |
+| --- | --- | --- |
+| `DATABASE_URL` | Local Compose PostgreSQL | Required database connection. |
+| `WEB_ORIGIN` | `http://localhost:5173` | Browser origin allowed by CORS. |
+| `ALLOWED_EMAIL_DOMAINS` | RMIT AU/VN/EU values | Registration allow-list. Keep it configurable. |
+| `AWS_REGION` + `MEDIA_BUCKET` | Unset | Enables local testing against an S3 media bucket through the standard AWS credential chain. |
+| `OPENROUTER_*` | Unset | Optional local content-analysis invocation. Do not commit the key. |
+| `ANALYTICS_REFRESH_STATE_MACHINE_ARN` | Unset | Optional production-style Step Functions analytics orchestration. |
+| `ANALYTICS_SCHEDULER_SECRET` | Unset | Authenticates the non-browser scheduled analytics route. |
+| `ANALYTICS_PSEUDONYM_KEY` | Empty template value | Required in production; use at least 32 bytes of random key material. |
 
-Production values are injected through the ECS task definition. ECS sets `DATABASE_SSL=true`; the production image includes AWS's RDS CA bundle through `NODE_EXTRA_CA_CERTS`, so certificate verification remains enabled. Secrets must come from ECS-supported SSM Parameter Store or Secrets Manager references, never image layers or source files.
+In AWS, ECS injects the database URL from Secrets Manager and sets verified PostgreSQL TLS. The production image includes the RDS CA bundle. Do not bake secrets into Docker images, source, task definitions, or OpenTofu variables.
 
-## Registration-domain policy
+## Deterministic demo data
 
-Approved RMIT domains live in `src/config/email-domains.ts`, not environment variables. The list is deliberately empty until AU, VN, and EU domains are confirmed. Future authentication must reject registration when the list is empty.
+`pnpm db:seed` is idempotent. It creates a system administrator, student users, societies, memberships, threads, comments, reports, and deterministic votes suitable for the assessment demonstration. Re-running it restores the seeded administrator's development credentials and active status.
 
-## Deployment assumptions
+The seed administrator is `seed.admin@rmit.edu.au` with password `SeedPass123!`; every seeded student uses the same development password. These accounts are for a local or controlled demonstration only. Change actual user credentials through the product and never reuse the seed password for a real account.
 
-Target request path:
+## Deployment
 
-```text
-Browser → Amplify Hosting → API Gateway (HTTPS) → backend ECS container on EC2 → RDS PostgreSQL
+Do not deploy this directory directly. The root deployment workflow builds the Docker image, pushes it to ECR, applies migrations through the one-shot ECS bootstrap task, starts the ECS service, and publishes the web client. Follow the [deployment guide](../docs/deployment/README.md).
+
+For code-only backend updates after a working deployment:
+
+```sh
+cd ..
+make push-backend
 ```
 
-Amplify rewrites `/api/*` to API Gateway so browser sessions remain first-party. API Gateway routing and ECS infrastructure are separate deployment work. API responses remain non-cacheable unless a future route explicitly defines safe caching.
+For schema or seed changes, run `make migrate-seed` before publishing backend code that depends on those changes.
+
+## Analytics and content analysis
+
+Both are feature-gated infrastructure paths. The administrator analytics workflow creates durable, range-scoped refresh runs; Step Functions coordinates Glue and Athena; a workflow Lambda persists results. Never start an analytics workflow with empty input. See [analytics](../docs/analytics/README.md).
+
+Content analysis is initially deployed in `shadow` mode after the active Learner Lab, Lambda artifact, and OpenRouter secret have been confirmed. See [content-analysis documentation](../docs/content-analysis/).

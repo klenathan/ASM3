@@ -1,0 +1,9 @@
+ALTER TABLE "action_events" DROP CONSTRAINT "action_events_dimensions_check";--> statement-breakpoint
+ALTER TABLE "action_events" ADD CONSTRAINT "action_events_dimensions_check" CHECK ((
+      ("action_events"."event_type" IN ('thread_created', 'thread_edited', 'thread_deleted', 'thread_reaction_changed') AND "action_events"."target_type" = 'thread' AND "action_events"."society_id" IS NOT NULL AND "action_events"."thread_id" IS NOT NULL)
+      OR ("action_events"."event_type" IN ('comment_created', 'comment_edited', 'comment_deleted', 'comment_reaction_changed') AND "action_events"."target_type" = 'comment' AND "action_events"."society_id" IS NOT NULL AND "action_events"."thread_id" IS NOT NULL AND "action_events"."comment_id" IS NOT NULL)
+      OR ("action_events"."event_type" IN ('society_membership_joined', 'society_membership_left', 'society_membership_activated') AND "action_events"."target_type" = 'society' AND "action_events"."society_id" IS NOT NULL)
+      OR ("action_events"."event_type" = 'society_membership_banned' AND "action_events"."target_type" = 'society' AND "action_events"."society_id" IS NOT NULL AND "action_events"."report_id" IS NOT NULL)
+      OR ("action_events"."event_type" = 'report_created' AND "action_events"."target_type" = 'report' AND "action_events"."society_id" IS NOT NULL AND "action_events"."report_id" IS NOT NULL AND ("action_events"."thread_id" IS NOT NULL OR "action_events"."comment_id" IS NOT NULL))
+      OR ("action_events"."event_type" = 'moderation_report_decided' AND "action_events"."target_type" = 'report' AND "action_events"."society_id" IS NOT NULL AND "action_events"."report_id" IS NOT NULL AND ("action_events"."thread_id" IS NOT NULL OR "action_events"."comment_id" IS NOT NULL))
+    ));

@@ -1,0 +1,1 @@
+ALTER TABLE "auth_users" ADD COLUMN "password_hash" varchar(512) DEFAULT '' NOT NULL;
