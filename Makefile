@@ -68,10 +68,10 @@ plan:
 	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) plan)
 
 apply:
-	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) apply)
+	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) apply -refresh=false)
 
 cd:
-	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) apply -auto-approve)
+	$(call with_env,$(TOFU) -chdir=$(INFRA_DIR) apply -auto-approve -refresh=false)
 	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/run-database-bootstrap.sh
 	@TARGET_PLATFORM="$(TARGET_PLATFORM)" ./scripts/push-backend-ecr.sh
 	@./scripts/deploy-frontend.sh

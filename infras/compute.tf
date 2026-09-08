@@ -135,6 +135,9 @@ resource "aws_ecs_task_definition" "backend" {
       ], var.enable_analytics_pipeline ? [{
         name      = "ANALYTICS_SCHEDULER_SECRET"
         valueFrom = aws_secretsmanager_secret.analytics_scheduler_secret[0].arn
+        }] : [], var.enable_mapbox ? [{
+        name      = "MAPBOX_SECRET_TOKEN"
+        valueFrom = aws_secretsmanager_secret.mapbox_secret_token[0].arn
     }] : [])
     healthCheck = {
       command     = ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]

@@ -93,6 +93,11 @@ output "openrouter_api_key_secret_arn" {
   value       = try(aws_secretsmanager_secret.openrouter_api_key[0].arn, null)
 }
 
+output "mapbox_secret_token_secret_arn" {
+  description = "Secrets Manager ARN that must contain the Mapbox server token when Mapbox is enabled."
+  value       = try(aws_secretsmanager_secret.mapbox_secret_token[0].arn, null)
+}
+
 output "analytics_scheduler_dlq_url" {
   description = "SQS DLQ for failed EventBridge analytics refresh deliveries."
   value       = try(aws_sqs_queue.analytics_scheduler_dlq[0].url, null)

@@ -73,3 +73,12 @@ resource "aws_secretsmanager_secret" "openrouter_api_key" {
   recovery_window_in_days = var.environment == "prod" ? 7 : 0
   tags                    = local.common_tags
 }
+
+resource "aws_secretsmanager_secret" "mapbox_secret_token" {
+  count = var.enable_mapbox ? 1 : 0
+
+  name                    = "${local.name}/mapbox-secret-token"
+  description             = "Mapbox access token consumed by the ECS backend"
+  recovery_window_in_days = var.environment == "prod" ? 7 : 0
+  tags                    = local.common_tags
+}

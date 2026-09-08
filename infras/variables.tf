@@ -165,6 +165,13 @@ variable "media_abandoned_object_days" {
   default     = 30
 }
 
+# ----- Mapbox place search and location attachments -------------------------
+variable "enable_mapbox" {
+  description = "Provision and inject the Mapbox server token into the ECS backend. Populate the created Secrets Manager secret after apply."
+  type        = bool
+  default     = false
+}
+
 # ----- Lambda + OpenRouter content analysis (Phase 0 gated) -----------------
 variable "enable_content_analysis_lambda" {
   description = "Deploy the content-analysis Lambda. Keep false until Phase 0 confirms LabRole trust, Secrets Manager access, and OpenRouter connectivity in the active lab."

@@ -76,6 +76,61 @@ Edit the ignored `infras/terraform.tfvars`:
 
 Never put an API key, database password, credential, or access token in this file. Secrets are created as AWS Secrets Manager placeholders and populated after OpenTofu apply.
 
+### 5. Configure Mapbox
+
+Mapbox uses separate deployment paths:
+
+- `VITE_MAPBOX_PUBLIC_TOKEN` is a browser-visible, origin-restricted token
+  embedded during the Vite build.
+- `MAPBOX_SECRET_TOKEN` is the server token consumed by the ECS backend. Do
+  not put it in `terraform.tfvars` or the frontend bundle.
+
+Add the public token to the ignored repository-root `.env`:
+
+```sh
+VITE_MAPBOX_PUBLIC_TOKEN="pk..."
+```
+
+Enable the ECS secret in `infras/terraform.tfvars`:
+
+```hcl
+enable_mapbox = true
+```
+
+Apply with `app_desired_count = 0`, then populate the reported secret ARN:
+
+```sh
+make plan
+make apply
+make output
+set -a
+. ./.env
+set +a
+aws secretsmanager put-secret-value \
+  --secret-id "$(tofu -chdir=infras output -raw mapbox_secret_token_secret_arn)" \
+  --secret-string "$MAPBOX_SECRET_TOKEN"
+```
+
+Use a server token with the required Mapbox API scopes. If the only available
+token is a public `pk.*` token, it can be used temporarily as the server value
+by setting `MAPBOX_SECRET_TOKEN` to it, but a separate restricted server token
+is safer.
+
+After the secret exists, set `app_desired_count = 1`, apply, and publish both
+artifacts:
+
+```sh
+make plan
+make apply
+make push-backend
+make deploy-frontend
+```
+
+`make deploy-frontend` sources root `.env`, so the `VITE_MAPBOX_PUBLIC_TOKEN`
+value is included in the generated static bundle. Amplify is receiving the
+already-built ZIP; it does not read `.env` itself. Re-run this target whenever
+the public token changes.
+
 ## Initial deployment
 
 Run these commands from the repository root. The Makefile loads `.env` for targets that need AWS credentials.
