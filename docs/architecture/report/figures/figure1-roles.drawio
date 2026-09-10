@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-09-08T00:00:00.000Z" agent="OpenAI" version="26.0.14" type="device">
+  <diagram id="Figure 1 — Roles" name="Figure 1 — Roles">
+    <mxGraphModel dx="1200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="990" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="Product roles and client operations" style="html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#1F2937;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="28" width="770" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Authority is scoped by active society membership." style="html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#475569;fontSize=10;fontStyle=0;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="55" y="64" width="740" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Browser client operations&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F6FAFE;strokeColor=#93C5FD;fontColor=#1F2937;fontSize=11;fontStyle=0;align=left;verticalAlign=top;spacing=8;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="50" y="120" width="750" height="690" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7F5;strokeColor=#F7B4A4;fontColor=#1F2937;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="90" y="170" width="240" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="STU" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E04B2A;strokeColor=none;fontColor=#FFFFFF;fontSize=10;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="102" y="192.0" width="38" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;Student&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px&quot;&gt;Role&lt;/span&gt;" style="html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="148" y="179" width="172" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Browser operations&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Browse, join/leave, create, edit, delete, vote, report; attach media and a verified location&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="420" y="170" width="300" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="can perform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#475569;fontColor=#1F2937;fontSize=10;labelBackgroundColor=#FFFFFF;" parent="1" edge="1" source="5" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7F5;strokeColor=#F7B4A4;fontColor=#1F2937;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="90" y="360" width="240" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="MOD" style="ellipse;whiteSpace=wrap;html=1;fillColor=#C2410C;strokeColor=none;fontColor=#FFFFFF;fontSize=10;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="102" y="382.0" width="38" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="&lt;b&gt;Moderator / Society Admin&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px&quot;&gt;Role&lt;/span&gt;" style="html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="148" y="369" width="172" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="&lt;b&gt;Browser operations&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Inspect a society report queue; record a decision; request reanalysis when enabled&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="420" y="360" width="300" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="can perform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#475569;fontColor=#1F2937;fontSize=10;labelBackgroundColor=#FFFFFF;" parent="1" edge="1" source="10" target="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7F5;strokeColor=#F7B4A4;fontColor=#1F2937;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="90" y="550" width="240" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="ADM" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9A3412;strokeColor=none;fontColor=#FFFFFF;fontSize=10;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="102" y="572.0" width="38" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="&lt;b&gt;System Admin&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px&quot;&gt;Role&lt;/span&gt;" style="html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="148" y="559" width="172" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="&lt;b&gt;Browser operations&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Manage users and societies; request, inspect, and view analytics refreshes&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="420" y="550" width="300" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="can perform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#475569;fontColor=#1F2937;fontSize=10;labelBackgroundColor=#FFFFFF;" parent="1" edge="1" source="15" target="18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="&lt;b&gt;Authority boundary&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:11px&quot;&gt;A moderator acts only through active membership in the relevant society. &lt;code&gt;system_admin&lt;/code&gt; is the only globally elevated role.&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#94A3B8;fontColor=#1F2937;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="90" y="705" width="630" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="Figure 1. Roles orient the reader; downstream figures trace each operation through the architecture." style="html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#475569;fontSize=9;fontStyle=0;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="55" y="930" width="740" height="24" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

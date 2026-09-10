@@ -10,7 +10,6 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{enumitem}
-\usepackage{pdflscape}
 \usepackage{xcolor}
 \usepackage{caption}
 \usepackage{hyperref}
@@ -92,10 +91,11 @@ System administrators & User and society governance plus interpretable aggregate
 \end{tabularx}
 
 \begin{figure}[p]\centering
-\includegraphics[width=0.96\textwidth,height=0.75\textheight,keepaspectratio]{figures/figure1-roles.pdf}
-\caption{Product roles and client operations. The diagram orients the reader; the operation coverage table and Figures~\ref{fig:core-flow}--\ref{fig:analytics-flow} provide the downstream invocation paths.}
+\includegraphics[width=0.96\textwidth,height=0.82\textheight,keepaspectratio]{figures/figure1-roles.png}
+\caption{Product roles and client operations. The diagram orients the reader; the operation coverage table, Figure~\ref{fig:core-flow}, and the detailed sequences in \hyperref[app:detailed-sequences]{Appendix~\ref*{app:detailed-sequences}} provide the downstream invocation paths.}
 \label{fig:roles}
 \end{figure}
+\clearpage
 
 \section{Related work}
 \subsection{Community discussion platforms}
@@ -140,47 +140,38 @@ Request, monitor, and view analytics refresh & System administrator & Figure~\re
 \bottomrule
 \end{longtable}
 
+\clearpage
 \begin{figure}[p]\centering
-\includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{figures/figure2-overview.pdf}
+\includegraphics[width=0.96\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure2-overview.png}
 \caption{Deployment and component overview. The primary path is the active topology documented in infrastructure source; content analysis and analytics are feature-gated and must be status-labelled in the final report.}
 \label{fig:overview}
 \end{figure}
+\clearpage
 
 \subsection{Core authentication and community request flow}
 Figure~\ref{fig:core-flow} covers synchronous community operations. The SPA invokes an application or API operation; Amplify rewrites \texttt{/api/*} to API Gateway; API Gateway proxies it to ECS; and the backend applies its dependency flow: route, controller, application service, domain policy, repository port, and Drizzle repository. The repository reads or writes RDS PostgreSQL, using a transaction when a use case requires one, before the response returns through API Gateway. This sequence makes the backend a domain-oriented modular monolith, not independently deployed microservices.
 
 \begin{figure}[p]\centering
-\includegraphics[width=\textwidth,height=0.81\textheight,keepaspectratio]{figures/figure3-core-flow.pdf}
+\includegraphics[width=0.96\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure3-core-flow.png}
 \caption{Core authentication and community request flow. The internal ECS dependency flow shows that transport, application policy, and persistence responsibilities are distinct.}\label{fig:core-flow}
 \end{figure}
+\clearpage
 
 \subsection{Media upload and verified location flow}
-The media lane in Figure~\ref{fig:media-location-flow} keeps binary transfer off the application backend. The backend authorizes the request and creates pending metadata in RDS, then returns a presigned S3 upload URL. The browser uploads the binary directly to S3 and confirms completion through the API. The backend changes the media state to ready and attaches it to the thread. RDS retains metadata and the object key, never the media binary or presigned URL.
+The media lane in \hyperref[fig:media-location-flow]{Appendix Figure~\ref*{fig:media-location-flow} (click to view)} keeps binary transfer off the application backend. The backend authorizes the request and creates pending metadata in RDS, then returns a presigned S3 upload URL. The browser uploads the binary directly to S3 and confirms completion through the API. The backend changes the media state to ready and attaches it to the thread. RDS retains metadata and the object key, never the media binary or presigned URL.
 
 The location lane is intentionally server verified. The place interface submits the selected Mapbox identifier, not arbitrary client coordinates. The ECS places adapter retrieves and verifies the selected place before persistence, then stores the verified name, Mapbox identifier, place type, latitude, and longitude with the thread. Mapbox documents its Search service and place-retrieval interfaces \cite{mapbox-search}.
 
-\begin{figure}[p]\centering
-\includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/figure4-media-location.pdf}
-\caption{Two-lane media-upload and verified-location flow. The backend controls authorization and persistence; the browser sends media bytes directly to S3 and location data is verified against Mapbox.}\label{fig:media-location-flow}
-\end{figure}
 
 \subsection{Moderation and optional content analysis}
-A student report is persisted through the standard SPA, API Gateway, ECS, and RDS path. A moderator decision additionally verifies that the principal has an active moderator membership for the same society. This is different from the global \texttt{system\_admin} role. Figure~\ref{fig:moderation-flow} depicts the content-reanalysis route as an \emph{implemented optional pipeline}: it must remain clearly marked as non-live until its SQS, worker, Lambda, OpenRouter, storage-access, persistence, and visible-result path are exercised. OpenRouter documents its API as the inference integration boundary \cite{openrouter-api}.
+A student report is persisted through the standard SPA, API Gateway, ECS, and RDS path. A moderator decision additionally verifies that the principal has an active moderator membership for the same society. This is different from the global \texttt{system\_admin} role. \hyperref[fig:moderation-flow]{Appendix Figure~\ref*{fig:moderation-flow} (click to view)} depicts the content-reanalysis route as an \emph{implemented optional pipeline}: it must remain clearly marked as non-live until its SQS, worker, Lambda, OpenRouter, storage-access, persistence, and visible-result path are exercised. OpenRouter documents its API as the inference integration boundary \cite{openrouter-api}.
 
-\begin{figure}[p]\centering
-\includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/figure5-moderation.pdf}
-\caption{Moderation and optional content-analysis flow. Orange elements are feature-gated; do not claim them as deployed evidence without an end-to-end observation.}\label{fig:moderation-flow}
-\end{figure}
 
 \subsection{Optional analytics refresh and reporting}
-Figure~\ref{fig:analytics-flow} describes the analytics v2 operation when enabled: a system administrator requests an inclusive-start/exclusive-end UTC date-range refresh, or EventBridge invokes the authenticated scheduler endpoint. ECS creates one durable run in RDS and starts a Step Functions execution with range-scoped input. Step Functions owns waiting, retry, timeout, and fan-in rather than ECS polling Glue or Athena. Glue exports action events, memberships, and votes to private S3 and catalogs Parquet external tables. Athena runs activity, current-state, and reconciliation queries in parallel. The workflow Lambda validates the results and persists metric rows to RDS, which the Admin Center reads through ECS.
+\hyperref[fig:analytics-flow]{Appendix Figure~\ref*{fig:analytics-flow} (click to view)} describes the analytics v2 operation when enabled: a system administrator requests an inclusive-start/exclusive-end UTC date-range refresh, or EventBridge invokes the authenticated scheduler endpoint. ECS creates one durable run in RDS and starts a Step Functions execution with range-scoped input. Step Functions owns waiting, retry, timeout, and fan-in rather than ECS polling Glue or Athena. Glue exports action events, memberships, and votes to private S3 and catalogs Parquet external tables. Athena runs activity, current-state, and reconciliation queries in parallel. The workflow Lambda validates the results and persists metric rows to RDS, which the Admin Center reads through ECS.
 
 Actor identities in action events are HMAC pseudonyms rather than direct user identifiers. The entire analytics path is feature-gated in the documented infrastructure. It is not live assessment evidence until the refresh request, durable status, Glue output, Athena query, persisted metric, and visible table/chart have all been demonstrated. AWS documents the orchestration, ETL, query, and scheduling services used by this optional path \cite{aws-stepfunctions,aws-glue,aws-athena,aws-eventbridge}.
 
-\begin{figure}[p]\centering
-\includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure6-analytics.pdf}
-\caption{Optional analytics refresh and reporting flow. Dashed arrows represent scheduling and orchestration transitions. The full path must be enabled and observed before it is stated as deployed.}\label{fig:analytics-flow}
-\end{figure}
 
 \section{System descriptions}
 The component table links every service to a browser operation or automatic service-to-service invocation. Final submission must remove or relabel any row whose component is unavailable in the demonstration environment.
@@ -222,10 +213,13 @@ Content-analysis data & RDS/S3/Lambda workflow when enabled & Never publish cred
 \bottomrule
 \end{tabularx}
 
+\clearpage
 \begin{figure}[p]\centering
-\includegraphics[width=\textwidth,height=0.77\textheight,keepaspectratio]{figures/figure7-erd.pdf}
-\caption{Simplified logical data model. It communicates relationships and invariants rather than every physical column.}\label{fig:erd}
+\includegraphics[width=0.96\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure7-erd.png}
+\caption{Simplified logical data model. It communicates relationships and invariants rather than every physical column.}
+\label{fig:erd}
 \end{figure}
+\clearpage
 
 \subsection{Logical data invariants}
 Identifiers are application-generated UUIDs and timestamps use UTC. Vote values are constrained to $-1$ or $1$. Moderator authority is derived from active society membership. Soft deletion and status transitions preserve moderation evidence. Media records retain an object key but no presigned or delivery URL. A persisted location requires the Mapbox identifier and its verified coordinate fields together.
@@ -267,6 +261,32 @@ Analytics pipeline & Refresh, status, Glue output, Athena queries, persisted met
 
 Before export, replace the cover and link placeholders; verify the live URL in a browser; confirm every claimed AWS service is provisioned and exercised; ensure every client operation appears in the coverage table and a flow figure; label feature-gated components accurately; include no secrets, private URLs, full ARNs, account identifiers, or credential material; and copy the rendered figure PDFs to the submission package's \texttt{doc\_images/} directory.
 
+\clearpage
+\appendix
+\setcounter{figure}{0}
+\renewcommand{\thefigure}{\thesection.\arabic{figure}}
+\section{Detailed operation sequences}\label{app:detailed-sequences}
+The main architecture section links to these full-width operation sequences. They are placed here to keep the main narrative concise while retaining the complete invocation paths.
+
+\begin{figure}[p]\centering
+\includegraphics[width=0.96\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure4-media-location.png}
+\caption{Two-lane media-upload and verified-location flow. The backend controls authorization and persistence; the browser sends media bytes directly to S3 and location data is verified against Mapbox.}
+\label{fig:media-location-flow}
+\end{figure}
+\clearpage
+
+\begin{figure}[p]\centering
+\includegraphics[width=0.96\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure5-moderation.png}
+\caption{Moderation and optional content-analysis flow. Orange elements are feature-gated; do not claim them as deployed evidence without an end-to-end observation.}
+\label{fig:moderation-flow}
+\end{figure}
+\clearpage
+
+\begin{figure}[p]\centering
+\includegraphics[width=0.96\textwidth,height=0.84\textheight,keepaspectratio]{figures/figure6-analytics.png}
+\caption{Optional analytics refresh and reporting flow. Dashed arrows represent scheduling and orchestration transitions. The full path must be enabled and observed before it is stated as deployed.}
+\label{fig:analytics-flow}
+\end{figure}
 \clearpage
 \bibliographystyle{IEEEtran}
 \bibliography{references}

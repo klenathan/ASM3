@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 OUTPUT=${1:-"$ROOT_DIR/submission.zip"}
+REPORT_PDF_NAME=CloudComputing_s3891890_report.pdf
+REPORT_PDF="$ROOT_DIR/$REPORT_PDF_NAME"
+FIGURES_DIR="$ROOT_DIR/docs/architecture/report/figures"
+
 
 if [[ "$#" -gt 1 ]]; then
   echo "Usage: $0 [output-archive.zip]" >&2
@@ -32,7 +36,7 @@ is_excluded_path() {
   local path=$1
 
   case "/$path" in
-    */doc_images|*/doc_images/*|*/deploy|*/deploy/*|*/data|*/data/*)
+    */docs|*/docs/*|*/doc_images|*/doc_images/*|*/deploy|*/deploy/*)
       return 0
       ;;
     */.env|*/.env.*)
@@ -60,8 +64,45 @@ is_excluded_path() {
 TMP_DIR=$(mktemp -d)
 STAGING_DIR="$TMP_DIR/submission"
 CODE_DIR="$STAGING_DIR/code"
+DOC_IMAGES_DIR="$STAGING_DIR/doc_images"
 trap 'rm -rf -- "$TMP_DIR"' EXIT
-mkdir -p -- "$CODE_DIR"
+mkdir -p -- "$CODE_DIR" "$DOC_IMAGES_DIR" "$STAGING_DIR/data"
+
+[[ -d "$ROOT_DIR/data/migrations" ]] || {
+  echo "Missing required migration data directory: data/migrations" >&2
+  exit 1
+}
+
+[[ -f "$REPORT_PDF" ]] || {
+  echo "Report PDF not found: $REPORT_PDF" >&2
+  exit 1
+}
+[[ -d "$FIGURES_DIR" ]] || {
+  echo "Report figures directory not found: $FIGURES_DIR" >&2
+  exit 1
+}
+cp -p -- "$REPORT_PDF" "$STAGING_DIR/$REPORT_PDF_NAME"
+
+# Include only publishable figure images, preserving any figure subdirectories.
+image_count=0
+while IFS= read -r -d '' figure_path; do
+  relative_figure_path=${figure_path#"$FIGURES_DIR/"}
+  destination_path="$DOC_IMAGES_DIR/$relative_figure_path"
+  mkdir -p -- "$(dirname -- "$destination_path")"
+  cp -p -- "$figure_path" "$destination_path"
+  image_count=$((image_count + 1))
+done < <(
+  find "$FIGURES_DIR" -type f \( \
+    -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' \
+    -o -iname '*.svg' -o -iname '*.webp' -o -iname '*.tif' -o -iname '*.tiff' \
+  \) -print0
+)
+
+(( image_count > 0 )) || {
+  echo "No report figure images found: $FIGURES_DIR" >&2
+  exit 1
+}
+
 
 # Include tracked files and non-ignored worktree files so the archive represents
 # the current repository, while still applying an explicit secret-file denylist.
@@ -70,12 +111,18 @@ while IFS= read -r -d '' relative_path; do
     continue
   fi
 
+  [[ "$relative_path" == "$REPORT_PDF_NAME" ]] && continue
+
   if [[ "$OUTPUT" == "$ROOT_DIR/"* && "$relative_path" == "${OUTPUT#"$ROOT_DIR/"}" ]]; then
     continue
   fi
 
   source_path="$ROOT_DIR/$relative_path"
-  destination_path="$CODE_DIR/$relative_path"
+  if [[ "$relative_path" == data/* ]]; then
+    destination_path="$STAGING_DIR/$relative_path"
+  else
+    destination_path="$CODE_DIR/$relative_path"
+  fi
 
   if [[ -L "$source_path" ]]; then
     link_target=$(readlink "$source_path")
@@ -113,17 +160,42 @@ fi
 rm -f -- "$OUTPUT"
 (
   cd -- "$STAGING_DIR"
-  zip -qry "$OUTPUT" code
+  zip -qry "$OUTPUT" code data doc_images "$REPORT_PDF_NAME"
 )
 
 while IFS= read -r archive_path; do
-  archive_path=${archive_path#code/}
-  if is_excluded_path "$archive_path"; then
-    rm -f -- "$OUTPUT"
-    echo "Archive validation failed: excluded path present." >&2
-    exit 1
+  if [[ "$archive_path" == code/* ]]; then
+    if is_excluded_path "${archive_path#code/}"; then
+      rm -f -- "$OUTPUT"
+      echo "Archive validation failed: excluded code path present." >&2
+      exit 1
+    fi
   fi
 done < <(unzip -Z1 "$OUTPUT")
 
-echo "Created secret-safe source archive: $OUTPUT"
-echo "Add this code/ directory to the final assessment ZIP with the required document, doc_images/, deploy/, and data/."
+unzip -Z1 "$OUTPUT" | grep -Fx -- "$REPORT_PDF_NAME" >/dev/null || {
+  rm -f -- "$OUTPUT"
+  echo "Archive validation failed: report PDF missing." >&2
+  exit 1
+}
+
+while IFS= read -r -d '' migration_path; do
+  relative_migration_path=${migration_path#"$ROOT_DIR/data/"}
+  unzip -Z1 "$OUTPUT" | grep -Fx -- "data/$relative_migration_path" >/dev/null || {
+    rm -f -- "$OUTPUT"
+    echo "Archive validation failed: migration missing." >&2
+    exit 1
+  }
+done < <(find "$ROOT_DIR/data/migrations" -type f -name '*.sql' -print0)
+
+while IFS= read -r -d '' figure_path; do
+  relative_figure_path=${figure_path#"$DOC_IMAGES_DIR/"}
+  unzip -Z1 "$OUTPUT" | grep -Fx -- "doc_images/$relative_figure_path" >/dev/null || {
+    rm -f -- "$OUTPUT"
+    echo "Archive validation failed: report figure missing." >&2
+    exit 1
+  }
+done < <(find "$DOC_IMAGES_DIR" -type f -print0)
+
+echo "Created submission archive: $OUTPUT"
+echo "Contains code/ (without docs/), data/ migrations, doc_images/ report figures, and $REPORT_PDF_NAME."
